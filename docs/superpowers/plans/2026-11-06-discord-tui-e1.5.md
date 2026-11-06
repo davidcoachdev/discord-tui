@@ -229,9 +229,28 @@ test("CHROME_UA matches the captured user-agent", () => {});
 
 (Si `TYPING_START`/`PRESENCE_UPDATE` faltan porque no había segunda cuenta, van en una lista `OPTIONAL` que solo avisa.)
 
-- [ ] **Step 2–4:** FAIL → implementar → `bun test && bun run typecheck` PASS.
-- [ ] **Step 5:** escribir `docs/protocol-notes.md` con una sección por fixture: qué es, de dónde salió, campos que usamos, y las respuestas a lo **[sin verificar]** de la spec: valor de `capabilities`; si READY trae `private_channels` (y si no, dónde vienen los DMs); forma exacta del op 37 (rangos, `typing`, `activities`, `threads`); forma del body del ack (`{ token: null, last_viewed }` o lo que se vea); si hay `X-Discord-Timezone`; flujo de subida (directo multipart o `/attachments` + upload URL); forma de `GUILD_MEMBER_LIST_UPDATE` (`ops` SYNC/INSERT/UPDATE/DELETE/INVALIDATE).
-- [ ] **Step 6:** commit `docs(e1.5): protocol notes from captures` + push.
+- [x] **Step 2–4:** FAIL → implementar → `bun test && bun run typecheck` PASS.
+
+Los tests de contrato viven en `tests/fixtures/fixtures-contract.test.ts` (incluyen identify, super properties, UA y `shapeOf`).
+
+```text
+$ bun test tests/fixtures
+ 15 pass
+ 0 fail
+ 26 expect() calls
+Ran 15 tests across 1 file. [135.00ms]
+
+$ bun test && bun run typecheck
+ 86 pass
+ 0 fail
+ 174 expect() calls
+Ran 86 tests across 19 files. [3.89s]
+$ tsc --noEmit   # sin salida, código 0
+```
+- [x] **Step 5:** escribir `docs/protocol-notes.md` con una sección por fixture: qué es, de dónde salió, campos que usamos, y las respuestas a lo **[sin verificar]** de la spec: valor de `capabilities`; si READY trae `private_channels` (y si no, dónde vienen los DMs); forma exacta del op 37 (rangos, `typing`, `activities`, `threads`); forma del body del ack (`{ token: null, last_viewed }` o lo que se vea); si hay `X-Discord-Timezone`; flujo de subida (directo multipart o `/attachments` + upload URL); forma de `GUILD_MEMBER_LIST_UPDATE` (`ops` SYNC/INSERT/UPDATE/DELETE/INVALIDATE).
+
+Hecho en `docs/protocol-notes.md`, secciones "Fixtures de E1.5 (sintéticas)" y "Respuestas a los [sin verificar]".
+- [x] **Step 6:** commit `docs(e1.5): protocol notes from captures` + push.
 
 ---
 
