@@ -129,16 +129,16 @@ El CLI acepta además `--url <ws>` (solo para tests; por defecto el gateway real
 
 ```text
 $ bun test tests/gateway tests/scripts/capture-gateway.test.ts
- 3 pass
+ 4 pass
  0 fail
- 11 expect() calls
-Ran 3 tests across 2 files. [293.00ms]
+ 14 expect() calls
+Ran 4 tests across 2 files. [462.00ms]
 
 $ bun test && bun run typecheck
- 64 pass
+ 65 pass
  0 fail
- 138 expect() calls
-Ran 64 tests across 18 files. [3.24s]
+ 139 expect() calls
+Ran 65 tests across 18 files. [3.50s]
 $ tsc --noEmit   # sin salida, código 0
 ```
 
