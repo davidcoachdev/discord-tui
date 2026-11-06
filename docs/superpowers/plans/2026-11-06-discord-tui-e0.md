@@ -208,7 +208,7 @@ $ tsc --noEmit   # sin salida, código 0
   - `assertTty(stream: { isTTY?: boolean }): string | null` en `src/main.tsx` (devuelve `discord-tui necesita una terminal` si no es TTY).
   - `src/main.tsx`: si `assertTty(process.stdout)` da mensaje, lo escribe en stderr y sale con 1; si no, crea el renderer con `useKittyKeyboard: { events: true }` (lo necesita el PTT de E4b) y monta `App`; `onQuit` destruye el renderer y hace `process.exit(0)`.
 
-- [ ] **Step 1: Test que falla**
+- [x] **Step 1: Test que falla**
 
 ```tsx
 test("renders the three empty columns and the status bar", async () => {
@@ -233,10 +233,30 @@ test("tiny terminal still renders", async () => {
 });
 ```
 
-- [ ] **Step 2: Correr** — Run: `bun test tests/ui` · Expected: FAIL.
-- [ ] **Step 3: Implementar** `App`, `createAppKeymap` y `main.tsx` con las firmas de arriba. El keymap se crea dentro de `App` con el renderer del contexto de `@opentui/solid`.
-- [ ] **Step 4: Verificar** — Run: `bun test && bun run typecheck` · Expected: todo en verde.
-- [ ] **Step 5: Commit y push** — `git commit -m "feat(e0): empty three-column layout, q quits"` + push.
+- [x] **Step 2: Correr** — Run: `bun test tests/ui` · Expected: FAIL.
+
+```text
+$ bun test tests/ui
+error: Cannot find module '../../src/main' from '.../tests/ui/app.test.tsx'
+
+ 0 pass
+ 1 fail
+ 1 error
+```
+
+- [x] **Step 3: Implementar** `App`, `createAppKeymap` y `main.tsx` con las firmas de arriba. El keymap se crea dentro de `App` con el renderer del contexto de `@opentui/solid`.
+- [x] **Step 4: Verificar** — Run: `bun test && bun run typecheck` · Expected: todo en verde.
+
+```text
+$ bun test && bun run typecheck
+ 13 pass
+ 0 fail
+ 26 expect() calls
+Ran 13 tests across 5 files. [291.00ms]
+$ tsc --noEmit   # sin salida, código 0
+```
+
+- [x] **Step 5: Commit y push** — `git commit -m "feat(e0): empty three-column layout, q quits"` + push.
 
 - [ ] **Step 6: 🧍 Paso de Gon — mirar el esqueleto en Ghostty**
 
