@@ -42,9 +42,20 @@
 
 Este request **no lleva token**: `GET https://discord.com/app` y los `.js` que referencia son públicos, así que el agente sí lo puede correr.
 
-- [ ] **Step 1: Spike (criterio pass/fail).** Escribir `scripts/spike-build-number.ts` que baja `https://discord.com/app`, lista los `<script src="/assets/...js">` y busca en cada uno `/buildNumber["']?\s*[:=]\s*["']?(\d{5,7})/` (también `build_number`). Run: `bun scripts/spike-build-number.ts`. **Pass:** imprime un número de 5 a 7 dígitos en menos de 10 s. **Fail:** no lo encuentra en ningún asset. En los dos casos se anota en `docs/protocol-notes.md`, sección "client_build_number", el método que anduvo, la fecha y el número.
-- [ ] **Step 2: Fallback si falla (el que nombra la spec):** se usa el último cacheado en `session.json`, y si no hay, `FALLBACK_BUILD_NUMBER` con el número que Gon copia de su navegador en E1.5. Hasta E1.5 `FALLBACK_BUILD_NUMBER` es el número que haya dado el spike, o el que Gon lea en DevTools si el spike falló (**🧍 Paso de Gon**: en Chrome, `discord.com/app` → DevTools → Network → cualquier request a `/api/v9` → copiar el valor del header `X-Super-Properties` → en la consola de DevTools correr `JSON.parse(atob("<valor>")).client_build_number` y pasarle solo ese número al agente).
-- [ ] **Step 3: Tests**
+- [x] **Step 1: Spike (criterio pass/fail).** Escribir `scripts/spike-build-number.ts` que baja `https://discord.com/app`, lista los `<script src="/assets/...js">` y busca en cada uno `/buildNumber["']?\s*[:=]\s*["']?(\d{5,7})/` (también `build_number`). Run: `bun scripts/spike-build-number.ts`. **Pass:** imprime un número de 5 a 7 dígitos en menos de 10 s. **Fail:** no lo encuentra en ningún asset. En los dos casos se anota en `docs/protocol-notes.md`, sección "client_build_number", el método que anduvo, la fecha y el número.
+
+```text
+$ time bun scripts/spike-build-number.ts
+663810
+
+real    0m0.273s
+```
+
+Resultado: **pass**. El número está en el HTML de `/app`, en `window.GLOBAL_ENV` (`"BUILD_NUMBER":"663810"`); el spike lo lee de ahí y deja el escaneo de assets como respaldo. Documentado en `docs/protocol-notes.md` (método, fecha 2026-11-06 y número).
+- [x] **Step 2: Fallback si falla (el que nombra la spec):** se usa el último cacheado en `session.json`, y si no hay, `FALLBACK_BUILD_NUMBER` con el número que Gon copia de su navegador en E1.5. Hasta E1.5 `FALLBACK_BUILD_NUMBER` es el número que haya dado el spike, o el que Gon lea en DevTools si el spike falló (**🧍 Paso de Gon**: en Chrome, `discord.com/app` → DevTools → Network → cualquier request a `/api/v9` → copiar el valor del header `X-Super-Properties` → en la consola de DevTools correr `JSON.parse(atob("<valor>")).client_build_number` y pasarle solo ese número al agente).
+
+El spike pasó, así que `FALLBACK_BUILD_NUMBER = 663810` y no hizo falta el paso de Gon.
+- [x] **Step 3: Tests**
 
 ```ts
 test("extractBuildNumber finds the number in a minified asset", () => {
@@ -58,8 +69,24 @@ test("fetchBuildNumber falls back to cache, then to the constant", async () => {
 });
 ```
 
-- [ ] **Step 4:** implementar con timeout de 10 s (`AbortSignal.timeout(10_000)`). Run: `bun test tests/client-props` · Expected: PASS.
-- [ ] **Step 5:** commit `feat(e1): client build number discovery` + push.
+- [x] **Step 4:** implementar con timeout de 10 s (`AbortSignal.timeout(10_000)`). Run: `bun test tests/client-props` · Expected: PASS.
+
+```text
+$ bun test tests/client-props
+ 4 pass
+ 0 fail
+ 6 expect() calls
+Ran 4 tests across 1 file. [119.00ms]
+
+$ bun test && bun run typecheck
+ 17 pass
+ 0 fail
+ 32 expect() calls
+Ran 17 tests across 6 files. [282.00ms]
+$ tsc --noEmit   # sin salida, código 0
+```
+
+- [x] **Step 5:** commit `feat(e1): client build number discovery` + push.
 
 ---
 
