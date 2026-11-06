@@ -41,7 +41,7 @@
 **Interfaces:**
 - Produces: `findTokenLike(text: string): string[]` y `TOKEN_PATTERNS: RegExp[]` en `src/security/token-pattern.ts`; `scanFiles(paths: string[]): Promise<string[]>` (devuelve `path:línea` de cada coincidencia) en `src/security/scan.ts`; `fakeToken(seed?: string): string` en `tests/helpers/fake-token.ts` (lo usan todos los tests que necesitan un token falso).
 
-- [ ] **Step 1: Crear el esqueleto**
+- [x] **Step 1: Crear el esqueleto**
 
 `package.json` con `"type": "module"`, `"private": true`, `engines.bun ">=1.3.14"`, scripts: `"dev": "bun run src/main.tsx"`, `"test": "bun test"`, `"typecheck": "tsc --noEmit"`. Instalar con `bun add --exact` las versiones de Global Constraints. `.gitignore`: `node_modules/`, `*.log`, `.env*`, `captures-raw/`. `tsconfig.json`: `strict: true`, `noUncheckedIndexedAccess: true`, `module: "Preserve"`, `moduleResolution: "bundler"`, `types: ["bun"]`, jsx como en Global Constraints.
 
@@ -54,7 +54,7 @@
 6. "En tests, los tokens falsos se arman con `fakeToken()`; nunca escribas un literal con forma de token."
 7. Cómo correr: `bun install`, `bun test`, `bun run typecheck`, `bun run dev`.
 
-- [ ] **Step 2: Escribir los tests que fallan**
+- [x] **Step 2: Escribir los tests que fallan**
 
 ```ts
 // tests/security/token-pattern.test.ts
@@ -85,21 +85,40 @@ test("scanner skips files over 5 MiB and files with NUL bytes", async () => {
 
 `fakeToken(seed = "a")` devuelve `["MTAw".repeat(6), "G" + seed.repeat(5), "z".repeat(30)].join(".")` (24.6.30 caracteres).
 
-- [ ] **Step 3: Correr y ver que fallan**
+- [x] **Step 3: Correr y ver que fallan**
 
 Run: `bun test tests/security`
 Expected: FAIL, `Cannot find module '../../src/security/token-pattern'`.
 
-- [ ] **Step 4: Implementar `src/security/token-pattern.ts`**
+```text
+$ bun test tests/security
+error: Cannot find module '../../src/security/token-pattern' from '.../tests/security/token-pattern.test.ts'
+error: Cannot find module '../../src/security/scan' from '.../tests/security/no-token-leak.test.ts'
+
+ 0 pass
+ 2 fail
+ 2 errors
+```
+
+- [x] **Step 4: Implementar `src/security/token-pattern.ts`**
 
 `TOKEN_PATTERNS = [/[A-Za-z0-9_-]{24,28}\.[A-Za-z0-9_-]{6}\.[A-Za-z0-9_-]{27,38}/g, /mfa\.[A-Za-z0-9_-]{20,}/g]`. `findTokenLike` devuelve los matches únicos en orden de aparición.
 
-- [ ] **Step 5: Verificar**
+- [x] **Step 5: Verificar**
 
 Run: `bun test && bun run typecheck`
 Expected: `5 pass, 0 fail` y typecheck sin errores.
 
-- [ ] **Step 6: Commit y push**
+```text
+$ bun test && bun run typecheck
+ 5 pass
+ 0 fail
+ 5 expect() calls
+Ran 5 tests across 2 files. [129.00ms]
+$ tsc --noEmit   # sin salida, código 0
+```
+
+- [x] **Step 6: Commit y push**
 
 ```bash
 git add -A && git commit -m "chore(e0): scaffold, AGENTS.md and token leak test" && git push origin main
