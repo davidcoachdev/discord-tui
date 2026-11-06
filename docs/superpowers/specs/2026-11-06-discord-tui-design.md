@@ -42,16 +42,19 @@ Reemplazar la app de Discord en el uso diario con un cliente de terminal hecho c
   - imágenes inline;
   - notificación de escritorio cuando te mencionan;
   - estado de no leídos.
-- Voz en canales de servidor y en llamadas de DM (las llamadas de DM son **[nuestra]**, ver 7.6):
+  - **[nuestra]** extras para el uso diario: subir archivos, ya sea pegando una captura del portapapeles con `wl-paste` (instalado, probado local) o eligiendo un path; emojis custom (como imagen si se puede, si no `:nombre:`); markdown; embeds básicos (título, descripción, imagen).
+- Voz en canales de servidor:
   - entrar y salir con una tecla;
-  - ver quién habla;
-  - mute, deafen y push-to-talk;
+  - ver quién habla, uno mismo incluido;
+  - **modo de entrada como el cliente oficial [Gon]**: Actividad de voz (VAD, por defecto) o Push-to-Talk, más mute y deafen. Detalle en 7.6;
   - **DAVE E2EE**.
 - Funciona contra la cuenta real en cada etapa.
 
 **No-objetivos (fuera de la v1) [Gon]:** video, screen share, stage channels. **[nuestra]** También quedan afuera:
 
-- hilos y foros completos (en la v1 se muestran como canal, en solo lectura si complica);
+- búsqueda, mensajes fijados, mandar stickers;
+- hilos y foros;
+- llamadas de DM: van a E5 o después;
 - crear servidores o canales;
 - mandar solicitudes de amistad;
 - abrir DMs nuevos con desconocidos;
@@ -73,7 +76,8 @@ Concord y endcord los evitan a propósito porque disparan filtros antispam (http
 ## 3. Restricciones
 
 - **SO:** Linux (Omarchy/Arch, Hyprland). Probado local con kernel 7.2.8, 2026-11-06.
-- **Terminal:** Ghostty (principal) o Kitty. Las dos soportan el protocolo gráfico de Kitty (https://ghostty.org/docs/features, 2026-11-06). Que Ghostty 1.4 tenga cobertura completa del protocolo lo dice una sola fuente secundaria (https://alternativeto.net/news/2026/10/ghostty-1-4-brings-full-kitty-graphics-support-and-performance-and-memory-improvements/, 2026-11-06), así que queda **[sin verificar]**.
+- **Terminal [Gon]:** corre directo en **Ghostty, sin tmux**. Se diseña para eso: imágenes con el protocolo gráfico de Kitty y teclas con el Kitty keyboard protocol. Kitty también sirve.
+- **Imágenes:** Ghostty y Kitty soportan el protocolo gráfico de Kitty (https://ghostty.org/docs/features, 2026-11-06). Que Ghostty 1.4 tenga cobertura completa del protocolo lo dice una sola fuente secundaria (https://alternativeto.net/news/2026/10/ghostty-1-4-brings-full-kitty-graphics-support-and-performance-and-memory-improvements/, 2026-11-06), así que queda **[sin verificar]**.
 - **Audio:** PipeWire. Los binarios `pw-cat`, `pw-record`, `ffmpeg` (n9.0.2, con libopus) y `notify-send` están instalados (probado local).
 - **Runtime:** Bun. Local hay 1.4.3. `@opentui/core` 0.8.2 pide `bun >=1.3.14` (`npm view @opentui/core engines`, 2026-11-06).
 - **Lenguaje:** TypeScript.
@@ -91,6 +95,10 @@ Concord y endcord los evitan a propósito porque disparan filtros antispam (http
    - Se maneja con el teclado estilo vim (j/k, atajos para saltar a un canal). El mouse es un extra.
    - TypeScript y Bun.
    - Se construye por etapas, y cada una se prueba contra la cuenta real: login, leer, escribir, transporte de voz, DAVE y pulido.
+
+6. **Respuestas posteriores de Gon** ("en ghostty donde permita ver imagenes y que se pueda habilitar o deshabilitar tal cual el discord el mic"):
+   - Lo corre directo en Ghostty, sin tmux, con imágenes inline.
+   - El mic funciona como en Discord. Se elige el modo de entrada (Actividad de voz por defecto, o Push-to-Talk) y hay toggles de mute y deafen.
 
 **Corrección sobre lo que se le dijo a Gon.** Le dijimos que la voz se podía probar primero "sin cifrado contra un servidor local de prueba". Eso **no sirve tal cual**. Desde el 1 de marzo de 2026 Discord solo acepta llamadas E2EE en DMs, DMs grupales, canales de voz y Go Live. Un cliente sin DAVE no puede entrar: el servidor cierra con el código 4017 "E2EE required". Fuentes:
 
@@ -161,7 +169,7 @@ Regla: `ui` nunca habla con la red. Solo lee el `store` y llama a `actions`.
   - Además existen `@opentui/three` y `@opentui/ssh` (https://github.com/sst/opentui, 2026-11-06).
 - Runtime: core pide `bun >=1.3.14` o `node >=26.4.0` con `--experimental-ffi` (`npm view @opentui/core engines`, 2026-11-06). Para desarrollar OpenTUI en sí hacen falta Zig y Bun más nuevos, pero eso no afecta a quien lo consume (https://github.com/sst/opentui, 2026-11-06).
 - Madurez: sigue en 0.x. Ya tiene más de 300 versiones publicadas (https://socket.dev/npm/package/@opentui/core/overview/0.6.7, 2026-11-06). Lo usa en producción OpenCode (https://github.com/sst/opentui, 2026-11-06). Hay que esperar cambios de API entre versiones menores, así que conviene **fijar la versión exacta** **[nuestra]**.
-- **Imágenes:** existe `ImageRenderable`. Lee PNG, JPEG, WebP y GIF desde un path, una URL http(s), un `Uint8Array` y otras fuentes. Tiene los protocolos `auto | kitty | sixel | blocks` y los modos de ajuste `fit | cover | fill`. Hay un tope de unos 8 MiB de salida de imagen por frame. Si corrés dentro de tmux, `auto` cae a blocks. Se configura con las variables de entorno `OPENTUI_IMAGE_PROTOCOL` y `OPENTUI_GRAPHICS=false` (https://opentui.com/docs/components/image, 2026-11-06). En la 0.8.2 están exportados `ImageRenderable`, `NativeImage` y `resolveImageRenderProtocol` (probado local). La animación de GIF queda **[sin verificar]**.
+- **Imágenes:** existe `ImageRenderable`. Lee PNG, JPEG, WebP y GIF desde un path, una URL http(s), un `Uint8Array` y otras fuentes. Tiene los protocolos `auto | kitty | sixel | blocks` y los modos de ajuste `fit | cover | fill`. Hay un tope de unos 8 MiB de salida de imagen por frame. Si corrés dentro de tmux, `auto` cae a blocks; Gon no usa tmux **[Gon]**, así que `auto` elige Kitty en Ghostty. Se configura con las variables de entorno `OPENTUI_IMAGE_PROTOCOL` y `OPENTUI_GRAPHICS=false` (https://opentui.com/docs/components/image, 2026-11-06). En la 0.8.2 están exportados `ImageRenderable`, `NativeImage` y `resolveImageRenderProtocol` (probado local). La animación de GIF queda **[sin verificar]**.
 - **QR:** se usa `@opentui/qrcode` para el login, así no hace falta otra librería.
 
 ### 6.2 Gateway para cuentas de usuario
@@ -383,23 +391,39 @@ Layout:
 | `v` | entrar o salir de voz en el canal de voz seleccionado |
 | `m` | mute |
 | `D` | deafen |
-| `Espacio` sostenido | PTT |
+| `Espacio` sostenido | PTT (solo en modo Push-to-Talk) |
+| `M` | cambiar el modo de entrada (VAD o PTT) |
+| `Ctrl-v` (en el composer) | pegar una imagen del portapapeles como adjunto |
+| `a` | adjuntar un archivo por path |
 | `?` | ayuda |
 | `q` | salir |
 
 El mouse es un extra: click para seleccionar y scroll.
 
-### 7.6 PTT en terminal
+### 7.6 Mic: modo de entrada como Discord
 
-Una terminal no avisa cuando soltás una tecla, salvo con el **Kitty keyboard protocol** activado con los "report event types". Ghostty y Kitty lo soportan (https://ghostty.org/docs/features, 2026-11-06), pero que OpenTUI exponga los eventos de soltar tecla queda **[sin verificar]**.
+**[Gon]** Funciona como el cliente oficial. Un setting `input_mode` elige entre `voice_activity`, que es el default, y `push_to_talk`. Mute y deafen son toggles aparte y se mandan como `self_mute` y `self_deaf` en el op 4, igual que el oficial.
 
-**[nuestra]** El plan:
+**Voice Activity (VAD) [nuestra]:**
 
-1. Primero, PTT por eventos press y release si OpenTUI los entrega.
-2. Si no los entrega, PTT con un toggle: una tecla prende la transmisión y la misma la apaga, con un indicador grande en pantalla.
-3. PTT global, fuera de foco, vía un bind de Hyprland que llama a un socket local. Queda como mejora para después.
+- Se mide la energía RMS de cada frame de 20 ms en dBFS.
+- La sensibilidad es `auto` por defecto: el umbral se adapta al piso de ruido medido, más un margen. También se puede poner a mano en dBFS.
+- Para evitar que corte entre palabras, se abre después de 2 frames sobre el umbral y se cierra después de 300 ms por debajo.
+- Al abrir se manda Speaking (op 5) con `VOICE` y se transmite Opus. Al cerrar se mandan los 5 frames de silencio `F8 FF FE`, después Speaking con 0, y se deja de mandar paquetes (6.6).
+- Un detector con modelo (RNNoise o Silero) queda para después de la v1.
 
-Llamadas de DM: usan op 4 con `guild_id: null` y además los eventos de call (op 13 Call Connect). **[nuestra]** Entran en la v1 si salen fácil después de los canales de guild. Si no, pasan a v1.1.
+**Push-to-Talk:**
+
+- Gon corre la app en Ghostty sin tmux, así que se usa el Kitty keyboard protocol con reporte de tipo de evento.
+- OpenTUI 0.8.2 lo soporta. `KittyKeyboardOptions.events` ("Report event types (press/repeat/release)", por defecto false) se activa en `useKittyKeyboard`, y `KeyHandler` emite `keyrelease` (probado local, `renderer.d.ts`, `lib/KeyHandler.d.ts`, `lib/parse.keypress.d.ts`).
+- Mantener apretada la tecla transmite y soltarla corta, con los mismos frames de silencio. Los `repeat` se ignoran.
+- **[nuestra]** Si no llega ningún `release`, por ejemplo con una terminal sin el protocolo, se cae a modo toggle: una tecla prende la transmisión y la misma la apaga, con un aviso en la barra.
+- PTT global fuera de foco, con un bind de Hyprland que habla con un socket local, queda para después de la v1.
+
+**Indicadores y prueba del mic [nuestra]:**
+
+- El indicador de que uno mismo habla está en la barra de voz, igual que el de los demás.
+- En settings hay un medidor de nivel del mic en vivo con la línea del umbral, más un "probar mic" que hace eco local: es el mismo pipeline de E4a, así que sale barato.
 
 ### 7.7 Store y caché
 
@@ -434,80 +458,115 @@ Hecho: la docs dice que `X-Super-Properties` cuenta para los sistemas antiabuso 
 - Los subprocesos (`pw-*`, `notify-send`) se lanzan con `env` limpio.
 - No hay modo "debug" que vuelque payloads con el token. Si se graba una captura del gateway para tests, se redacta `d.token` y `auth_token`.
 
+### 8.1 Quién toca la cuenta real **[nuestra]**
+
+- **El agente de DeepSeek nunca lee el token ni `session.json`, y nunca ve payloads autenticados crudos.**
+- Gon hace a mano, siguiendo un checklist que da el plan:
+  - las capturas del cliente web oficial: `capabilities` del identify, client properties, headers de REST, op 37 y payloads de ack;
+  - todas las pruebas con la cuenta real: escanear el QR, mandar mensajes, entrar a voz.
+- El agente trabaja sobre **fixtures sanitizadas** que Gon guarda en `fixtures/` del repo, con el token, los ids y los nombres redactados. Un script `scripts/redact.ts`, que escribe el agente, ayuda a Gon a redactar.
+- Hay un test que falla si en `fixtures/` aparece algo con forma de token.
+- **Las capturas se juntan en una sola tanda antes de E2** (paso E1.5), así las etapas no se traban esperándolas.
+- Después de cada prueba real, Gon le pasa al agente solo el resultado: qué vio, y los logs ya redactados, porque el logger redacta solo.
+
+### 8.2 Segundo participante **[nuestra]**
+
+- Lo que necesita a otra persona se junta en una lista corta de **checkpoints por etapa que piden "una segunda cuenta de prueba o un amigo"** (9).
+  - Ejemplos: voz en las dos direcciones, una mención que dispara `notify-send`, ver el typing y la presencia de otro.
+  - Todo lo demás lo verifica Gon solo.
+- **Una conexión de voz por cuenta:** el teléfono de Gon con la misma cuenta **no** sirve como segundo participante. Entrar a voz desde el teléfono desconecta al TUI, o al revés. Las fuentes son indirectas y no oficiales (https://support.discord.com/hc/vi/community/posts/360040333532, https://streamersplaybook.com/?p=2450, 2026-11-06), así que queda **[sin verificar]**.
+- Las menciones o los mensajes de uno mismo tampoco disparan notificaciones.
+
 ## 9. Etapas
 
-Cada etapa termina en algo que Gon puede usar o mirar, y se verifica **contra la cuenta real**.
+Cada etapa termina en algo que Gon puede usar o mirar, y se verifica **contra la cuenta real**. Esas pruebas las hace Gon a mano (8.1). Los puntos marcados con **[2ª]** piden "una segunda cuenta de prueba o un amigo" (8.2). Se pueden juntar y hacer todos en una misma sesión al final de cada etapa.
 
 **E0. Esqueleto.**
 
 - Arranca Bun con OpenTUI 0.8.2 fijada, muestra un layout vacío de tres columnas y hay tests corriendo.
-- *Hecho:* `bun run dev` dibuja el layout, `bun test` pasa, `q` sale.
-- *Verificar:* manual y con CI local.
+- *Hecho:* `bun run dev` dibuja el layout en Ghostty, `bun test` pasa, `q` sale.
 
 **E1. Login.**
 
 - QR, token pegado y `session.json` 0600.
-- *Hecho:* escaneás el QR con el teléfono y aparece "logueado como <username>". Si reiniciás, entra sin pedir login. `logout` borra la sesión. Si hay captcha, cae a pegar el token con un mensaje claro.
-- *Verificar:* contra la cuenta real; `stat -c %a session.json` da 600; `grep` del token en los logs da vacío.
+- *Hecho (Gon):* escanea el QR con el teléfono y aparece "logueado como <username>". Si reinicia, entra sin pedir login. `logout` borra la sesión. Si hay captcha, cae a pegar el token con un mensaje claro.
+- *Verificar:* `stat -c %a ~/.config/discord-tui/session.json` da 600, y `grep` del token en los logs da vacío.
+- *Agente:* lo prueba con un WS falso de remote-auth hecho según 6.5. Nunca ve el token real.
+
+**E1.5. Tanda de capturas (Gon, una sola vez).**
+
+- Con el checklist del plan, Gon captura desde el cliente web oficial y guarda todo redactado en `fixtures/`:
+  - el identify;
+  - un READY recortado;
+  - un request REST con sus headers;
+  - el op 37;
+  - un ack;
+  - un `MESSAGE_CREATE` con adjunto, emoji custom y embed;
+  - el `VOICE_STATE_UPDATE` y el `VOICE_SERVER_UPDATE` al entrar a un canal de voz.
 
 **E2. Leer.**
 
-- Gateway (identify, READY, resume y reconnect), guilds, canales, DMs, historial, mensajes en vivo, no leídos, imágenes inline, lista de miembros con op 37 y presencia.
-- *Hecho:* navegás con j/k y Ctrl-k. Un mensaje que mandás desde el teléfono aparece en menos de 1 s. Si cortás el wifi 30 s, se reconecta y no falta ningún mensaje. Una imagen se ve inline en Ghostty y, si se usa `OPENTUI_IMAGE_PROTOCOL=blocks`, sale en bloques o como link.
-- *Verificar:* contra la cuenta real, en un servidor propio de prueba con los mensajes contados.
+- Gateway (identify, READY, resume y reconnect), guilds, canales, DMs, historial, mensajes en vivo y no leídos.
+- Imágenes inline con Kitty graphics, emojis custom, markdown, embeds básicos, lista de miembros con op 37 y presencia.
+- *Hecho (Gon solo):*
+  - navega con j/k y Ctrl-k;
+  - un mensaje que manda desde el teléfono, con la misma cuenta, aparece en menos de 1 s;
+  - si corta el wifi 30 s, se reconecta y no falta ningún mensaje;
+  - una imagen y un emoji custom se ven inline en Ghostty.
+- *[2ª]* El typing y la presencia de otro se ven.
 
 **E3. Escribir.**
 
-- Mandar, reply, @mención con autocompletado, editar y borrar los propios, reacciones, typing, outbox, ack y notificaciones.
-- *Hecho:* todo lo anterior se ve bien en el teléfono. Un envío con la red cortada queda como "failed" y se reintenta con una tecla. Una mención desde otra cuenta o desde el teléfono dispara `notify-send`.
-- *Verificar:* contra la cuenta real en el servidor de prueba. Un test de la outbox con un servidor falso que devuelve 429 y 500.
+- Mandar, reply, @mención con autocompletado, editar y borrar los propios, reacciones, typing, outbox y ack.
+- Subir archivos: pegar del portapapeles con `wl-paste --list-types` y `wl-paste --type image/png`, o elegir un path.
+- Notificaciones.
+- *Hecho (Gon solo):*
+  - todo lo anterior se ve bien en el teléfono;
+  - pegar una captura la sube;
+  - un envío con la red cortada queda como "failed" y se reintenta con una tecla.
+- *[2ª]* Una mención de otra cuenta dispara `notify-send`.
+- *Agente:* un test de la outbox contra un servidor falso que devuelve 429 y 500.
 
-**E4. Voz (transporte y DAVE juntos contra Discord; por separado en local).**
+**E4. Voz (transporte, DAVE y mic; juntos contra Discord, por separado en local).**
 
-- E4a, local y sin red:
-  - pw-record → Opus → pw-cat hace eco en los auriculares con menos de 150 ms de latencia;
-  - loopback UDP con RTP y `aead_aes256_gcm_rtpsize` entre dos sockets;
-  - dos `DAVESession` de davey hacen el handshake y un frame cifrado con una se descifra con la otra.
-- E4b, contra la cuenta real:
-  - entrar a un canal de voz del servidor de prueba con `@discordjs/voice` y el adapter, con DAVE activo;
-  - el teléfono de Gon, conectado como segundo participante, escucha y es escuchado;
+- **E4a, local y sin red (agente, y Gon escucha):**
+  - pw-record → Opus → pw-cat hace eco con menos de 150 ms de latencia;
+  - el medidor de nivel y el VAD abren y cierran con la voz;
+  - loopback UDP con RTP y `aead_aes256_gcm_rtpsize`;
+  - dos `DAVESession` hacen el handshake y se descifran entre sí.
+- **E4b, solo (Gon):**
+  - entra a un canal de voz del servidor de prueba con DAVE activo, sin cierre 4017;
+  - su propio indicador de que habla prende con VAD y con PTT (soltar la tecla corta);
+  - mute y deafen se reflejan en la lista del canal en el teléfono, que mira sin entrar a voz;
+  - al salir libera el canal.
+- **E4c [2ª]:**
+  - con otra persona en el canal, se escucha en las dos direcciones durante 10 minutos sin cortes;
   - se ve quién habla;
-  - mute, deafen y PTT andan;
-  - el canal muestra el escudo E2EE en el teléfono **[sin verificar]** (hay que ver si la app lo muestra);
-  - salir de verdad libera el canal.
-- *Hecho:* una llamada de 10 minutos sin cortes, y el código de privacidad (`voicePrivacyCode`) coincide con el que muestra el teléfono **[sin verificar]** (hay que ver si el teléfono lo muestra).
-- *Plan B:* si E4b falla (un 4017 persistente, o el adapter no anda en Bun), se pasa a `voice/` propio sobre davey 0.2.0 y se repite E4b.
-- *Verificar:* local con tests, y contra la cuenta real con la llamada.
+  - el código de privacidad (`voicePrivacyCode`) coincide con el que muestra el cliente de la otra persona **[sin verificar]** (hay que ver si lo muestra).
+- *Plan B:* si E4b falla (un 4017 persistente, o el adapter no anda en Bun), se pasa a `voice/` propio sobre davey 0.2.0 y se repite.
 
 **E5. Pulido.**
 
-- Keymap completo y ayuda `?`, temas, settings de audio (dispositivo con `--target`, volumen por usuario), llamadas de DM si no entraron antes, y manejo de errores visibles.
+- Keymap completo y ayuda `?`, temas, settings de audio (dispositivo con `--target`, volumen por usuario, modo de entrada, sensibilidad) y errores visibles.
+- Llamadas de DM si da el tiempo; si no, van después de la v1.
 - *Hecho:* Gon usa discord-tui un día entero de laburo sin abrir la app oficial.
 
 ## 10. Riesgos y preguntas abiertas
 
 1. **Ban:** aceptado (sección 0). Se mitiga con la sección 7.8.
 2. **Captcha en el login QR:** probable según concord. La salida es pegar el token.
-3. **El build number y la forma del identify cambian:** depende de lo que se descubra en el arranque y de discord.food. Si Discord cambia algo, el login o el READY pueden romperse sin aviso, así que los errores de identify se muestran en pantalla.
+3. **El build number y la forma del identify cambian:** si Discord cambia algo, el login o el READY pueden romperse sin aviso, así que los errores de identify se muestran en pantalla.
 4. **@discordjs/voice con usuario y en Bun:** **[sin verificar]** en real (E4b). El plan B está definido.
-5. **Cambios de DAVE:** Discord puede subir la versión del protocolo. La versión de davey se fija y se actualiza a propósito. La docs exige soportar las versiones de DAVE que no se discontinuaron.
-6. **Eventos de soltar tecla en OpenTUI para PTT:** **[sin verificar]**. La salida es el toggle.
-7. **Op 37 y lista de miembros:** el formato exacto está **[sin verificar]**, y en servidores enormes la lista es parcial por diseño.
-8. **OpenTUI 0.x:** puede romper la API, así que la versión va fijada.
-9. **Mezclar la identidad de web con voz UDP:** **[sin verificar]** si importa.
-10. **Pregunta para Gon (no bloquea):** ¿quiere llamadas de DM en la v1 sí o sí, o alcanza con los canales de voz de servidor? Este doc asume que van si salen fácil.
+5. **Cambios de DAVE:** Discord puede subir la versión del protocolo. La versión de davey se fija y se actualiza a propósito.
+6. **Op 37 y lista de miembros:** el formato exacto está **[sin verificar]**, y lo resuelve E1.5. En servidores enormes la lista es parcial por diseño.
+7. **OpenTUI 0.x:** puede romper la API, así que la versión va fijada.
+8. **Mezclar la identidad de web con voz UDP:** **[sin verificar]** si importa.
+9. **VAD por energía en ambientes ruidosos:** el umbral auto y el ajuste manual lo mitigan, y el detector con modelo queda para después de la v1.
 
 ## 11. Lo que queda para el builder
 
 - Elegir entre Solid y React (7.5) y dejar fijadas las versiones exactas de `@opentui/*`, `@discordjs/voice`, `@snazzah/davey` y `@discordjs/opus`.
-- Capturar del cliente web oficial, con la cuenta de Gon y en su navegador:
-  - el `capabilities` del identify;
-  - las client properties completas;
-  - los headers de REST;
-  - el payload del op 37 y el de los acks.
-
-  Documentarlo en `docs/protocol-notes.md`, con el token redactado.
-- Resolver cómo se saca el `client_build_number`.
-- Escribir el plan en pasos chicos siguiendo las etapas de la sección 9, cada uno con un comando o una acción que verifique el "hecho".
-- Armar un servidor de Discord propio de prueba, con un canal de texto y uno de voz, para todas las pruebas reales.
-- Revisar vimcord y DiscordCLI si hace falta (quedaron **[sin verificar]**).
+- Escribir el checklist de capturas de E1.5 para Gon y el script `scripts/redact.ts`. Documentar las capturas en `docs/protocol-notes.md`.
+- Resolver cómo se saca el `client_build_number`. Lo hace Gon en su navegador, con el checklist.
+- Escribir el plan en pasos chicos siguiendo las etapas de la sección 9. Cada paso dice si lo verifica el agente (tests y fixtures), Gon solo, o Gon con **[2ª]**.
+- Pedirle a Gon que arme un servidor de Discord propio de prueba, con un canal de texto y uno de voz, y que consiga la segunda cuenta o el amigo para los checkpoints **[2ª]**.
