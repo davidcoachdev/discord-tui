@@ -19,6 +19,19 @@ export class UnauthorizedError extends HttpError {
   }
 }
 
+/** La respuesta llegó con status OK pero el cuerpo no era JSON. */
+export class InvalidResponseError extends HttpError {
+  readonly contentType: string;
+  readonly bytes: number;
+
+  constructor(route: string, status: number, contentType: string, bytes: number) {
+    super(status, route);
+    this.name = "InvalidResponseError";
+    this.contentType = contentType;
+    this.bytes = bytes;
+  }
+}
+
 export class CaptchaRequiredError extends Error {
   constructor(route: string) {
     super(`captcha required on ${route}`);

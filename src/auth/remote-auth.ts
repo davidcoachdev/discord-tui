@@ -1,5 +1,5 @@
 import { log } from "../log/logger";
-import { CaptchaRequiredError, HttpError } from "../rest/errors";
+import { CaptchaRequiredError, HttpError, InvalidResponseError } from "../rest/errors";
 import type { Http } from "../rest/http";
 import { Secret } from "../secret";
 import { generateRaKeys, toBase64Url, type RaKeys } from "./ra-crypto";
@@ -224,11 +224,13 @@ export function createRemoteAuth(deps: RemoteAuthDeps): RemoteAuth {
         return;
       }
       const reason =
-        error instanceof HttpError
-          ? `HttpError ${error.status}${error.code !== undefined ? ` ${error.code}` : ""}`
-          : error instanceof Error
-            ? error.name
-            : "login failed";
+        error instanceof InvalidResponseError
+          ? `HttpError ${error.status} (${error.contentType || "sin content-type"}, ${error.bytes} bytes)`
+          : error instanceof HttpError
+            ? `HttpError ${error.status}${error.code !== undefined ? ` ${error.code}` : ""}`
+            : error instanceof Error
+              ? error.name
+              : "login failed";
       log.error("remote-auth.login-failed", { error_name: reason });
       emit({ type: "error", reason });
       stop();

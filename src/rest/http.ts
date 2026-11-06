@@ -1,7 +1,7 @@
 import type { ClientProps } from "../client-props/props";
 import { log, type LogFields } from "../log/logger";
 import type { Secret } from "../secret";
-import { CaptchaRequiredError, HttpError, NetworkError, UnauthorizedError } from "./errors";
+import { CaptchaRequiredError, HttpError, InvalidResponseError, NetworkError, UnauthorizedError } from "./errors";
 
 const DEFAULT_BASE_URL = "https://discord.com/api/v9";
 const SNOWFLAKE_SEGMENT = /\/\d{17,20}(?=\/|$)/g;
@@ -84,8 +84,17 @@ export function createHttp(deps: HttpDeps): Http {
       }
 
       if (text.length > 0 && data === null) {
-        log.error("http.error", { method, route, status: response.status });
-        throw new HttpError(response.status, route);
+        const contentType = response.headers.get("content-type") ?? "";
+        const encoding = response.headers.get("content-encoding") ?? "";
+        const detail = `${contentType || "sin content-type"}${encoding ? `; encoding=${encoding}` : ""}`;
+        log.error("http.non-json", {
+          method,
+          route,
+          status: response.status,
+          msg: detail,
+          count: text.length,
+        });
+        throw new InvalidResponseError(route, response.status, detail, text.length);
       }
 
       return data as T;

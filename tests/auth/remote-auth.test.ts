@@ -205,3 +205,14 @@ test("login without encrypted_token reports the response keys", async () => {
     h.stop();
   }
 });
+
+test("non-JSON login response reports the content type", async () => {
+  const h = await startHarness({}, () => new Response("<html>nope</html>", { headers: { "content-type": "text/html" } }));
+  try {
+    await waitFor(() => h.events.some((event) => event.type === "error"));
+    const errorEvent = h.events.find((event) => event.type === "error") as Extract<RaEvent, { type: "error" }>;
+    expect(errorEvent.reason).toContain("text/html");
+  } finally {
+    h.stop();
+  }
+});

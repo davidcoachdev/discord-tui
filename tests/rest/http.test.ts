@@ -8,7 +8,7 @@ process.env.XDG_CONFIG_HOME = mkdtempSync(join(tmpdir(), "discord-tui-http-confi
 
 const { logPath } = await import("../../src/config/paths");
 const { createClientProps } = await import("../../src/client-props/props");
-const { CaptchaRequiredError, UnauthorizedError } = await import("../../src/rest/errors");
+const { CaptchaRequiredError, InvalidResponseError, UnauthorizedError } = await import("../../src/rest/errors");
 const { createHttp } = await import("../../src/rest/http");
 const { findTokenLike } = await import("../../src/security/token-pattern");
 const { Secret } = await import("../../src/secret");
@@ -79,6 +79,21 @@ test("captcha body throws CaptchaRequiredError even with 200", async () => {
     await expect(http.request("POST", "/users/@me/remote-auth/login", { ticket: "t" })).rejects.toBeInstanceOf(
       CaptchaRequiredError,
     );
+  } finally {
+    fake.stop();
+  }
+});
+
+test("200 with a non-JSON body throws InvalidResponseError with the content type", async () => {
+  const fake = startFakeHttp(() => new Response("<html>nope</html>", { headers: { "content-type": "text/html" } }));
+  try {
+    const http = createHttp({ props: createClientProps({ buildNumber: 1 }), baseUrl: fake.url });
+    const error = (await http.request("POST", "/users/@me/remote-auth/login", { ticket: "t" }).catch(
+      (caught) => caught,
+    )) as InstanceType<typeof InvalidResponseError>;
+    expect(error).toBeInstanceOf(InvalidResponseError);
+    expect(error.contentType).toContain("text/html");
+    expect(error.bytes).toBeGreaterThan(0);
   } finally {
     fake.stop();
   }
