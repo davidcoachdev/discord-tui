@@ -32,6 +32,20 @@ export class InvalidResponseError extends HttpError {
   }
 }
 
+export class RateLimitedError extends HttpError {
+  readonly retryAfterMs: number;
+  readonly global: boolean;
+  readonly scope: string | null;
+
+  constructor(route: string, retryAfterMs: number, global: boolean, scope: string | null) {
+    super(429, route);
+    this.name = "RateLimitedError";
+    this.retryAfterMs = retryAfterMs;
+    this.global = global;
+    this.scope = scope;
+  }
+}
+
 export class CaptchaRequiredError extends Error {
   constructor(route: string) {
     super(`captcha required on ${route}`);

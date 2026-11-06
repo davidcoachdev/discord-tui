@@ -1,7 +1,7 @@
 import type { ClientProps } from "../client-props/props";
 import { log, type LogFields } from "../log/logger";
 import type { Secret } from "../secret";
-import { CaptchaRequiredError, HttpError, InvalidResponseError, NetworkError, UnauthorizedError } from "./errors";
+import { CaptchaRequiredError, HttpError, InvalidResponseError, NetworkError, RateLimitedError, UnauthorizedError } from "./errors";
 
 const DEFAULT_BASE_URL = "https://discord.com/api/v9";
 const SNOWFLAKE_SEGMENT = /\/\d{17,20}(?=\/|$)/g;
@@ -79,6 +79,12 @@ export function createHttp(deps: HttpDeps): Http {
         log.error("http.error", fields);
 
         if (captcha) throw new CaptchaRequiredError(route);
+        if (response.status === 429) {
+          const retryAfter = typeof parsed?.retry_after === "number" ? parsed.retry_after : Number(response.headers.get("retry-after") ?? "1");
+          const scope =
+            typeof parsed?.scope === "string" ? parsed.scope : response.headers.get("x-ratelimit-scope");
+          throw new RateLimitedError(route, Math.max(0, retryAfter) * 1000, parsed?.global === true, scope ?? null);
+        }
         if (response.status === 401) throw new UnauthorizedError(route, code);
         throw new HttpError(response.status, route, code);
       }

@@ -8,7 +8,7 @@ process.env.XDG_CONFIG_HOME = mkdtempSync(join(tmpdir(), "discord-tui-http-confi
 
 const { logPath } = await import("../../src/config/paths");
 const { createClientProps } = await import("../../src/client-props/props");
-const { CaptchaRequiredError, InvalidResponseError, UnauthorizedError } = await import("../../src/rest/errors");
+const { CaptchaRequiredError, InvalidResponseError, RateLimitedError, UnauthorizedError } = await import("../../src/rest/errors");
 const { createHttp } = await import("../../src/rest/http");
 const { findTokenLike } = await import("../../src/security/token-pattern");
 const { Secret } = await import("../../src/secret");
@@ -119,4 +119,22 @@ test("default base URL is https://discord.com/api/v9", async () => {
   const http = createHttp({ props: createClientProps({ buildNumber: 1 }), fetch: fakeFetch });
   await http.request("GET", "/users/@me");
   expect(seen).toBe("https://discord.com/api/v9/users/@me");
+});
+
+test("429 throws RateLimitedError with retry_after, global and scope", async () => {
+  const fake = startFakeHttp(() =>
+    Response.json({ retry_after: 0.05, global: false, scope: "user" }, { status: 429 }),
+  );
+  try {
+    const http = createHttp({ props: createClientProps({ buildNumber: 1 }), baseUrl: fake.url });
+    const error = (await http
+      .request("GET", "/channels/1/messages")
+      .catch((caught) => caught)) as InstanceType<typeof RateLimitedError>;
+    expect(error).toBeInstanceOf(RateLimitedError);
+    expect(error.retryAfterMs).toBeCloseTo(50, 0);
+    expect(error.global).toBe(false);
+    expect(error.scope).toBe("user");
+  } finally {
+    fake.stop();
+  }
 });

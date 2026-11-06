@@ -17,6 +17,7 @@
     "@opentui/keymap": "0.8.2",
     "@opentui/qrcode": "0.8.2",
     "@opentui/solid": "0.8.2",
+    "discord-api-types": "0.38.57",
     "solid-js": "1.9.18"
   },
   "devDependencies": {

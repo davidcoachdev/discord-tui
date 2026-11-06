@@ -59,7 +59,7 @@ Resultado parcial: el spike corre sin crashear. La constante `IMAGE_MODE = "kitt
   - `createRestClient(deps: { http: Http; onUnauthorized(): void; sleep?: (ms: number) => Promise<void> }): RestClient` con `request<T>(method: string, path: string, body?: unknown): Promise<T>` y `closed: boolean`.
   - `getMessages(rest: RestClient, channelId: string, opts?: { before?: string; limit?: number }): Promise<ApiMessage[]>` en `routes.ts` (E3 suma más rutas acá).
 
-- [ ] **Step 1: Tests que fallan**
+- [x] **Step 1: Tests que fallan**
 
 ```ts
 test("same route is serialized, different routes run in parallel", async () => {});
@@ -79,8 +79,23 @@ test("routeKey keeps major params", () => {
 });
 ```
 
-- [ ] **Step 2–4:** FAIL → implementar → `bun test tests/rest` PASS.
-- [ ] **Step 5:** commit `feat(e2): rest client with per-route queues` + push.
+- [x] **Step 2–4:** FAIL → implementar → `bun test tests/rest` PASS.
+
+```text
+$ bun test tests/rest
+ 16 pass
+ 0 fail
+ 35 expect() calls
+Ran 16 tests across 2 files. [257.00ms]
+
+$ bun test && bun run typecheck
+ 94 pass
+ 0 fail
+ 195 expect() calls
+Ran 94 tests across 20 files. [3.96s]
+$ tsc --noEmit   # sin salida, código 0
+```
+- [x] **Step 5:** commit `feat(e2): rest client with per-route queues` + push.
 
 ---
 
