@@ -71,3 +71,15 @@ test("captcha body throws CaptchaRequiredError", async () => {
     fake.stop();
   }
 });
+
+test("captcha body throws CaptchaRequiredError even with 200", async () => {
+  const fake = startFakeHttp(() => Response.json({ captcha_key: ["captcha-required"], captcha_sitekey: "x" }));
+  try {
+    const http = createHttp({ props: createClientProps({ buildNumber: 1 }), baseUrl: fake.url });
+    await expect(http.request("POST", "/users/@me/remote-auth/login", { ticket: "t" })).rejects.toBeInstanceOf(
+      CaptchaRequiredError,
+    );
+  } finally {
+    fake.stop();
+  }
+});

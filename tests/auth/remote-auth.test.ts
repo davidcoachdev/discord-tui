@@ -193,3 +193,15 @@ test("4000/4001/4002 retry, 1000 after pending_login does not", async () => {
     h.stop();
   }
 });
+
+test("login without encrypted_token reports the response keys", async () => {
+  const h = await startHarness({}, () => Response.json({ message: "nope" }));
+  try {
+    await waitFor(() => h.events.some((event) => event.type === "error"));
+    const errorEvent = h.events.find((event) => event.type === "error") as Extract<RaEvent, { type: "error" }>;
+    expect(errorEvent.reason).toContain("login sin encrypted_token");
+    expect(errorEvent.reason).toContain("message");
+  } finally {
+    h.stop();
+  }
+});

@@ -1,5 +1,5 @@
 import { log } from "../log/logger";
-import { CaptchaRequiredError } from "../rest/errors";
+import { CaptchaRequiredError, HttpError } from "../rest/errors";
 import type { Http } from "../rest/http";
 import { Secret } from "../secret";
 import { generateRaKeys, toBase64Url, type RaKeys } from "./ra-crypto";
@@ -200,13 +200,21 @@ export function createRemoteAuth(deps: RemoteAuthDeps): RemoteAuth {
     clearHeartbeat();
     if (keys === null || typeof message.ticket !== "string") return;
     try {
-      const response = await deps.http.request<{ encrypted_token?: string }>(
+      const response = await deps.http.request<Record<string, unknown>>(
         "POST",
         "/users/@me/remote-auth/login",
         { ticket: message.ticket },
       );
-      if (!response?.encrypted_token) throw new Error("missing encrypted_token");
-      const token = new TextDecoder().decode(await keys.decrypt(response.encrypted_token));
+      const encrypted = typeof response?.encrypted_token === "string" ? response.encrypted_token : null;
+      if (encrypted === null) {
+        const names =
+          response !== null && typeof response === "object" ? Object.keys(response).sort().join(",") : "sin cuerpo";
+        log.error("remote-auth.login-shape", { count: names === "sin cuerpo" ? 0 : names.split(",").length });
+        emit({ type: "error", reason: `login sin encrypted_token (${names})` });
+        stop();
+        return;
+      }
+      const token = new TextDecoder().decode(await keys.decrypt(encrypted));
       emit({ type: "token", token: new Secret(token), userId });
       stop();
     } catch (error) {
@@ -215,8 +223,14 @@ export function createRemoteAuth(deps: RemoteAuthDeps): RemoteAuth {
         stop();
         return;
       }
-      log.error("remote-auth.login-failed", { error_name: error instanceof Error ? error.name : "unknown" });
-      emit({ type: "error", reason: error instanceof Error ? error.name : "login failed" });
+      const reason =
+        error instanceof HttpError
+          ? `HttpError ${error.status}${error.code !== undefined ? ` ${error.code}` : ""}`
+          : error instanceof Error
+            ? error.name
+            : "login failed";
+      log.error("remote-auth.login-failed", { error_name: reason });
+      emit({ type: "error", reason });
       stop();
     }
   }

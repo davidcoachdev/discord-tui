@@ -70,18 +70,22 @@ export function createHttp(deps: HttpDeps): Http {
         }
       }
       const parsed = asRecord(data);
+      const captcha = parsed !== null && ("captcha_key" in parsed || "captcha_sitekey" in parsed);
 
-      if (!response.ok) {
+      if (!response.ok || captcha) {
         const code = numericCode(parsed);
         const fields: LogFields = { method, route, status: response.status };
         if (code !== undefined) fields.code = code;
         log.error("http.error", fields);
 
+        if (captcha) throw new CaptchaRequiredError(route);
         if (response.status === 401) throw new UnauthorizedError(route, code);
-        if (parsed && ("captcha_key" in parsed || "captcha_sitekey" in parsed)) {
-          throw new CaptchaRequiredError(route);
-        }
         throw new HttpError(response.status, route, code);
+      }
+
+      if (text.length > 0 && data === null) {
+        log.error("http.error", { method, route, status: response.status });
+        throw new HttpError(response.status, route);
       }
 
       return data as T;
