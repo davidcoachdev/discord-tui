@@ -112,7 +112,7 @@ test("request keeps the base path (/api/v9)", async () => {
 
 test("default base URL is https://discord.com/api/v9", async () => {
   let seen = "";
-  const fakeFetch = (async (input: RequestInfo | URL) => {
+  const fakeFetch = (async (input: string | URL | Request) => {
     seen = String(input);
     return Response.json({});
   }) as unknown as typeof fetch;
