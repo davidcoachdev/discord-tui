@@ -1,4 +1,4 @@
-import type { APIMessage } from "discord-api-types/v10";
+import type { APIMessage } from "discord-api-types/v9";
 
 import type { RestClient } from "./client";
 

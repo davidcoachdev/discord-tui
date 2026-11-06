@@ -101,6 +101,7 @@ export function applyPage(
         byId,
         loadingOlder: false,
         hasMoreBefore: mode === "older" ? messages.length >= 50 : previous.hasMoreBefore,
+        stale: false,
       },
     },
   };

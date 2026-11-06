@@ -118,6 +118,8 @@ export type Action =
   | { type: "gw"; t: string; d: any }
   | { type: "connection"; status: GatewayStatus }
   | { type: "messages/page"; channelId: string; messages: ApiMessage[]; mode: "older" | "latest" }
+  | { type: "messages/loading"; channelId: string; loading: boolean }
+  | { type: "messages/staleAll" }
   | { type: "ui/selectGuild"; id: string | "@dms" }
   | { type: "ui/selectChannel"; id: string }
   | { type: "ui/focus"; focus: Focus }

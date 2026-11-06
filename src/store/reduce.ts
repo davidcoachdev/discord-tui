@@ -37,6 +37,20 @@ export function reduce(state: AppState, action: Action): AppState {
       return state.connection === action.status ? state : { ...state, connection: action.status };
     case "messages/page":
       return applyPage(state, action.channelId, action.messages, action.mode);
+    case "messages/loading": {
+      const slice = state.messages[action.channelId];
+      if (!slice) return state;
+      return {
+        ...state,
+        messages: { ...state.messages, [action.channelId]: { ...slice, loadingOlder: action.loading } },
+      };
+    }
+    case "messages/staleAll": {
+      const messages = Object.fromEntries(
+        Object.entries(state.messages).map(([channelId, slice]) => [channelId, { ...slice, stale: true }]),
+      );
+      return { ...state, messages };
+    }
     case "ui/selectGuild":
       return { ...state, ui: { ...state.ui, selectedGuildId: action.id } };
     case "ui/selectChannel":

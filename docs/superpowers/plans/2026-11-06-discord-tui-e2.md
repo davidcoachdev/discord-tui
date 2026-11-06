@@ -305,7 +305,7 @@ $ tsc --noEmit   # sin salida, código 0
   - `createActions(deps: { store: Store; rest: RestClient; gateway: Gateway }): Actions` con `selectGuild(id: string | "@dms"): void`, `openChannel(id: string): Promise<void>` (si el canal no tiene mensajes o está `stale`, pide los últimos 50), `loadOlder(id: string): Promise<void>` (no-op si `loadingOlder` o `!hasMoreBefore`), `focus(f)`, `toggleMembers()`. E3/E4 suman acciones acá.
   - `createRuntime(deps: { session: Session; me: { id: string; username: string }; props: ClientProps; WebSocketImpl?; fetch? }): { store: Store; actions: Actions; start(): void; stop(): void; onUnauthorized(fn: () => void): void }`. Cablea dispatch → store, status → `connection`, `session identified` (que no sea el primero) → marca todos los canales `stale` y recarga el abierto; `fatal`/401 → `onUnauthorized` (main vuelve a la pantalla de login).
 
-- [ ] **Step 1: Tests**
+- [x] **Step 1: Tests**
 
 ```ts
 test("loadOlder sends one request even if called 5 times while in flight", async () => { expect(fake.requests).toHaveLength(1); });
@@ -318,8 +318,25 @@ test("after a resume, nothing is refetched", async () => { expect(fake.requests)
 test("401 from rest or 4004 from gateway calls onUnauthorized", async () => {});
 ```
 
-- [ ] **Step 2–4:** FAIL → implementar → PASS.
-- [ ] **Step 5:** commit `feat(e2): actions, runtime and reconnect gap fill` + push.
+- [x] **Step 2–4:** FAIL → implementar → PASS.
+
+```text
+$ bun test tests/actions tests/app/runtime.test.ts
+ 6 pass
+ 0 fail
+ 10 expect() calls
+Ran 6 tests across 2 files.
+
+$ bun test && bun run typecheck
+ 135 pass
+ 0 fail
+ 275 expect() calls
+Ran 135 tests across 28 files. [4.53s]
+$ tsc --noEmit   # sin salida, código 0
+```
+
+Se agregaron las acciones `messages/loading` y `messages/staleAll` al store, y `url`, `setTimer` y `random` opcionales en `RuntimeDeps` para los tests.
+- [x] **Step 5:** commit `feat(e2): actions, runtime and reconnect gap fill` + push.
 
 ---
 

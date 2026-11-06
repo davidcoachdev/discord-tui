@@ -152,19 +152,21 @@ export function createGateway(deps: GatewayDeps): Gateway {
     if (typeof s === "number") seq = s;
     log.info("gateway.dispatch", { t, seq: s ?? undefined });
 
+    let sessionKind: SessionKind | null = null;
     if (t === "READY" && d && typeof d === "object") {
       sessionId = typeof d.session_id === "string" ? d.session_id : sessionId;
       resumeGatewayUrl = typeof d.resume_gateway_url === "string" ? d.resume_gateway_url : resumeGatewayUrl;
       backoffIndex = 0;
       setStatus("ready");
-      emit("session", "identified");
+      sessionKind = "identified";
     } else if (t === "RESUMED") {
       backoffIndex = 0;
       setStatus("ready");
-      emit("session", "resumed");
+      sessionKind = "resumed";
     }
 
     emit("dispatch", t, d);
+    if (sessionKind !== null) emit("session", sessionKind);
   }
 
   function handleMessage(raw: string): void {
