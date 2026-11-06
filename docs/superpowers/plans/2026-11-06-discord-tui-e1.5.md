@@ -39,7 +39,7 @@
 - Consumes: `findTokenLike` (E0).
 - Produces:
   - `createRedactor(opts?: { trim?: number }): Redactor` con `redactJson(value: unknown): unknown` y `redactCurl(curlText: string): { method: string; url: string; headers: Record<string, string>; body: unknown }`. Un mismo `Redactor` mantiene un solo mapa de ids para todas las entradas.
-  - CLI: `bun scripts/redact.ts --out <dir> [--trim 3] <input>...`. Cada input `*.json` sale como `<dir>/<mismo nombre>.json`; cada `*.curl.txt` sale como `<dir>/<nombre>.json` con la forma de `redactCurl`. Imprime solo `ok <archivo>` por cada salida.
+  - CLI: `bun scripts/redact.ts --root <dir crudo> --out <dir> [--trim 3]`: procesa **todos** los `*.json` y `*.curl.txt` bajo `--root` en una sola corrida (un solo mapa de ids) y conserva la ruta relativa: `<root>/browser/identify.json` → `<out>/browser/identify.json`; un `*.curl.txt` sale como `.json` con la forma de `redactCurl`. `--trim` solo afecta a payloads `READY*`. Imprime solo `ok <archivo>` por cada salida.
 
 Reglas **[nuestra]**:
 - Claves cuyo valor pasa a `"[redacted]"`: `token`, `auth_token`, `authorization`, `cookie`, `x-fingerprint`, `ticket`, `encrypted_token`, `email`, `phone`, `password`, `analytics_token`, `user_settings_proto`, `session_id` (pasa a `"SESSION_ID"`), `x-captcha-key`.
@@ -121,9 +121,9 @@ test("capture script identifies without intents and saves dispatches", async () 
 
 ### Task 3: 🧍 Paso de Gon — capturas desde el navegador
 
-Todo en Chrome, logueado en https://discord.com/app, con DevTools abierto (F12) y **solo en el servidor de prueba**. Cada cosa se guarda en `~/discord-captures-raw/` (`mkdir -p ~/discord-captures-raw && chmod 700 ~/discord-captures-raw`).
+Todo en Chrome, logueado en https://discord.com/app, con DevTools abierto (F12) y **solo en el servidor de prueba**. Cada cosa se guarda en `~/discord-captures-raw/browser/` (`mkdir -p ~/discord-captures-raw/browser && chmod -R 700 ~/discord-captures-raw`).
 
-- [ ] **1. Identify:** DevTools → Network → filtro `WS` → recargar la página (Ctrl+R) → click en la conexión `gateway.discord.gg` → pestaña Messages → el **primer mensaje con flecha verde (saliente)** que tiene `"op":2` → click derecho → Copy message → guardarlo como `~/discord-captures-raw/identify.json`. Anotar aparte el número de `"capabilities"` (no es secreto, se lo pasa al agente). Si los mensajes salientes aparecen como "Binary Message", avisarle al agente y saltear 1 y 2.
+- [ ] **1. Identify:** DevTools → Network → filtro `WS` → recargar la página (Ctrl+R) → click en la conexión `gateway.discord.gg` → pestaña Messages → el **primer mensaje con flecha verde (saliente)** que tiene `"op":2` → click derecho → Copy message → guardarlo como `~/discord-captures-raw/browser/identify.json`. Anotar aparte el número de `"capabilities"` (no es secreto, se lo pasa al agente). Si los mensajes salientes aparecen como "Binary Message", avisarle al agente y saltear 1 y 2.
 - [ ] **2. Op 37:** con la misma conexión abierta, entrar al canal `#pruebas` → en Messages buscar el saliente con `"op":37` → Copy message → `op37.json`.
 - [ ] **3. Op 4:** entrar al canal de voz `Voz` y salir → el saliente con `"op":4` y `channel_id` no nulo → `op4-join.json`.
 - [ ] **4. Headers REST:** filtro `Fetch/XHR` → mandar un mensaje "hola" en `#pruebas` → click derecho en el `POST …/messages` → Copy → Copy as cURL (bash) → `send-message.curl.txt`.
@@ -141,7 +141,7 @@ Todo en Chrome, logueado en https://discord.com/app, con DevTools abierto (F12) 
 ```bash
 cd ~/projects/discord-tui
 bun scripts/capture-gateway.ts --out ~/discord-captures-raw/gateway --capabilities <N de Task 3> \
-  --op37 ~/discord-captures-raw/op37.json --voice <id del servidor de prueba> <id del canal Voz>
+  --op37 ~/discord-captures-raw/browser/op37.json --voice <id del servidor de prueba> <id del canal Voz>
 ```
 
 (Los ids se copian con modo desarrollador de Discord: click derecho → Copiar ID. No se le pasan al agente.)
@@ -160,8 +160,7 @@ bun scripts/capture-gateway.ts --out ~/discord-captures-raw/gateway --capabiliti
 
 ```bash
 cd ~/projects/discord-tui
-bun scripts/redact.ts --out fixtures/browser ~/discord-captures-raw/*.json ~/discord-captures-raw/*.curl.txt
-bun scripts/redact.ts --trim 3 --out fixtures/gateway ~/discord-captures-raw/gateway/*.json
+bun scripts/redact.ts --root ~/discord-captures-raw --out fixtures --trim 3
 bun test tests/security/no-token-leak.test.ts
 ```
 
