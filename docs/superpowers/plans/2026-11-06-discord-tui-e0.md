@@ -97,7 +97,7 @@ Expected: FAIL, `Cannot find module '../../src/security/token-pattern'`.
 - [ ] **Step 5: Verificar**
 
 Run: `bun test && bun run typecheck`
-Expected: `4 pass, 0 fail` y typecheck sin errores.
+Expected: `5 pass, 0 fail` y typecheck sin errores.
 
 - [ ] **Step 6: Commit y push**
 
