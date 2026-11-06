@@ -1,0 +1,195 @@
+import { expect, test } from "bun:test";
+
+import { generateRaKeys, type RaKeys } from "../../src/auth/ra-crypto";
+import { createRemoteAuth, type RaEvent, type RemoteAuth } from "../../src/auth/remote-auth";
+import { createClientProps } from "../../src/client-props/props";
+import { createHttp } from "../../src/rest/http";
+import { startFakeHttp, type FakeHttp } from "../fakes/fake-http";
+import { startFakeRemoteAuth, type FakeRaScript, type FakeRemoteAuth } from "../fakes/fake-remote-auth";
+import { fakeToken } from "../helpers/fake-token";
+
+function waitFor(predicate: () => boolean, timeoutMs = 3000): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const started = Date.now();
+    const timer = setInterval(() => {
+      if (predicate()) {
+        clearInterval(timer);
+        resolve();
+        return;
+      }
+      if (Date.now() - started > timeoutMs) {
+        clearInterval(timer);
+        reject(new Error("timeout"));
+      }
+    }, 5);
+  });
+}
+
+async function encryptFor(publicSpkiB64: string, plain: string): Promise<string> {
+  const publicKey = await crypto.subtle.importKey(
+    "spki",
+    Buffer.from(publicSpkiB64, "base64"),
+    { name: "RSA-OAEP", hash: "SHA-256" },
+    false,
+    ["encrypt"],
+  );
+  const cipher = await crypto.subtle.encrypt({ name: "RSA-OAEP" }, publicKey, new TextEncoder().encode(plain));
+  return Buffer.from(cipher).toString("base64");
+}
+
+interface Harness {
+  keys: RaKeys;
+  fake: FakeRemoteAuth;
+  http: FakeHttp;
+  auth: RemoteAuth;
+  events: RaEvent[];
+  stop(): void;
+}
+
+async function startHarness(
+  script: FakeRaScript = {},
+  httpHandler?: (req: Request) => Response | Promise<Response>,
+): Promise<Harness> {
+  const keys = await generateRaKeys();
+  let latest = keys;
+  let generations = 0;
+
+  const fake = startFakeRemoteAuth(script);
+  const http = startFakeHttp(async (req) => {
+    if (httpHandler) return httpHandler(req);
+    return Response.json({ encrypted_token: await encryptFor(latest.publicSpkiB64, fakeToken()) });
+  });
+
+  const auth = createRemoteAuth({
+    http: createHttp({ props: createClientProps({ buildNumber: 1 }), baseUrl: http.url }),
+    wsUrl: fake.url,
+    makeKeys: async () => {
+      generations += 1;
+      if (generations > 1) latest = await generateRaKeys();
+      return latest;
+    },
+  });
+
+  const events: RaEvent[] = [];
+  auth.on((event) => events.push(event));
+  auth.start();
+
+  return {
+    keys,
+    fake,
+    http,
+    auth,
+    events,
+    stop() {
+      auth.stop();
+      fake.stop();
+      http.stop();
+    },
+  };
+}
+
+test("happy path: qr → scanned → token", async () => {
+  const h = await startHarness();
+  try {
+    await waitFor(() => h.events.some((event) => event.type === "token"));
+    expect(h.events.map((event) => event.type)).toEqual(["qr", "scanned", "token"]);
+    const qr = h.events[0] as Extract<RaEvent, { type: "qr" }>;
+    expect(qr.url).toBe(`https://discord.com/ra/${h.keys.fingerprint}`);
+    const scanned = h.events[1] as Extract<RaEvent, { type: "scanned" }>;
+    expect(scanned.username).toBe("gonfake");
+    const tokenEvent = h.events[2] as Extract<RaEvent, { type: "token" }>;
+    expect(tokenEvent.token.reveal()).toBe(fakeToken());
+    expect(tokenEvent.userId).toBe("123");
+    expect(h.fake.originHeader).toBe("https://discord.com");
+  } finally {
+    h.stop();
+  }
+});
+
+test("nonce_proof answer is base64url without padding", async () => {
+  const h = await startHarness();
+  try {
+    await waitFor(() => h.events.some((event) => event.type === "token"));
+    const reply = h.fake.received.find((message) => message.op === "nonce_proof");
+    expect(reply).toBeDefined();
+    expect(reply.nonce).toMatch(/^[A-Za-z0-9_-]+$/);
+    expect(reply.nonce).not.toContain("=");
+  } finally {
+    h.stop();
+  }
+});
+
+test("fingerprint mismatch reconnects with a fresh key pair", async () => {
+  const h = await startHarness({ fingerprint: "wrong" });
+  try {
+    await waitFor(() => h.events.some((event) => event.type === "qr"));
+    expect(h.fake.connections).toBe(2);
+    const inits = h.fake.received.filter((message) => message.op === "init");
+    expect(inits).toHaveLength(2);
+    expect(inits[0]!.encoded_public_key).not.toBe(inits[1]!.encoded_public_key);
+  } finally {
+    h.stop();
+  }
+});
+
+test("close 4003 produces a new qr without restarting", async () => {
+  const h = await startHarness({ closeAfterQr: 4003 });
+  try {
+    await waitFor(() => h.events.filter((event) => event.type === "qr").length === 2);
+    expect(h.fake.connections).toBe(2);
+  } finally {
+    h.stop();
+  }
+});
+
+test("cancel emits cancelled and then a new qr", async () => {
+  const h = await startHarness({ cancel: true });
+  try {
+    await waitFor(() => h.events.some((event) => event.type === "cancelled"));
+    await waitFor(() => h.events.filter((event) => event.type === "qr").length === 2);
+  } finally {
+    h.stop();
+  }
+});
+
+test("missing heartbeat_ack reconnects", async () => {
+  const h = await startHarness({ noHeartbeatAck: true, heartbeatInterval: 50, stallAfterQr: true });
+  try {
+    await waitFor(() => h.fake.connections >= 2, 4000);
+  } finally {
+    h.stop();
+  }
+});
+
+test("captcha on login emits captcha and stops", async () => {
+  const h = await startHarness({}, () => Response.json({ captcha_key: ["captcha-required"] }, { status: 400 }));
+  try {
+    await waitFor(() => h.events.some((event) => event.type === "captcha"));
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    expect(h.events.some((event) => event.type === "token")).toBe(false);
+    expect(h.fake.connections).toBe(1);
+  } finally {
+    h.stop();
+  }
+});
+
+test("4000/4001/4002 retry, 1000 after pending_login does not", async () => {
+  for (const code of [4000, 4001, 4002]) {
+    const h = await startHarness({ closeAfterQr: code });
+    try {
+      await waitFor(() => h.events.filter((event) => event.type === "qr").length === 2);
+      expect(h.fake.connections).toBe(2);
+    } finally {
+      h.stop();
+    }
+  }
+
+  const h = await startHarness();
+  try {
+    await waitFor(() => h.events.some((event) => event.type === "token"));
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    expect(h.fake.connections).toBe(1);
+  } finally {
+    h.stop();
+  }
+});

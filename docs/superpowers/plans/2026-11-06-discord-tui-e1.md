@@ -289,7 +289,7 @@ $ tsc --noEmit   # sin salida, código 0
   - `createRemoteAuth(deps: { http: Http; wsUrl?: string; makeKeys?: typeof generateRaKeys; WebSocketImpl?: typeof WebSocket }): { start(): void; stop(): void; on(fn: (e: RaEvent) => void): () => void }`.
   - `startFakeRemoteAuth(script: FakeRaScript): { url: string; received: any[]; stop(): void }`: servidor `Bun.serve` que hace el rol del gateway según spec 6.5 (`hello` → espera `init` → manda `nonce_proof` cifrado con la clave recibida → verifica el `nonce` → `pending_remote_init` → `pending_ticket` → `pending_login` o `cancel`), con opciones para mandar un fingerprint incorrecto, cerrar con 4003, dejar de mandar `heartbeat_ack`, y registrar el header `Origin`.
 
-- [ ] **Step 1: Tests que fallan**
+- [x] **Step 1: Tests que fallan**
 
 ```ts
 test("happy path: qr → scanned → token", async () => {
@@ -309,10 +309,39 @@ test("captcha on login emits captcha and stops", async () => { /* http fake → 
 test("4000/4001/4002 retry, 1000 after pending_login does not", async () => {});
 ```
 
-- [ ] **Step 2:** Run `bun test tests/auth/remote-auth.test.ts` · Expected: FAIL.
-- [ ] **Step 3:** implementar. Heartbeat: `{ op: "heartbeat" }` cada `heartbeat_interval`; si no llegó `heartbeat_ack` antes del siguiente, cierra y reconecta. Tope de reintentos: 5 seguidos, después `error`. El `userId` sale de `encrypted_user_payload` (`id:discriminator:avatar:username`).
-- [ ] **Step 4:** Run `bun test && bun run typecheck` · Expected: PASS.
-- [ ] **Step 5:** commit `feat(e1): remote auth state machine` + push.
+- [x] **Step 2:** Run `bun test tests/auth/remote-auth.test.ts` · Expected: FAIL.
+
+```text
+$ bun test tests/auth/remote-auth.test.ts   # antes de implementar
+error: Cannot find module '../../src/auth/remote-auth' from '.../tests/auth/remote-auth.test.ts'
+
+ 0 pass
+ 1 fail
+ 1 error
+```
+
+- [x] **Step 3:** implementar. Heartbeat: `{ op: "heartbeat" }` cada `heartbeat_interval`; si no llegó `heartbeat_ack` antes del siguiente, cierra y reconecta. Tope de reintentos: 5 seguidos, después `error`. El `userId` sale de `encrypted_user_payload` (`id:discriminator:avatar:username`).
+
+El fake expone además `originHeader` y `connections` (los usan los tests) y opciones `closeAfterQr`, `closeAfterLogin`, `stallAfterQr` y `heartbeatInterval`.
+
+- [x] **Step 4:** Run `bun test && bun run typecheck` · Expected: PASS.
+
+```text
+$ bun test tests/auth/remote-auth.test.ts
+ 8 pass
+ 0 fail
+ 19 expect() calls
+Ran 8 tests across 1 file. [2.42s]
+
+$ bun test && bun run typecheck
+ 39 pass
+ 0 fail
+ 79 expect() calls
+Ran 39 tests across 11 files. [2.25s]
+$ tsc --noEmit   # sin salida, código 0
+```
+
+- [x] **Step 5:** commit `feat(e1): remote auth state machine` + push.
 
 ---
 
