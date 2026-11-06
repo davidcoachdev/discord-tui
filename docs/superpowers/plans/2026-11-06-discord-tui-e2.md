@@ -112,7 +112,7 @@ $ tsc --noEmit   # sin salida, código 0
   - `type GatewayStatus = "connecting" | "identifying" | "ready" | "resuming" | "reconnecting" | "disconnected"`.
   - `createGateway(deps: { token: Secret; props: ClientProps; url?: string; WebSocketImpl?: typeof WebSocket; random?: () => number; setTimer?: typeof setTimeout }): Gateway` con `connect(): void`, `close(): void`, `send(op: number, d: unknown): void`, `status: GatewayStatus`, `sessionId: string | null`, `seq: number | null`, `on(ev: "dispatch", fn: (t: string, d: any) => void)`, `on(ev: "status", fn: (s: GatewayStatus) => void)`, `on(ev: "session", fn: (kind: "identified" | "resumed") => void)`, `on(ev: "fatal", fn: (reason: "unauthorized") => void)`.
 
-- [ ] **Step 1: Tests que fallan**
+- [x] **Step 1: Tests que fallan**
 
 ```ts
 test("sends identify after hello, without intents", async () => {
@@ -129,8 +129,23 @@ test("never logs the identify payload", async () => { expect(findTokenLike(logFi
 test("send throttles to 110 payloads per 60 s", async () => {});
 ```
 
-- [ ] **Step 2–4:** FAIL → implementar → `bun test tests/gateway` PASS.
-- [ ] **Step 5:** commit `feat(e2): gateway connection with heartbeat` + push.
+- [x] **Step 2–4:** FAIL → implementar → `bun test tests/gateway` PASS.
+
+```text
+$ bun test tests/gateway
+ 9 pass
+ 0 fail
+ 20 expect() calls
+Ran 9 tests across 2 files. [439.00ms]
+
+$ bun test && bun run typecheck
+ 101 pass
+ 0 fail
+ 211 expect() calls
+Ran 101 tests across 21 files. [4.09s]
+$ tsc --noEmit   # sin salida, código 0
+```
+- [x] **Step 5:** commit `feat(e2): gateway connection with heartbeat` + push.
 
 ---
 

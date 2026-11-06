@@ -15,6 +15,7 @@ export interface FakeGateway {
   sent: any[];
   received: any[];
   dispatch(t: string, d: unknown): void;
+  sendRaw(payload: unknown): void;
   close(code: number): void;
   stop(): void;
 }
@@ -100,6 +101,9 @@ export function startFakeGateway(opts: FakeGatewayOptions = {}): FakeGateway {
     sent,
     received,
     dispatch,
+    sendRaw: (payload: unknown) => {
+      if (active !== null) sendJson(active, payload);
+    },
     close: (code: number) => active?.close(code),
     stop: () => server.stop(true),
   };
