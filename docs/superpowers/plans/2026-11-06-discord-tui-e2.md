@@ -209,7 +209,7 @@ Nota: al reconectar hay que resetear el inflater (contexto zlib nuevo por conexi
   - `compareSnowflakes(a: string, b: string): -1 | 0 | 1`; `generateNonce(now?: number): string` (`((BigInt(now) - 1420070400000n) << 22n).toString()`).
   - Selectores: `selectGuildList(s)`, `selectChannelList(s, guildId: string | "@dms"): ChannelRow[]` (`ChannelRow = { id; name; kind: "text" | "voice" | "category" | "dm" | "group_dm"; unread: boolean; mentions: number; muted: boolean; depth: 0 | 1 }`), `isChannelUnread(s, channelId)`, `selectNextUnread(s, fromChannelId: string | null): string | null`.
 
-- [ ] **Step 1: Tests que fallan** (con `fixtures/gateway/READY-1.json` y, si existe, `READY_SUPPLEMENTAL-1.json`)
+- [x] **Step 1: Tests que fallan** (con `fixtures/gateway/READY-1.json` y, si existe, `READY_SUPPLEMENTAL-1.json`)
 
 ```ts
 test("READY fills me, guilds, channels, users (deduped) and read states", () => {
@@ -228,8 +228,25 @@ test("unread when last_message_id > lastAckedId; muted channel is not returned b
 test("compareSnowflakes compares as BigInt", () => { expect(compareSnowflakes("99", "100")).toBe(-1); });
 ```
 
-- [ ] **Step 2–4:** FAIL → implementar → `bun test tests/store` PASS.
-- [ ] **Step 5:** commit `feat(e2): store, READY reducer and channel permissions` + push.
+- [x] **Step 2–4:** FAIL → implementar → `bun test tests/store` PASS.
+
+```text
+$ bun test tests/store
+ 14 pass
+ 0 fail
+ 26 expect() calls
+Ran 14 tests across 3 files. [124.00ms]
+
+$ bun test && bun run typecheck
+ 121 pass
+ 0 fail
+ 246 expect() calls
+Ran 121 tests across 25 files. [4.28s]
+$ tsc --noEmit   # sin salida, código 0
+```
+
+La fixture READY se amplió con `users`, un DM en `private_channels` y `read_state` para cubrir DMs y no leídos.
+- [x] **Step 5:** commit `feat(e2): store, READY reducer and channel permissions` + push.
 
 ---
 
