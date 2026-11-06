@@ -50,7 +50,7 @@ Reglas **[nuestra]**:
 - `relationships`, `connected_accounts`, `consents` → `[]`/`{}`.
 - `--trim N` corta a N elementos los arrays de primer y segundo nivel de un READY.
 
-- [ ] **Step 1: Tests que fallan**
+- [x] **Step 1: Tests que fallan**
 
 ```ts
 test("secret keys are redacted at any depth", () => {
@@ -76,8 +76,17 @@ test("cli exits 2 and writes nothing if a token-like string survives", async () 
 test("--trim keeps 3 guilds in READY", () => {});
 ```
 
-- [ ] **Step 2–4:** FAIL → implementar → `bun test tests/security` PASS.
-- [ ] **Step 5:** commit `feat(e1.5): redact script for captures` + push.
+- [x] **Step 2–4:** FAIL → implementar → `bun test tests/security` PASS.
+
+```text
+$ bun test tests/security/redact.test.ts
+ 5 pass
+ 0 fail
+ 16 expect() calls
+Ran 5 tests across 1 file. [387.00ms]
+```
+
+- [x] **Step 5:** commit `feat(e1.5): redact script for captures` + push.
 
 ---
 
