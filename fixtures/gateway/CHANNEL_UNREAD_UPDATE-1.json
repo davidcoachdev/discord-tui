@@ -1,0 +1,12 @@
+{
+  "op": 0,
+  "t": "CHANNEL_UNREAD_UPDATE",
+  "s": 9,
+  "d": {
+    "guild_id": "100000000000000001",
+    "channel_id": "100000000000000002",
+    "last_message_id": "100000000000000020",
+    "last_read_message_id": null,
+    "unread": true
+  }
+}

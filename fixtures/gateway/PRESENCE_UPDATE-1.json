@@ -1,0 +1,24 @@
+{
+  "op": 0,
+  "t": "PRESENCE_UPDATE",
+  "s": 8,
+  "d": {
+    "user": {
+      "id": "100000000000000011",
+      "username": "user2",
+      "global_name": "user2",
+      "discriminator": "0",
+      "avatar": null,
+      "bot": false,
+      "flags": 0,
+      "premium_type": 0,
+      "public_flags": 0
+    },
+    "guild_id": "100000000000000001",
+    "status": "idle",
+    "activities": [],
+    "client_status": {
+      "desktop": "idle"
+    }
+  }
+}

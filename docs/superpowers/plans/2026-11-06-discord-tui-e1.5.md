@@ -232,3 +232,9 @@ test("CHROME_UA matches the captured user-agent", () => {});
 - [ ] **Step 2–4:** FAIL → implementar → `bun test && bun run typecheck` PASS.
 - [ ] **Step 5:** escribir `docs/protocol-notes.md` con una sección por fixture: qué es, de dónde salió, campos que usamos, y las respuestas a lo **[sin verificar]** de la spec: valor de `capabilities`; si READY trae `private_channels` (y si no, dónde vienen los DMs); forma exacta del op 37 (rangos, `typing`, `activities`, `threads`); forma del body del ack (`{ token: null, last_viewed }` o lo que se vea); si hay `X-Discord-Timezone`; flujo de subida (directo multipart o `/attachments` + upload URL); forma de `GUILD_MEMBER_LIST_UPDATE` (`ops` SYNC/INSERT/UPDATE/DELETE/INVALIDATE).
 - [ ] **Step 6:** commit `docs(e1.5): protocol notes from captures` + push.
+
+---
+
+## Nota de ejecución (2026-11-06)
+
+Gon no tenía tiempo para las capturas del navegador (Tasks 3–5). En su lugar, las fixtures se generaron desde el bundle JS público del cliente web y `discord-api-types`, sin tocar la cuenta ni el token. El detalle y las respuestas a los **[sin verificar]** están en `docs/protocol-notes.md`, sección "Fixtures de E1.5 (sintéticas)". Las Tasks 3–5 quedan sin tildar: no se hicieron como estaban escritas. Cuando haya una captura real, se reemplazan las fixtures y se ajusta lo que difiera.

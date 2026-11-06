@@ -1,0 +1,19 @@
+{
+  "op": 0,
+  "t": "VOICE_STATE_UPDATE",
+  "s": 5,
+  "d": {
+    "guild_id": "100000000000000001",
+    "channel_id": "100000000000000003",
+    "user_id": "100000000000000010",
+    "session_id": "SESSION_ID",
+    "deaf": false,
+    "mute": false,
+    "self_deaf": false,
+    "self_mute": false,
+    "self_stream": false,
+    "self_video": false,
+    "suppress": false,
+    "request_to_speak_timestamp": null
+  }
+}

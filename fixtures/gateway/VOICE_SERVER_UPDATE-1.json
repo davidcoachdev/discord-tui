@@ -1,0 +1,11 @@
+{
+  "op": 0,
+  "t": "VOICE_SERVER_UPDATE",
+  "s": 6,
+  "d": {
+    "token": "[redacted]",
+    "guild_id": "100000000000000001",
+    "channel_id": "100000000000000003",
+    "endpoint": "c-xxx00-00000000.discord.media:443"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "method": "POST",
+  "url": "https://discord.com/api/v9/channels/100000000000000002/messages/100000000000000020/ack",
+  "headers": {
+    "accept": "*/*",
+    "authorization": "[redacted]",
+    "content-type": "application/json",
+    "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+  },
+  "body": {
+    "token": null,
+    "last_viewed": 0
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "method": "POST",
+  "url": "https://discord.com/api/v9/channels/100000000000000002/messages",
+  "headers": {
+    "accept": "*/*",
+    "authorization": "[redacted]",
+    "content-type": "application/json",
+    "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "x-super-properties": "eyJvcyI6IkxpbnV4IiwiYnJvd3NlciI6IkNocm9tZSIsInJlbGVhc2VfY2hhbm5lbCI6InN0YWJsZSIsImNsaWVudF9idWlsZF9udW1iZXIiOjY2MzgxMCwib3NfdmVyc2lvbiI6IkxpbnV4IiwiYnJvd3Nlcl91c2VyX2FnZW50IjoiTW96aWxsYS81LjAgKFgxMTsgTGludXggeDg2XzY0KSBBcHBsZVdlYktpdC81MzcuMzYgKEtIVE1MLCBsaWtlIEdlY2tvKSBDaHJvbWUvMTQyLjAuMC4wIFNhZmFyaS81MzcuMzYiLCJicm93c2VyX3ZlcnNpb24iOiIxNDIuMC4wLjAiLCJzeXN0ZW1fbG9jYWxlIjoiZXMtQVIiLCJjbGllbnRfbGF1bmNoX2lkIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxIiwiY2xpZW50X2hlYXJ0YmVhdF9zZXNzaW9uX2lkIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAyIn0="
+  },
+  "body": {
+    "content": "hola",
+    "nonce": "100000000000000050",
+    "tts": false,
+    "flags": 0
+  }
+}

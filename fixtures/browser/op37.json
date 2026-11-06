@@ -1,0 +1,28 @@
+{
+  "op": 37,
+  "d": {
+    "subscriptions": {
+      "100000000000000001": {
+        "typing": true,
+        "threads": false,
+        "activities": true,
+        "members": [
+          [
+            0,
+            99
+          ]
+        ],
+        "member_updates": false,
+        "channels": {
+          "100000000000000002": [
+            [
+              0,
+              99
+            ]
+          ]
+        },
+        "thread_member_lists": {}
+      }
+    }
+  }
+}

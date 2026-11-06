@@ -1,0 +1,68 @@
+{
+  "op": 0,
+  "t": "MESSAGE_CREATE",
+  "s": 2,
+  "d": {
+    "id": "100000000000000020",
+    "type": 0,
+    "channel_id": "100000000000000002",
+    "guild_id": "100000000000000001",
+    "author": {
+      "id": "100000000000000010",
+      "username": "user1",
+      "global_name": "user1",
+      "discriminator": "0",
+      "avatar": null,
+      "bot": false,
+      "flags": 0,
+      "premium_type": 0,
+      "public_flags": 0
+    },
+    "content": "hola",
+    "timestamp": "2026-11-06T12:00:00.000000+00:00",
+    "edited_timestamp": null,
+    "tts": false,
+    "mention_everyone": false,
+    "mentions": [],
+    "mention_roles": [],
+    "attachments": [
+      {
+        "id": "100000000000000040",
+        "filename": "image.png",
+        "size": 12345,
+        "url": "https://cdn.discordapp.com/attachments/100000000000000002/100000000000000040/image.png",
+        "proxy_url": "https://media.discordapp.net/attachments/100000000000000002/100000000000000040/image.png",
+        "width": 128,
+        "height": 128,
+        "content_type": "image/png"
+      }
+    ],
+    "embeds": [
+      {
+        "type": "rich",
+        "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        "title": "Video",
+        "description": "Un video",
+        "thumbnail": {
+          "url": "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
+          "width": 480,
+          "height": 360
+        }
+      }
+    ],
+    "reactions": [
+      {
+        "emoji": {
+          "id": "100000000000000030",
+          "name": "partyparrot"
+        },
+        "count": 1,
+        "me": false
+      }
+    ],
+    "pinned": false,
+    "flags": 0,
+    "components": [],
+    "stickers": []
+  }
+}
