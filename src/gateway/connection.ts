@@ -5,6 +5,7 @@ import { buildIdentify } from "./identify";
 import { createZlibStreamInflater } from "./inflate";
 
 export type GatewayStatus = "connecting" | "identifying" | "ready" | "resuming" | "reconnecting" | "disconnected";
+export type SessionKind = "identified" | "resumed";
 
 export interface Gateway {
   connect(): void;
@@ -16,7 +17,7 @@ export interface Gateway {
   readonly seq: number | null;
   on(ev: "dispatch", fn: (t: string, d: any) => void): () => void;
   on(ev: "status", fn: (status: GatewayStatus) => void): () => void;
-  on(ev: "session", fn: (kind: "identified" | "resumed") => void): () => void;
+  on(ev: "session", fn: (kind: SessionKind) => void): () => void;
   on(ev: "fatal", fn: (reason: "unauthorized") => void): () => void;
 }
 
@@ -32,6 +33,7 @@ export interface GatewayDeps {
 const DEFAULT_URL = "wss://gateway.discord.gg/?v=9&encoding=json&compress=zlib-stream";
 const SEND_LIMIT = 110;
 const SEND_WINDOW_MS = 60_000;
+const MAX_BACKOFF_MS = 30_000;
 
 function toBytes(data: unknown): Uint8Array | null {
   if (data instanceof ArrayBuffer) return new Uint8Array(data);
@@ -53,7 +55,11 @@ export function createGateway(deps: GatewayDeps): Gateway {
   let resumeGatewayUrl: string | null = null;
   let seq: number | null = null;
   let heartbeatTimer: ReturnType<typeof setTimeout> | null = null;
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   let closedByUser = false;
+  let resuming = false;
+  let acked = true;
+  let backoffIndex = 0;
   const sentAt: number[] = [];
 
   function emit(ev: string, ...args: unknown[]): void {
@@ -97,25 +103,67 @@ export function createGateway(deps: GatewayDeps): Gateway {
     }
   }
 
+  function heartbeatTick(): void {
+    if (!acked) {
+      log.error("gateway.heartbeat-miss");
+      try {
+        socket?.close(4000);
+      } catch {
+        // ya estaba cerrado
+      }
+      return;
+    }
+    acked = false;
+    send(1, seq);
+  }
+
   function startHeartbeat(interval: number): void {
     stopHeartbeat();
     if (!Number.isFinite(interval) || interval <= 0) return;
+    acked = true;
     const jitter = Math.floor(interval * random());
     heartbeatTimer = setTimeout(() => {
-      send(1, seq);
-      heartbeatTimer = setInterval(() => send(1, seq), interval);
+      heartbeatTick();
+      heartbeatTimer = setInterval(heartbeatTick, interval);
     }, jitter);
+  }
+
+  function resumeUrl(): string {
+    const base = (resumeGatewayUrl ?? url).replace(/\?.*$/, "").replace(/\/+$/, "");
+    return `${base}/?v=9&encoding=json&compress=zlib-stream`;
+  }
+
+  function scheduleReconnect(kind: "resume" | "identify", delayOverride?: number): void {
+    if (closedByUser || reconnectTimer !== null) return;
+    setStatus("reconnecting");
+
+    const base = Math.min(MAX_BACKOFF_MS, 1_000 * 2 ** Math.min(backoffIndex, 5));
+    backoffIndex = Math.min(6, backoffIndex + 1);
+    const delay = delayOverride ?? Math.round(base * (0.8 + random() * 0.4));
+
+    reconnectTimer = setTimer(() => {
+      reconnectTimer = null;
+      resuming = kind === "resume";
+      openSocket(kind === "resume" ? resumeUrl() : url);
+    }, delay);
   }
 
   function onDispatch(t: string, d: any, s: number | null): void {
     if (typeof s === "number") seq = s;
     log.info("gateway.dispatch", { t, seq: s ?? undefined });
+
     if (t === "READY" && d && typeof d === "object") {
       sessionId = typeof d.session_id === "string" ? d.session_id : sessionId;
       resumeGatewayUrl = typeof d.resume_gateway_url === "string" ? d.resume_gateway_url : resumeGatewayUrl;
+      backoffIndex = 0;
       setStatus("ready");
       emit("session", "identified");
+    } else if (t === "RESUMED") {
+      backoffIndex = 0;
+      setStatus("ready");
+      emit("session", "resumed");
     }
+
     emit("dispatch", t, d);
   }
 
@@ -129,17 +177,49 @@ export function createGateway(deps: GatewayDeps): Gateway {
 
     switch (message.op) {
       case 10: {
-        setStatus("identifying");
-        const identify = buildIdentify(deps.token, deps.props);
-        send(2, identify.d);
-        startHeartbeat(message.d?.heartbeat_interval ?? 0);
+        const interval = message.d?.heartbeat_interval ?? 0;
+        if (resuming && sessionId !== null && seq !== null) {
+          setStatus("resuming");
+          send(6, { token: deps.token.reveal(), session_id: sessionId, seq });
+        } else {
+          resuming = false;
+          setStatus("identifying");
+          const identify = buildIdentify(deps.token, deps.props);
+          send(2, identify.d);
+        }
+        startHeartbeat(interval);
         return;
       }
       case 11:
+        acked = true;
         return;
       case 1:
         send(1, seq);
         return;
+      case 7:
+        try {
+          socket?.close(4000);
+        } catch {
+          // ya estaba cerrado
+        }
+        return;
+      case 9: {
+        const resumable = message.d === true;
+        if (!resumable) {
+          sessionId = null;
+          seq = null;
+        }
+        try {
+          socket?.close(4000);
+        } catch {
+          // ya estaba cerrado
+        }
+        scheduleReconnect(
+          resumable ? "resume" : "identify",
+          resumable ? undefined : 1_000 + Math.floor(random() * 4_000),
+        );
+        return;
+      }
       case 0:
         onDispatch(String(message.t), message.d, typeof message.s === "number" ? message.s : null);
         return;
@@ -151,41 +231,67 @@ export function createGateway(deps: GatewayDeps): Gateway {
   function handleClose(code: number): void {
     stopHeartbeat();
     socket = null;
-    setStatus("disconnected");
+    reconnectTimer = null;
+    resuming = false;
+
+    if (closedByUser) {
+      setStatus("disconnected");
+      return;
+    }
     if (code === 4004) {
       log.error("gateway.fatal", { close_code: code });
+      setStatus("disconnected");
       emit("fatal", "unauthorized");
+      return;
     }
+    if (code === 4007 || code === 4009) {
+      sessionId = null;
+      seq = null;
+      scheduleReconnect("identify");
+      return;
+    }
+    scheduleReconnect(sessionId !== null && seq !== null ? "resume" : "identify");
+  }
+
+  function openSocket(target: string): void {
+    inflater.reset();
+    setStatus(resuming ? "resuming" : "connecting");
+    const ws = new WebSocketImpl(target);
+    socket = ws;
+
+    ws.onmessage = (event: MessageEvent) => {
+      let text: string | null;
+      if (typeof event.data === "string") {
+        text = event.data;
+      } else {
+        const bytes = toBytes(event.data);
+        text = bytes === null ? null : inflater.push(bytes);
+      }
+      if (text !== null) handleMessage(text);
+    };
+    ws.onclose = (event: CloseEvent) => {
+      if (socket === ws) handleClose(event.code);
+    };
+    ws.onerror = () => {
+      // el cierre llega por onclose
+    };
   }
 
   return {
     connect(): void {
-      if (socket !== null) return;
+      if (socket !== null || reconnectTimer !== null) return;
       closedByUser = false;
-      setStatus("connecting");
-      const ws = new WebSocketImpl(url);
-      socket = ws;
-
-      ws.onmessage = (event: MessageEvent) => {
-        let text: string | null;
-        if (typeof event.data === "string") {
-          text = event.data;
-        } else {
-          const bytes = toBytes(event.data);
-          text = bytes === null ? null : inflater.push(bytes);
-        }
-        if (text !== null) handleMessage(text);
-      };
-      ws.onclose = (event: CloseEvent) => {
-        if (socket === ws) handleClose(event.code);
-      };
-      ws.onerror = () => {
-        // el cierre llega por onclose
-      };
+      backoffIndex = 0;
+      resuming = false;
+      openSocket(url);
     },
     close(): void {
       closedByUser = true;
       stopHeartbeat();
+      if (reconnectTimer !== null) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
       const current = socket;
       socket = null;
       try {

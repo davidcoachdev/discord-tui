@@ -160,7 +160,7 @@ $ tsc --noEmit   # sin salida, código 0
 
 Reglas (spec 6.2 y discord.food): op 7 o cierre que no sea fatal → reconectar a `resume_gateway_url` y mandar op 6 `{ token, session_id, seq }`. op 9 `d: true` → resume; `d: false` → esperar 1–5 s al azar e identify nuevo. 4007 y 4009 → identify nuevo. 4004 → fatal. Falta de `heartbeat_ack` → cerrar con 4000 y resume. Backoff: 1, 2, 4, 8, 16, 30 s (tope), con jitter ±20 %. Mientras tanto `status` = `reconnecting`.
 
-- [ ] **Step 1: Tests**
+- [x] **Step 1: Tests**
 
 ```ts
 test("op 7 resumes against resume_gateway_url with session_id and seq", async () => {});
@@ -171,8 +171,25 @@ test("backoff grows and caps at 30 s", () => { expect(delays).toEqual([1000, 200
 test("status goes ready → reconnecting → resuming → ready", async () => {});
 ```
 
-- [ ] **Step 2–4:** FAIL → implementar → PASS.
-- [ ] **Step 5:** commit `feat(e2): gateway resume and reconnect` + push.
+- [x] **Step 2–4:** FAIL → implementar → PASS.
+
+```text
+$ bun test tests/gateway/resume.test.ts
+ 6 pass
+ 0 fail
+ 9 expect() calls
+Ran 6 tests across 1 file. [304.00ms]
+
+$ bun test && bun run typecheck
+ 107 pass
+ 0 fail
+ 220 expect() calls
+Ran 107 tests across 22 files. [4.48s]
+$ tsc --noEmit   # sin salida, código 0
+```
+
+Nota: al reconectar hay que resetear el inflater (contexto zlib nuevo por conexión); el test de resume lo cubre.
+- [x] **Step 5:** commit `feat(e2): gateway resume and reconnect` + push.
 
 ---
 

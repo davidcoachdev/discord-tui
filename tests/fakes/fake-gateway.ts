@@ -8,6 +8,8 @@ export interface FakeGatewayOptions {
   onIdentify?(d: any): void;
   script?: FakeGwStep[];
   heartbeatInterval?: number;
+  noHeartbeatAck?: boolean;
+  closeOnOpen?: number;
 }
 
 export interface FakeGateway {
@@ -64,6 +66,10 @@ export function startFakeGateway(opts: FakeGatewayOptions = {}): FakeGateway {
     websocket: {
       open(ws) {
         active = ws;
+        if (opts.closeOnOpen !== undefined) {
+          ws.close(opts.closeOnOpen);
+          return;
+        }
         sendJson(ws, {
           op: 10,
           d: { heartbeat_interval: opts.heartbeatInterval ?? 45_000, _trace: ["fake"] },
@@ -78,7 +84,7 @@ export function startFakeGateway(opts: FakeGatewayOptions = {}): FakeGateway {
         }
         received.push(message);
         if (message.op === 1) {
-          sendJson(ws, { op: 11, d: null });
+          if (!opts.noHeartbeatAck) sendJson(ws, { op: 11, d: null });
           return;
         }
         if (message.op === 2) {
