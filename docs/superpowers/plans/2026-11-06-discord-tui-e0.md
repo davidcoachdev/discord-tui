@@ -140,7 +140,7 @@ git add -A && git commit -m "chore(e0): scaffold, AGENTS.md and token leak test"
   - `type LogFields = Partial<Record<AllowedField, string | number | boolean | null>>`; `createLogger(opts?: { file?: string }): Logger` con `info|warn|error(event: string, fields?: LogFields): void` y `flush(): Promise<void>`. `log` = logger por defecto a `logPath()`.
   - `ALLOWED_FIELDS = ["method","route","status","code","op","t","seq","close_code","guild_id","channel_id","message_id","state","attempt","duration_ms","error_name","msg","count","mode"] as const`.
 
-- [ ] **Step 1: Tests que fallan**
+- [x] **Step 1: Tests que fallan**
 
 ```ts
 test("Secret never reveals itself when stringified", () => {
@@ -166,13 +166,32 @@ test("log file is created with mode 0600 and its dir with 0700", async () => {
 });
 ```
 
-- [ ] **Step 2: Correr** — Run: `bun test tests/secret.test.ts tests/log` · Expected: FAIL por módulos inexistentes.
+- [x] **Step 2: Correr** — Run: `bun test tests/secret.test.ts tests/log` · Expected: FAIL por módulos inexistentes.
 
-- [ ] **Step 3: Implementar** `src/secret.ts`, `src/config/paths.ts` y `src/log/logger.ts`. Cada línea del log es JSON: `{"ts": ISO, "level", "event", ...fields}`. Los valores string pasan por un `redactTokens(s)` que reemplaza cada match de `TOKEN_PATTERNS` por `[redacted]`. Carpeta con `mkdir(..., { recursive: true, mode: 0o700 })`, archivo abierto con `openSync(path, "a", 0o600)`.
+```text
+$ bun test tests/secret.test.ts tests/log
+error: Cannot find module '../src/log/logger' from '.../tests/log/logger.test.ts'
+error: Cannot find module '../src/secret' from '.../tests/secret.test.ts'
 
-- [ ] **Step 4: Verificar** — Run: `bun test && bun run typecheck` · Expected: todo en verde.
+ 0 pass
+ 2 fail
+ 2 errors
+```
 
-- [ ] **Step 5: Commit y push** — `git commit -m "feat(e0): Secret type and allowlist logger"` + `git push origin main`.
+- [x] **Step 3: Implementar** `src/secret.ts`, `src/config/paths.ts` y `src/log/logger.ts`. Cada línea del log es JSON: `{"ts": ISO, "level", "event", ...fields}`. Los valores string pasan por un `redactTokens(s)` que reemplaza cada match de `TOKEN_PATTERNS` por `[redacted]`. Carpeta con `mkdir(..., { recursive: true, mode: 0o700 })`, archivo abierto con `openSync(path, "a", 0o600)`.
+
+- [x] **Step 4: Verificar** — Run: `bun test && bun run typecheck` · Expected: todo en verde.
+
+```text
+$ bun test && bun run typecheck
+ 9 pass
+ 0 fail
+ 18 expect() calls
+Ran 9 tests across 4 files. [132.00ms]
+$ tsc --noEmit   # sin salida, código 0
+```
+
+- [x] **Step 5: Commit y push** — `git commit -m "feat(e0): Secret type and allowlist logger"` + `git push origin main`.
 
 ---
 
