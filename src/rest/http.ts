@@ -36,7 +36,7 @@ export function createHttp(deps: HttpDeps): Http {
   return {
     async request<T>(method: string, path: string, body?: unknown): Promise<T> {
       const route = routeTemplate(path);
-      const url = new URL(path, base.endsWith("/") ? base : base + "/");
+      const url = new URL(`${base.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`);
 
       const headers: Record<string, string> = { ...deps.props.headers() };
       if (body !== undefined) headers["Content-Type"] = "application/json";

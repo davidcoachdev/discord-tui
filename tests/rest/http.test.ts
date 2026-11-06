@@ -98,3 +98,25 @@ test("200 with a non-JSON body throws InvalidResponseError with the content type
     fake.stop();
   }
 });
+
+test("request keeps the base path (/api/v9)", async () => {
+  const fake = startFakeHttp(() => Response.json({ ok: true }));
+  try {
+    const http = createHttp({ props: createClientProps({ buildNumber: 1 }), baseUrl: `${fake.url}/api/v9` });
+    await http.request("GET", "/users/@me");
+    expect(new URL(fake.requests[0]!.url).pathname).toBe("/api/v9/users/@me");
+  } finally {
+    fake.stop();
+  }
+});
+
+test("default base URL is https://discord.com/api/v9", async () => {
+  let seen = "";
+  const fakeFetch = (async (input: RequestInfo | URL) => {
+    seen = String(input);
+    return Response.json({});
+  }) as unknown as typeof fetch;
+  const http = createHttp({ props: createClientProps({ buildNumber: 1 }), fetch: fakeFetch });
+  await http.request("GET", "/users/@me");
+  expect(seen).toBe("https://discord.com/api/v9/users/@me");
+});
