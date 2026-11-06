@@ -230,7 +230,7 @@ $ tsc --noEmit   # sin salida, código 0
 **Interfaces:**
 - Produces: `generateRaKeys(): Promise<RaKeys>` con `RaKeys = { publicSpkiB64: string; fingerprint: string; decrypt(b64: string): Promise<Uint8Array> }`; `fingerprintOf(spkiDer: Uint8Array): string` (SHA-256, base64url sin padding); `toBase64Url(bytes: Uint8Array): string`.
 
-- [ ] **Step 1: Tests que fallan**
+- [x] **Step 1: Tests que fallan**
 
 ```ts
 test("fingerprintOf is sha256 base64url without padding", () => {
@@ -247,8 +247,31 @@ test("fingerprint matches the exported key", async () => {
 });
 ```
 
-- [ ] **Step 2–4:** correr (FAIL), implementar con `crypto.subtle.generateKey({ name: "RSA-OAEP", modulusLength: 2048, publicExponent: new Uint8Array([1,0,1]), hash: "SHA-256" }, false, ["decrypt","encrypt"])`, correr `bun test tests/auth` (PASS).
-- [ ] **Step 5:** commit `feat(e1): remote auth crypto` + push.
+- [x] **Step 2–4:** correr (FAIL), implementar con `crypto.subtle.generateKey({ name: "RSA-OAEP", modulusLength: 2048, publicExponent: new Uint8Array([1,0,1]), hash: "SHA-256" }, false, ["decrypt","encrypt"])`, correr `bun test tests/auth` (PASS).
+
+```text
+$ bun test tests/auth/ra-crypto.test.ts   # antes de implementar
+error: Cannot find module '../../src/auth/ra-crypto' from '.../tests/auth/ra-crypto.test.ts'
+
+ 0 pass
+ 1 fail
+ 1 error
+
+$ bun test tests/auth/ra-crypto.test.ts
+ 3 pass
+ 0 fail
+ 3 expect() calls
+Ran 3 tests across 1 file. [209.00ms]
+
+$ bun test && bun run typecheck
+ 31 pass
+ 0 fail
+ 60 expect() calls
+Ran 31 tests across 10 files. [391.00ms]
+$ tsc --noEmit   # sin salida, código 0
+```
+
+- [x] **Step 5:** commit `feat(e1): remote auth crypto` + push.
 
 ---
 
