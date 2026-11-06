@@ -170,7 +170,7 @@ $ tsc --noEmit   # sin salida, código 0
 - Consumes: `sessionPath()`, `configDir()` (E0 Task 2), `Secret`.
 - Produces: `type Session = { token: Secret; userId: string; buildNumber: number | null }`; `saveSession(s: Session): Promise<void>`; `loadSession(): Promise<Session | null>`; `deleteSession(): Promise<boolean>`; `class SessionPermissionError extends Error { mode: number }`.
 
-- [ ] **Step 1: Tests que fallan** (todos con `XDG_CONFIG_HOME` en una carpeta temporal)
+- [x] **Step 1: Tests que fallan** (todos con `XDG_CONFIG_HOME` en una carpeta temporal)
 
 ```ts
 test("saveSession creates file 0600 and dir 0700 from the start", async () => {
@@ -193,10 +193,31 @@ test("missing, corrupt or wrong-version session returns null without echoing con
 test("deleteSession removes the file", async () => { expect(await deleteSession()).toBe(true); expect(existsSync(sessionPath())).toBe(false); });
 ```
 
-- [ ] **Step 2:** Run `bun test tests/auth/session.test.ts` · Expected: FAIL.
-- [ ] **Step 3:** implementar. Escritura atómica: `open(tmp, "wx", 0o600)` en la misma carpeta, write, fsync, `rename` sobre `session.json`.
-- [ ] **Step 4:** Run `bun test && bun run typecheck` · Expected: PASS.
-- [ ] **Step 5:** commit `feat(e1): session file with 0600 permissions` + push.
+- [x] **Step 2:** Run `bun test tests/auth/session.test.ts` · Expected: FAIL.
+
+```text
+$ bun test tests/auth/session.test.ts
+error: Cannot find module '../../src/auth/session' from '.../tests/auth/session.test.ts'
+
+ 0 pass
+ 1 fail
+ 1 error
+```
+
+- [x] **Step 3:** implementar. Escritura atómica: `open(tmp, "wx", 0o600)` en la misma carpeta, write, fsync, `rename` sobre `session.json`.
+
+- [x] **Step 4:** Run `bun test && bun run typecheck` · Expected: PASS.
+
+```text
+$ bun test && bun run typecheck
+ 28 pass
+ 0 fail
+ 57 expect() calls
+Ran 28 tests across 9 files. [338.00ms]
+$ tsc --noEmit   # sin salida, código 0
+```
+
+- [x] **Step 5:** commit `feat(e1): session file with 0600 permissions` + push.
 
 ---
 
