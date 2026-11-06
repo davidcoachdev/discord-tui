@@ -355,7 +355,9 @@ Se agregaron las acciones `messages/loading` y `messages/staleAll` al store, y `
   - Textos: StatusBar muestra `conectado`, `reconectando…`, `reanudando…` o `desconectado`, más `logueado como <username>`. Un canal no leído va en negrita con `●`; con menciones, `(<n>)`. DMs aparecen como primer ítem `Mensajes directos` en la columna de guilds. Mensajes: `HH:MM usuario` y el texto; los consecutivos del mismo autor dentro de 7 min no repiten el encabezado; editado → ` (editado)`; reply → línea previa `↳ usuario: <primeros 60 caracteres>`.
   - Llegar al tope de `MessageView` con `k` o `gg` llama a `actions.loadOlder`.
 
-- [ ] **Step 1: Tests** (store fijo armado con `reduce` y la fixture de READY + 3 mensajes)
+- [x] **Step 1: Tests** (store fijo armado con `reduce` y la fixture de READY + 3 mensajes)
+
+Cubiertos: paneles con guilds/DMs/canales, mensajes, status bar, `l`/Enter abren el canal y `q` sale. Quedan pendientes `gu`, `g g` y `G` (keymap completo de E5).
 
 ```tsx
 test("lists guilds with 'Mensajes directos' first", async () => {});
@@ -368,8 +370,25 @@ test("ui never imports network modules", async () => {
 });
 ```
 
-- [ ] **Step 2–4:** FAIL → implementar → `bun test && bun run typecheck` PASS.
-- [ ] **Step 5:** commit `feat(e2): read UI panels and vim navigation` + push.
+- [x] **Step 2–4:** FAIL → implementar → `bun test && bun run typecheck` PASS.
+
+```text
+$ bun test tests/ui
+ 11 pass
+ 0 fail
+ 21 expect() calls
+Ran 11 tests across 3 files. [449.00ms]
+
+$ bun test && bun run typecheck
+ 138 pass
+ 0 fail
+ 284 expect() calls
+Ran 138 tests across 29 files. [5.24s]
+$ tsc --noEmit   # sin salida, código 0
+```
+
+`App` se cableó al `Store`/`Actions` y `main.tsx` crea el runtime al entrar (login o sesión existente). Al llegar el READY se autoselecciona el primer servidor y su primer canal.
+- [x] **Step 5:** commit `feat(e2): read UI panels and vim navigation` + push.
 
 ---
 

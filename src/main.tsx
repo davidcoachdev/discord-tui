@@ -1,8 +1,9 @@
 import { createCliRenderer } from "@opentui/core";
 import { render, useKeyboard } from "@opentui/solid";
-import { createSignal, Match, onCleanup, onMount, Switch, type JSX } from "solid-js";
+import { createSignal, onCleanup, onMount, Show, type Accessor, type JSX } from "solid-js";
 
 import { boot } from "./app/boot";
+import { createRuntime, type Runtime } from "./app/runtime";
 import { createRemoteAuth } from "./auth/remote-auth";
 import { deleteSession, loadSession, saveSession, type Session } from "./auth/session";
 import { normalizePastedToken, validateToken } from "./auth/token-login";
@@ -21,14 +22,20 @@ export function assertTty(stream: { isTTY?: boolean }): string | null {
 function LoginRoot(props: { buildNumber: number; onQuit: () => void }): JSX.Element {
   const clientProps = createClientProps({ buildNumber: props.buildNumber });
   const auth = createRemoteAuth({ http: createHttp({ props: clientProps }) });
-  const [screen, setScreen] = createSignal<"login" | "main">("login");
-  const [status, setStatus] = createSignal("");
+  const [runtime, setRuntime] = createSignal<Runtime | null>(null);
   let lastName = "";
 
   async function finish(token: Secret, userId: string, username: string): Promise<void> {
-    await saveSession({ token, userId, buildNumber: props.buildNumber });
-    setStatus(`logueado como ${username}`);
-    setScreen("main");
+    const session: Session = { token, userId, buildNumber: props.buildNumber };
+    await saveSession(session);
+
+    const next = createRuntime({ session, me: { id: userId, username }, props: clientProps });
+    next.onUnauthorized(() => {
+      next.stop();
+      setRuntime(null);
+    });
+    next.start();
+    setRuntime(next);
   }
 
   onMount(() => {
@@ -59,18 +66,13 @@ function LoginRoot(props: { buildNumber: number; onQuit: () => void }): JSX.Elem
   }
 
   useKeyboard((key) => {
-    if (screen() === "login" && key.name === "q" && !key.ctrl && !key.meta) props.onQuit();
+    if (runtime() === null && key.name === "q" && !key.ctrl && !key.meta) props.onQuit();
   });
 
   return (
-    <Switch>
-      <Match when={screen() === "login"}>
-        <LoginScreen auth={auth} onPasteToken={onPasteToken} />
-      </Match>
-      <Match when={screen() === "main"}>
-        <App status={status()} onQuit={props.onQuit} />
-      </Match>
-    </Switch>
+    <Show when={runtime()} fallback={<LoginScreen auth={auth} onPasteToken={onPasteToken} />}>
+      {(active: Accessor<Runtime>) => <App store={active().store} actions={active().actions} onQuit={props.onQuit} />}
+    </Show>
   );
 }
 
@@ -109,8 +111,11 @@ async function main(): Promise<void> {
     return;
   }
 
-  const status = result.kind === "main" ? `logueado como ${result.me.username}` : "sin conexión, reintentando";
-  await render(() => <App status={status} onQuit={quit} />, renderer);
+  const session = result.session;
+  const me = result.kind === "main" ? result.me : { id: session.userId, username: "" };
+  const runtime = createRuntime({ session, me, props: createClientProps({ buildNumber }) });
+  runtime.start();
+  await render(() => <App store={runtime.store} actions={runtime.actions} onQuit={quit} />, renderer);
 }
 
 if (import.meta.main) await main();
