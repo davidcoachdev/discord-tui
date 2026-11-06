@@ -104,7 +104,7 @@ Ran 5 tests across 1 file. [387.00ms]
   - `startFakeGateway(opts: { onIdentify?(d: any): void; script?: FakeGwStep[] }): { url: string; sent: any[]; received: any[]; dispatch(t: string, d: unknown): void; close(code: number): void; stop(): void }`: habla zlib-stream con un `deflate` compartido por conexión y `Z_SYNC_FLUSH`. E2 lo extiende.
   - CLI (la corre Gon): `bun scripts/capture-gateway.ts --out ~/discord-captures-raw/gateway --capabilities <n> [--op37 <archivo>] [--voice <guild_id> <channel_id>]`. Hace hello → identify (con `properties` de `createClientProps`, `capabilities` del argumento, `presence` online, `compress: false`, sin intents) → heartbeat. Guarda cada dispatch de la lista `READY, READY_SUPPLEMENTAL, MESSAGE_CREATE, MESSAGE_UPDATE, MESSAGE_REACTION_ADD, TYPING_START, PRESENCE_UPDATE, GUILD_MEMBER_LIST_UPDATE, VOICE_STATE_UPDATE, VOICE_SERVER_UPDATE, CHANNEL_UNREAD_UPDATE, MESSAGE_ACK` como `<out>/<T>-<n>.json` (máx. 3 por tipo). Teclas: `o` manda el op 37 del archivo, `v` manda op 4 de entrada al canal de voz y, cuando llega `VOICE_SERVER_UPDATE`, op 4 de salida (`channel_id: null`); `q` cierra con 1000. Por stdout solo `READY 1`, `MESSAGE_CREATE 2`…
 
-- [ ] **Step 1: Tests**
+- [x] **Step 1: Tests**
 
 ```ts
 test("inflater returns null until the 00 00 ff ff suffix arrives", () => {
@@ -123,8 +123,26 @@ test("capture script identifies without intents and saves dispatches", async () 
 });
 ```
 
-- [ ] **Step 2–4:** FAIL → implementar → `bun test` PASS.
-- [ ] **Step 5:** commit `feat(e1.5): zlib-stream inflater and gateway capture script` + push.
+- [x] **Step 2–4:** FAIL → implementar → `bun test` PASS.
+
+El CLI acepta además `--url <ws>` (solo para tests; por defecto el gateway real) y usa el `client_build_number` cacheado en la sesión para no pedir red.
+
+```text
+$ bun test tests/gateway tests/scripts/capture-gateway.test.ts
+ 3 pass
+ 0 fail
+ 11 expect() calls
+Ran 3 tests across 2 files. [293.00ms]
+
+$ bun test && bun run typecheck
+ 64 pass
+ 0 fail
+ 138 expect() calls
+Ran 64 tests across 18 files. [3.24s]
+$ tsc --noEmit   # sin salida, código 0
+```
+
+- [x] **Step 5:** commit `feat(e1.5): zlib-stream inflater and gateway capture script` + push.
 
 ---
 
