@@ -1,6 +1,7 @@
 import { compareSnowflakes } from "../util/snowflake";
 import { canViewChannel } from "./permissions";
-import type { AppState, ChannelState } from "./types";
+import { toMessage } from "./reducers/messages";
+import type { ApiMessage, AppState, ChannelState, Message } from "./types";
 
 export interface ChannelRow {
   id: string;
@@ -118,4 +119,13 @@ export function selectNextUnread(state: AppState, fromChannelId: string | null):
     if (row.unread && !row.muted) return row.id;
   }
   return null;
+}
+
+export function selectMessages(state: AppState, channelId: string): Message[] {
+  const slice = state.messages[channelId];
+  if (!slice) return [];
+  return slice.ids
+    .map((id) => slice.byId[id])
+    .filter((message): message is ApiMessage => message !== undefined)
+    .map((message) => toMessage(state, message));
 }

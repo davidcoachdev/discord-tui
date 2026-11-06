@@ -56,6 +56,22 @@ export interface MemberState {
   nick: string | null;
 }
 
+export interface Message {
+  id: string;
+  channelId: string;
+  authorId: string;
+  content: string;
+  timestamp: string;
+  editedTimestamp: string | null;
+  attachments: ApiAttachment[];
+  embeds: ApiEmbed[];
+  mentionIds: string[];
+  mentionsMe: boolean;
+  referenced: { id: string; authorId: string; content: string } | null;
+  reactions: { emoji: { id: string | null; name: string }; count: number; me: boolean }[];
+  nonce: string | null;
+}
+
 export interface MessageSlice {
   ids: string[];
   byId: Record<string, ApiMessage>;

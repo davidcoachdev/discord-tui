@@ -1,48 +1,38 @@
 import type { Action, ApiMessage, AppState } from "./types";
 import { applyReady, applyReadySupplemental } from "./reducers/ready";
+import {
+  applyMessageCreate,
+  applyMessageDelete,
+  applyMessageDeleteBulk,
+  applyMessageUpdate,
+  applyPage,
+} from "./reducers/messages";
+import { applyChannelUnreadUpdate, applyMessageAck } from "./reducers/read-state";
 import { compareSnowflakes } from "../util/snowflake";
-
-function applyPage(
-  state: AppState,
-  channelId: string,
-  messages: ApiMessage[],
-  mode: "older" | "latest",
-): AppState {
-  const previous = state.messages[channelId] ?? {
-    ids: [],
-    byId: {},
-    hasMoreBefore: true,
-    loadingOlder: false,
-    stale: false,
-  };
-  const byId = { ...previous.byId };
-  const ids = new Set(previous.ids);
-  for (const message of messages) {
-    byId[message.id] = message;
-    ids.add(message.id);
-  }
-  const ordered = [...ids].sort(compareSnowflakes);
-  return {
-    ...state,
-    messages: {
-      ...state.messages,
-      [channelId]: {
-        ...previous,
-        ids: ordered,
-        byId,
-        loadingOlder: false,
-        hasMoreBefore: mode === "older" ? messages.length >= 50 : previous.hasMoreBefore,
-      },
-    },
-  };
-}
 
 export function reduce(state: AppState, action: Action): AppState {
   switch (action.type) {
     case "gw":
-      if (action.t === "READY") return applyReady(state, action.d);
-      if (action.t === "READY_SUPPLEMENTAL") return applyReadySupplemental(state, action.d);
-      return state;
+      switch (action.t) {
+        case "READY":
+          return applyReady(state, action.d);
+        case "READY_SUPPLEMENTAL":
+          return applyReadySupplemental(state, action.d);
+        case "MESSAGE_CREATE":
+          return applyMessageCreate(state, action.d);
+        case "MESSAGE_UPDATE":
+          return applyMessageUpdate(state, action.d);
+        case "MESSAGE_DELETE":
+          return applyMessageDelete(state, action.d);
+        case "MESSAGE_DELETE_BULK":
+          return applyMessageDeleteBulk(state, action.d);
+        case "MESSAGE_ACK":
+          return applyMessageAck(state, action.d);
+        case "CHANNEL_UNREAD_UPDATE":
+          return applyChannelUnreadUpdate(state, action.d);
+        default:
+          return state;
+      }
     case "connection":
       return state.connection === action.status ? state : { ...state, connection: action.status };
     case "messages/page":

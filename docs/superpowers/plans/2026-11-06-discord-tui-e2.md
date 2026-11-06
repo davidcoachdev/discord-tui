@@ -259,7 +259,7 @@ La fixture READY se amplió con `users`, un DM en `private_channels` y `read_sta
 **Interfaces:**
 - Produces: manejo de `MESSAGE_CREATE`, `MESSAGE_UPDATE` (parcial: solo pisa los campos presentes), `MESSAGE_DELETE`, `MESSAGE_DELETE_BULK`, `MESSAGE_ACK`, `CHANNEL_UNREAD_UPDATE` (si la fixture existe) y `messages/page`. `selectMessages(s, channelId): Message[]` (orden ascendente por id). `Message = { id; channelId; authorId; content; timestamp; editedTimestamp: string | null; attachments; embeds; mentionIds: string[]; mentionsMe: boolean; referenced: { id: string; authorId: string; content: string } | null; reactions: { emoji: { id: string | null; name: string }; count: number; me: boolean }[]; nonce: string | null }`.
 
-- [ ] **Step 1: Tests**
+- [x] **Step 1: Tests**
 
 ```ts
 test("MESSAGE_CREATE appends and bumps channel last_message_id", () => {});
@@ -272,8 +272,23 @@ test("mentionsMe is true for <@me>, @everyone when mention_everyone, and replies
 test("MESSAGE_CREATE from fixture parses attachments, embeds and custom emoji content", () => {});
 ```
 
-- [ ] **Step 2–4:** FAIL → implementar → PASS.
-- [ ] **Step 5:** commit `feat(e2): message reducers and history merge` + push.
+- [x] **Step 2–4:** FAIL → implementar → PASS.
+
+```text
+$ bun test tests/store/messages.test.ts
+ 8 pass
+ 0 fail
+ 19 expect() calls
+Ran 8 tests across 1 file. [238.00ms]
+
+$ bun test && bun run typecheck
+ 129 pass
+ 0 fail
+ 265 expect() calls
+Ran 129 tests across 26 files. [4.41s]
+$ tsc --noEmit   # sin salida, código 0
+```
+- [x] **Step 5:** commit `feat(e2): message reducers and history merge` + push.
 
 ---
 
