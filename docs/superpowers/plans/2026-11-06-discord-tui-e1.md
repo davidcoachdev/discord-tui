@@ -411,7 +411,7 @@ $ tsc --noEmit   # sin salida, código 0
   - Textos literales: `Escaneá el código con la app de Discord`, `¿Sos vos, <username>? Confirmá en el teléfono`, `Discord pidió captcha, pegá el token`, `Pegá tu token (p para pegar, se ve como ••••)`, `logueado como <username>`, `sin conexión, reintentando`, `session.json tiene permisos <modo>; tienen que ser 600. Corré: chmod 600 ~/.config/discord-tui/session.json`.
   - Pantalla de token: instrucciones en 3 líneas (DevTools → Network → un request a `/api/v9` → header `Authorization`). El input muestra `•` por carácter, nunca el texto.
 
-- [ ] **Step 1: Tests**
+- [x] **Step 1: Tests**
 
 ```tsx
 test("shows the QR and the scan hint on qr event", async () => { expect(frame).toContain("Escaneá el código"); });
@@ -431,8 +431,33 @@ test("boot with network error keeps the session and returns offline", async () =
 test("argv ['logout'] deletes the session", async () => { expect(r.kind).toBe("logout-done"); });
 ```
 
-- [ ] **Step 2–4:** FAIL → implementar → `bun test && bun run typecheck` PASS. **[nuestra]** Con 401 al arrancar no se borra la sesión sola: se va al login y la sesión nueva la pisa.
-- [ ] **Step 5:** commit `feat(e1): login screen, boot and logout` + push.
+- [x] **Step 2–4:** FAIL → implementar → `bun test && bun run typecheck` PASS. **[nuestra]** Con 401 al arrancar no se borra la sesión sola: se va al login y la sesión nueva la pisa.
+
+El wiring de `main.tsx` quedó en un componente `LoginRoot` (Switch/Match de Solid): guarda la sesión al recibir el token o al validar el token pegado, y pasa a `App`; `App` acepta `status?` para mostrar `logueado como <username>` o `sin conexión, reintentando`.
+
+```text
+$ bun test tests/app tests/ui/login-screen.test.tsx   # antes de implementar
+error: Cannot find module '../../src/app/boot' from '.../tests/app/boot.test.ts'
+
+ 0 pass
+ 2 fail
+ 2 errors
+
+$ bun test tests/app tests/ui/login-screen.test.tsx
+ 10 pass
+ 0 fail
+ 16 expect() calls
+Ran 10 tests across 2 files. [331.00ms]
+
+$ bun test && bun run typecheck
+ 53 pass
+ 0 fail
+ 103 expect() calls
+Ran 53 tests across 14 files. [2.45s]
+$ tsc --noEmit   # sin salida, código 0
+```
+
+- [x] **Step 5:** commit `feat(e1): login screen, boot and logout` + push.
 
 ---
 

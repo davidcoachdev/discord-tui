@@ -3,15 +3,15 @@ import { useRenderer, type JSX } from "@opentui/solid";
 
 import { createAppKeymap } from "./keymap";
 
-function StatusBar(): JSX.Element {
+function StatusBar(props: { status: string }): JSX.Element {
   return (
     <box height={1} width="100%" paddingLeft={1}>
-      <text>desconectado</text>
+      <text>{props.status}</text>
     </box>
   );
 }
 
-export function App(props: { onQuit: () => void }): JSX.Element {
+export function App(props: { onQuit: () => void; status?: string }): JSX.Element {
   const renderer = useRenderer();
 
   onMount(() => {
@@ -25,7 +25,7 @@ export function App(props: { onQuit: () => void }): JSX.Element {
         <box title="Canales" border flexGrow={2} height="100%" />
         <box title="Mensajes" border flexGrow={4} height="100%" />
       </box>
-      <StatusBar />
+      <StatusBar status={props.status ?? "desconectado"} />
     </box>
   );
 }
