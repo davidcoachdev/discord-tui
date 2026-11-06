@@ -472,7 +472,7 @@ $ tsc --noEmit   # sin salida, código 0
 
 Lo corre **solo Gon**. El agente solo lo prueba con una sesión falsa en una carpeta temporal.
 
-- [ ] **Step 1: Test**
+- [x] **Step 1: Test**
 
 ```ts
 test("reports matches by file without printing the token", async () => {
@@ -482,8 +482,33 @@ test("reports matches by file without printing the token", async () => {
 });
 ```
 
-- [ ] **Step 2–4:** FAIL → implementar (por defecto escanea la carpeta de `logPath()` y los archivos del repo) → PASS. Agregar script `"leak-check": "bun scripts/leak-check.ts"`.
-- [ ] **Step 5:** commit `feat(e1): leak-check script for Gon` + push.
+- [x] **Step 2–4:** FAIL → implementar (por defecto escanea la carpeta de `logPath()` y los archivos del repo) → PASS. Agregar script `"leak-check": "bun scripts/leak-check.ts"`.
+
+`leakCheck` acepta además `scanFiles?: string[]`; la CLI le pasa los archivos versionados (`git ls-files -z`) y la carpeta de `logPath()`.
+
+```text
+$ bun test tests/scripts   # antes de implementar
+error: Cannot find module '../../scripts/leak-check' from '.../tests/scripts/leak-check.test.ts'
+
+ 0 pass
+ 1 fail
+ 1 error
+
+$ bun test tests/scripts
+ 3 pass
+ 0 fail
+ 8 expect() calls
+Ran 3 tests across 1 file. [384.00ms]
+
+$ bun test && bun run typecheck
+ 56 pass
+ 0 fail
+ 111 expect() calls
+Ran 56 tests across 15 files. [2.54s]
+$ tsc --noEmit   # sin salida, código 0
+```
+
+- [x] **Step 5:** commit `feat(e1): leak-check script for Gon` + push.
 
 - [ ] **Step 6: 🧍 Paso de Gon — login real (checkpoint E1)**
 

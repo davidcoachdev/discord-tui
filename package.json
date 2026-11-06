@@ -9,7 +9,8 @@
   "scripts": {
     "dev": "bun run src/main.tsx",
     "test": "bun test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "leak-check": "bun scripts/leak-check.ts"
   },
   "dependencies": {
     "@opentui/core": "0.8.2",
