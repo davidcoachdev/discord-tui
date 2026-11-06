@@ -77,4 +77,21 @@ export function createLogger(opts: { file?: string } = {}): Logger {
   };
 }
 
-export const log = createLogger();
+let defaultLogger: Logger | null = null;
+let defaultFile: string | null = null;
+
+function defaultLoggerForCurrentPath(): Logger {
+  const file = logPath();
+  if (defaultLogger === null || defaultFile !== file) {
+    defaultLogger = createLogger({ file });
+    defaultFile = file;
+  }
+  return defaultLogger;
+}
+
+export const log: Logger = {
+  info: (event, fields) => defaultLoggerForCurrentPath().info(event, fields),
+  warn: (event, fields) => defaultLoggerForCurrentPath().warn(event, fields),
+  error: (event, fields) => defaultLoggerForCurrentPath().error(event, fields),
+  flush: () => defaultLoggerForCurrentPath().flush(),
+};

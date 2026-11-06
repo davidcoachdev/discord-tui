@@ -103,7 +103,7 @@ $ tsc --noEmit   # sin salida, código 0
   - `createHttp(deps: { props: ClientProps; token?: Secret; baseUrl?: string; fetch?: typeof fetch }): Http` con `request<T>(method: string, path: string, body?: unknown): Promise<T>`. Errores: `HttpError { status; code?: number; route: string }`, `UnauthorizedError extends HttpError` (401), `CaptchaRequiredError` (cuerpo con `captcha_key` o `captcha_sitekey`), `NetworkError`.
   - `startFakeHttp(handler: (req: Request) => Response | Promise<Response>): { url: string; requests: Request[]; stop(): void }` en `tests/fakes/fake-http.ts`.
 
-- [ ] **Step 1: Tests que fallan**
+- [x] **Step 1: Tests que fallan**
 
 ```ts
 test("browser_user_agent matches the User-Agent header", () => {
@@ -130,10 +130,33 @@ test("captcha body throws CaptchaRequiredError", async () => {
 });
 ```
 
-- [ ] **Step 2:** Run `bun test tests/client-props tests/rest` · Expected: FAIL.
-- [ ] **Step 3:** implementar. La ruta que se loguea es la plantilla con los ids reemplazados por `:id` (`/channels/:id/messages`), nunca la query string.
-- [ ] **Step 4:** Run `bun test && bun run typecheck` · Expected: PASS.
-- [ ] **Step 5:** commit `feat(e1): client properties and minimal http client` + push.
+- [x] **Step 2:** Run `bun test tests/client-props tests/rest` · Expected: FAIL.
+
+```text
+$ bun test tests/client-props tests/rest
+error: Cannot find module '../../src/client-props/props' from '.../tests/rest/http.test.ts'
+
+ 0 pass
+ 2 fail
+ 2 errors
+```
+
+- [x] **Step 3:** implementar. La ruta que se loguea es la plantilla con los ids reemplazados por `:id` (`/channels/:id/messages`), nunca la query string.
+
+Notas de implementación: el logger por defecto re-resuelve `logPath()` en cada escritura (así los tests apuntan `XDG_STATE_HOME` a una carpeta temporal sin depender del orden de imports) y `Authorization` solo se agrega si el host es `discord.com` o el `127.0.0.1` del servidor falso.
+
+- [x] **Step 4:** Run `bun test && bun run typecheck` · Expected: PASS.
+
+```text
+$ bun test && bun run typecheck
+ 23 pass
+ 0 fail
+ 44 expect() calls
+Ran 23 tests across 8 files. [300.00ms]
+$ tsc --noEmit   # sin salida, código 0
+```
+
+- [x] **Step 5:** commit `feat(e1): client properties and minimal http client` + push.
 
 ---
 
