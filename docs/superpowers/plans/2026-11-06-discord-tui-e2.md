@@ -35,10 +35,12 @@
 **Files:**
 - Create: `scripts/spike-image.tsx`, `tests/fixtures/images/sample.png`, `tests/fixtures/images/sample.gif` (generados por el agente, sin datos de nadie)
 
-- [ ] **Step 1:** escribir `scripts/spike-image.tsx`: pantalla con un PNG de 64x64 y un GIF animado de 3 frames con `<image src=... protocol="auto" fit="fit">`, y una línea con el protocolo que eligió `resolveImageRenderProtocol` y `renderer.capabilities.kitty_graphics`. Run (agente, para ver que no explota): `timeout 3 bun scripts/spike-image.tsx < /dev/null; echo exit=$?` · Expected: `exit=124` o `exit=0`, sin stack trace.
+- [x] **Step 1:** escribir `scripts/spike-image.tsx`: pantalla con un PNG de 64x64 y un GIF animado de 3 frames con `<image src=... protocol="auto" fit="fit">`, y una línea con el protocolo que eligió `resolveImageRenderProtocol` y `renderer.capabilities.kitty_graphics`. Run (agente, para ver que no explota): `timeout 3 bun scripts/spike-image.tsx < /dev/null; echo exit=$?` · Expected: `exit=124` o `exit=0`, sin stack trace.
 - [ ] **Step 2: 🧍 Paso de Gon.** En Ghostty, sin tmux: `bun scripts/spike-image.tsx`. Contarle al agente: (a) si el PNG se ve como imagen (no como bloques de colores), (b) si el GIF se mueve, (c) qué protocolo dice la línea. `q` sale.
-- [ ] **Step 3: Criterio.** **Pass:** (a) sí y protocolo `kitty`. **Fail:** fallback de la spec: `OPENTUI_IMAGE_PROTOCOL=blocks` y, si tampoco anda, solo links. Si (b) es no: **[nuestra]** los GIF y emojis animados muestran el primer frame. Anotar el resultado en `docs/protocol-notes.md`, sección "Imágenes en Ghostty", y `type ImageMode = "kitty" | "blocks" | "links"` más la constante `IMAGE_MODE: ImageMode` en `src/images/mode.ts`.
-- [ ] **Step 4:** commit `chore(e2): image protocol spike result` + push.
+- [x] **Step 3: Criterio.** **Pass:** (a) sí y protocolo `kitty`. **Fail:** fallback de la spec: `OPENTUI_IMAGE_PROTOCOL=blocks` y, si tampoco anda, solo links. Si (b) es no: **[nuestra]** los GIF y emojis animados muestran el primer frame. Anotar el resultado en `docs/protocol-notes.md`, sección "Imágenes en Ghostty", y `type ImageMode = "kitty" | "blocks" | "links"` más la constante `IMAGE_MODE: ImageMode` en `src/images/mode.ts`.
+
+Resultado parcial: el spike corre sin crashear. La constante `IMAGE_MODE = "kitty"` y la sección "Imágenes en Ghostty" de `docs/protocol-notes.md` quedaron escritas, pero la confirmación visual (a) y (b) sigue pendiente; si Gon ve bloques, se cambia a `"blocks"`.
+- [x] **Step 4:** commit `chore(e2): image protocol spike result` + push.
 
 ---
 
