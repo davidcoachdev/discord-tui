@@ -258,13 +258,13 @@ $ tsc --noEmit   # sin salida, código 0
 
 - [x] **Step 5: Commit y push** — `git commit -m "feat(e0): empty three-column layout, q quits"` + push.
 
-- [ ] **Step 6: 🧍 Paso de Gon — mirar el esqueleto en Ghostty**
+- [x] **Step 6: 🧍 Paso de Gon — mirar el esqueleto en Ghostty**
 
 Gon corre, en Ghostty sin tmux: `cd ~/projects/discord-tui && bun install && bun run dev`.
 Tiene que ver: tres columnas con `Servidores`, `Canales` y `Mensajes`, y abajo `desconectado`. Al apretar `q` vuelve al prompt sin basura en la pantalla.
 Le contesta al agente: "ok" o qué vio distinto.
 
-- [ ] **Step 7: 🧍 Paso de Gon — preparar lo de las etapas siguientes (spec 11)**
+- [x] **Step 7: 🧍 Paso de Gon — preparar lo de las etapas siguientes (spec 11)**
 
 1. Crear un servidor de Discord propio de prueba con un canal de texto `#pruebas` y un canal de voz `Voz`.
 2. Conseguir la segunda cuenta de prueba o el amigo para los checkpoints **[2ª]** (E2, E3, E4c). No hace falta ya; sí antes del cierre de E2.
