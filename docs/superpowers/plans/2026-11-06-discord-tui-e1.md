@@ -354,7 +354,7 @@ $ tsc --noEmit   # sin salida, código 0
 **Interfaces:**
 - Produces: `normalizePastedToken(raw: string): { ok: true; token: Secret } | { ok: false; reason: "empty" | "prefixed" | "shape" }`; `validateToken(token: Secret, http: Http): Promise<{ userId: string; username: string }>` (`GET /users/@me`; 401 → `UnauthorizedError`).
 
-- [ ] **Step 1: Tests**
+- [x] **Step 1: Tests**
 
 ```ts
 test("trims spaces and quotes", () => {
@@ -368,8 +368,31 @@ test("rejects Bearer/Bot prefixes and non-token shapes", () => {
 test("validateToken returns user on 200 and throws UnauthorizedError on 401", async () => {});
 ```
 
-- [ ] **Step 2–4:** FAIL → implementar → `bun test` PASS.
-- [ ] **Step 5:** commit `feat(e1): pasted token login` + push.
+- [x] **Step 2–4:** FAIL → implementar → `bun test` PASS.
+
+```text
+$ bun test tests/auth/token-login.test.ts   # antes de implementar
+error: Cannot find module '../../src/auth/token-login' from '.../tests/auth/token-login.test.ts'
+
+ 0 pass
+ 1 fail
+ 1 error
+
+$ bun test tests/auth/token-login.test.ts
+ 4 pass
+ 0 fail
+ 8 expect() calls
+Ran 4 tests across 1 file. [136.00ms]
+
+$ bun test && bun run typecheck
+ 43 pass
+ 0 fail
+ 87 expect() calls
+Ran 43 tests across 12 files. [2.56s]
+$ tsc --noEmit   # sin salida, código 0
+```
+
+- [x] **Step 5:** commit `feat(e1): pasted token login` + push.
 
 ---
 
