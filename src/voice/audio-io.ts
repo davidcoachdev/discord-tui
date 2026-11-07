@@ -1,0 +1,163 @@
+import { cleanEnv } from "../proc/spawn";
+import { createFramer } from "./pcm-framer";
+
+export interface ProcLike {
+  stdin: { write(chunk: Uint8Array): void } | null;
+  stdout: ReadableStream<Uint8Array> | null;
+  stderr: ReadableStream<Uint8Array> | null;
+  exited: Promise<number>;
+  killed: boolean;
+  kill(): void;
+}
+
+export type SpawnLike = (cmd: string[], opts: { stdin: "pipe" | "ignore"; stdout: "pipe" | "ignore" }) => ProcLike;
+
+export class AudioDeviceError extends Error {}
+
+function defaultSpawn(): SpawnLike {
+  return (cmd, opts) =>
+    Bun.spawn(cmd, {
+      env: cleanEnv(),
+      stdin: opts.stdin,
+      stdout: opts.stdout,
+      stderr: "pipe",
+    }) as unknown as ProcLike;
+}
+
+async function readAll(stream: ReadableStream<Uint8Array> | null): Promise<string> {
+  if (!stream) return "";
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (value) chunks.push(value);
+  }
+  return Buffer.concat(chunks.map((c) => Buffer.from(c))).toString("utf8");
+}
+
+async function waitForEarlyExit(proc: ProcLike, label: string, binary: string): Promise<void> {
+  const early = await Promise.race([
+    proc.exited.then((code) => ({ exited: true as const, code })),
+    Bun.sleep(30).then(() => ({ exited: false as const, code: 0 })),
+  ]);
+  if (early.exited && early.code !== 0) {
+    const stderr = await readAll(proc.stderr);
+    throw new AudioDeviceError(`${label} (${binary}: ${stderr.trim() || `salió con código ${early.code}`})`);
+  }
+}
+
+export interface AudioCapture {
+  onFrame(fn: (pcm: Uint8Array) => void): () => void;
+  stop(): Promise<void>;
+}
+
+export async function startCapture(opts?: { target?: string; spawn?: SpawnLike }): Promise<AudioCapture> {
+  const spawn = opts?.spawn ?? defaultSpawn();
+  const cmd = ["pw-record", "--raw", "--format", "s16", "--rate", "48000", "--channels", "2", "--latency", "20ms"];
+  if (opts?.target) cmd.push("--target", opts.target);
+  cmd.push("-");
+
+  let proc: ProcLike;
+  try {
+    proc = spawn(cmd, { stdin: "ignore", stdout: "pipe" });
+  } catch (error) {
+    throw new AudioDeviceError(
+      `no pude abrir el micrófono (pw-record: ${error instanceof Error ? error.message : String(error)})`,
+    );
+  }
+
+  await waitForEarlyExit(proc, "no pude abrir el micrófono", "pw-record");
+
+  const framer = createFramer();
+  const listeners = new Set<(pcm: Uint8Array) => void>();
+
+  void (async () => {
+    const stdout = proc.stdout;
+    if (!stdout) return;
+    const reader = stdout.getReader();
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      for (const frame of framer.push(value)) {
+        for (const listener of listeners) listener(frame);
+      }
+    }
+  })();
+
+  return {
+    onFrame(fn: (pcm: Uint8Array) => void): () => void {
+      listeners.add(fn);
+      return () => listeners.delete(fn);
+    },
+    async stop(): Promise<void> {
+      proc.kill();
+      await proc.exited;
+    },
+  };
+}
+
+export interface AudioPlayback {
+  write(pcm: Uint8Array): void;
+  stop(): Promise<void>;
+  dropped(): number;
+}
+
+export async function startPlayback(opts?: {
+  target?: string;
+  spawn?: SpawnLike;
+  queuedFrames?: number;
+}): Promise<AudioPlayback> {
+  const spawn = opts?.spawn ?? defaultSpawn();
+  const cmd = ["pw-cat", "--playback", "--raw", "--format", "s16", "--rate", "48000", "--channels", "2"];
+  if (opts?.target) cmd.push("--target", opts.target);
+  cmd.push("-");
+
+  let proc: ProcLike;
+  try {
+    proc = spawn(cmd, { stdin: "pipe", stdout: "ignore" });
+  } catch (error) {
+    throw new AudioDeviceError(
+      `no pude abrir la salida de audio (pw-cat: ${error instanceof Error ? error.message : String(error)})`,
+    );
+  }
+
+  await waitForEarlyExit(proc, "no pude abrir la salida de audio", "pw-cat");
+
+  const maxQueued = opts?.queuedFrames ?? 10;
+  const queue: Uint8Array[] = [];
+  let droppedCount = 0;
+  let pumping = false;
+
+  // El drenaje corre en el próximo tick, imitando que `pw-cat` consume a su propio ritmo:
+  // si entran frames más rápido de lo que se vacía la cola, se descarta el más viejo.
+  function pump(): void {
+    if (pumping) return;
+    pumping = true;
+    queueMicrotask(() => {
+      pumping = false;
+      const frame = queue.shift();
+      if (frame) proc.stdin?.write(frame);
+      if (queue.length > 0) pump();
+    });
+  }
+
+  return {
+    write(pcm: Uint8Array): void {
+      if (queue.length >= maxQueued) {
+        queue.shift();
+        droppedCount += 1;
+      }
+      queue.push(pcm);
+      pump();
+    },
+    dropped(): number {
+      return droppedCount;
+    },
+    async stop(): Promise<void> {
+      proc.kill();
+      await proc.exited;
+    },
+  };
+}
