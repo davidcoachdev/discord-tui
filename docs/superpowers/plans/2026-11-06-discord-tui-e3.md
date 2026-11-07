@@ -348,7 +348,7 @@ test("Ctrl-v with no image pastes text normally", async () => {});
 - Consumes: `spawnClean` (Task 7).
 - Produces: `shouldNotify(s: AppState, msg: Message, viewingChannelId: string | null): boolean`; `notify(title: string, body: string, deps?: { spawn?: typeof spawnClean }): void` → `["notify-send", "-a", "discord-tui", title, body]`. Título: `<usuario> en #canal (<servidor>)` o `<usuario> (DM)`; cuerpo: el texto plano del mensaje, máx. 200 caracteres.
 
-- [ ] **Step 1: Tests**
+- [x] **Step 1: Tests**
 
 ```ts
 test.each([
@@ -361,8 +361,26 @@ test("notify spawns notify-send with an args array and clean env", () => {
 });
 ```
 
-- [ ] **Step 2–4:** FAIL → implementar → PASS.
-- [ ] **Step 5:** commit `feat(e3): desktop notifications` + push.
+- [x] **Step 2–4:** FAIL → implementar → PASS.
+
+```text
+$ bun test tests/notify
+ 10 pass
+ 0 fail
+ 10 expect() calls
+Ran 10 tests across 1 file. [121.00ms]
+
+$ bun test && bun run typecheck
+ 169 pass
+ 0 fail
+ 337 expect() calls
+Ran 169 tests across 37 files. [4.66s]
+$ tsc --noEmit   # sin salida, código 0
+```
+
+`runtime` notifica en cada `MESSAGE_CREATE` cuando `shouldNotify` da true. `proc/spawn.ts` (`cleanEnv` + `spawnClean`) quedó listo y E4/E5 lo reusan.
+
+- [x] **Step 5:** commit `feat(e3): desktop notifications` + push.
 
 ---
 

@@ -4,6 +4,8 @@ import type { ClientProps } from "../client-props/props";
 import { createGateway } from "../gateway/connection";
 import { createHttp } from "../rest/http";
 import { createRestClient } from "../rest/client";
+import { notify, notificationTitle, shouldNotify } from "../notify/notify";
+import { selectMessages } from "../store/selectors";
 import { createStore, type Store } from "../store/store";
 
 export interface RuntimeDeps {
@@ -46,7 +48,16 @@ export function createRuntime(deps: RuntimeDeps): Runtime {
 
   store.dispatch({ type: "connection", status: gateway.status });
   gateway.on("status", (status) => store.dispatch({ type: "connection", status }));
-  gateway.on("dispatch", (t, d) => store.dispatch({ type: "gw", t, d }));
+  gateway.on("dispatch", (t, d) => {
+    store.dispatch({ type: "gw", t, d });
+    if (t === "MESSAGE_CREATE" && typeof d?.channel_id === "string" && typeof d?.id === "string") {
+      const state = store.getState();
+      const message = selectMessages(state, d.channel_id).find((candidate) => candidate.id === d.id);
+      if (message && shouldNotify(state, message, state.ui.selectedChannelId)) {
+        notify(notificationTitle(state, message), message.content.slice(0, 200));
+      }
+    }
+  });
 
   let readySessions = 0;
   gateway.on("session", (kind) => {
