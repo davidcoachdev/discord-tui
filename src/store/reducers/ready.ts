@@ -171,7 +171,11 @@ export function applyReadySupplemental(state: AppState, d: any): AppState {
   const channels = { ...state.channels };
   const privateChannelIds = [...state.privateChannelIds];
   for (const raw of asList(d.lazy_private_channels, "id")) {
-    const recipients = asList(raw.recipients, "id");
+    const recipients: any[] = Array.isArray(raw.recipients)
+      ? raw.recipients
+      : Array.isArray(raw.recipient_ids)
+        ? raw.recipient_ids.map((recipientId: string) => users[recipientId] ?? { id: recipientId })
+        : [];
     for (const recipient of recipients) {
       if (recipient?.id) users[recipient.id] = toUser(recipient);
     }

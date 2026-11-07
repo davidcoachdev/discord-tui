@@ -50,6 +50,21 @@ export function createRuntime(deps: RuntimeDeps): Runtime {
   store.dispatch({ type: "connection", status: gateway.status });
   gateway.on("status", (status) => store.dispatch({ type: "connection", status }));
   gateway.on("dispatch", (t, d) => {
+    if (t === "READY" && d && typeof d === "object") {
+      const firstGuild =
+        (Array.isArray(d.guilds) ? d.guilds[0] : d.guilds && typeof d.guilds === "object" ? (() => { const k = Object.keys(d.guilds as object)[0]; return k !== undefined ? (d.guilds as any)[k] : undefined; })() : undefined);
+      const firstChannel = firstGuild?.channels?.[0];
+      log.info("ready.shape", {
+        msg: JSON.stringify({
+          dKeys: Object.keys(d).sort(),
+          guildsType: Array.isArray(d.guilds) ? "array" : typeof d.guilds,
+          guildKeys: firstGuild ? Object.keys(firstGuild).sort() : null,
+          channelKeys: firstChannel ? Object.keys(firstChannel).sort() : null,
+          hasGuildName: typeof firstGuild?.name,
+          hasChannelName: typeof firstChannel?.name,
+        }),
+      });
+    }
     try {
       store.dispatch({ type: "gw", t, d });
     } catch (error) {
