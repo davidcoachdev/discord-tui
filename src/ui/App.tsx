@@ -9,6 +9,9 @@ import { ChannelList } from "./components/ChannelList";
 import { GuildList } from "./components/GuildList";
 import { MessageView } from "./components/MessageView";
 import { StatusBar } from "./components/StatusBar";
+import { SettingsScreen, type SettingsDeps } from "./screens/SettingsScreen";
+import { listAudioDevices } from "../voice/devices";
+import { startCapture, startPlayback } from "../voice/audio-io";
 import { COMMON_EMOJI } from "../emoji/common";
 import { validateOutgoing } from "./composer-state";
 
@@ -16,7 +19,14 @@ function isOpenable(kind: string): boolean {
   return kind === "text" || kind === "dm" || kind === "group_dm";
 }
 
-export function App(props: { store: Store; actions: Actions; onQuit: () => void }): JSX.Element {
+const defaultSettingsDeps: SettingsDeps = { listAudioDevices, startCapture, startPlayback };
+
+export function App(props: {
+  store: Store;
+  actions: Actions;
+  onQuit: () => void;
+  settingsDeps?: SettingsDeps;
+}): JSX.Element {
   const [insert, setInsert] = createSignal(false);
   const [replyTo, setReplyTo] = createSignal<string | null>(null);
   const [editing, setEditing] = createSignal<string | null>(null);
@@ -27,6 +37,8 @@ export function App(props: { store: Store; actions: Actions; onQuit: () => void 
   const [lastD, setLastD] = createSignal(0);
   const [pickerOpen, setPickerOpen] = createSignal(false);
   const [pickerQuery, setPickerQuery] = createSignal("");
+  const [settingsOpen, setSettingsOpen] = createSignal(false);
+  const [pendingG, setPendingG] = createSignal(false);
 
   const channelId = (): string | null => props.store.getState().ui.selectedChannelId;
   const currentText = (): string => {
@@ -181,6 +193,8 @@ export function App(props: { store: Store; actions: Actions; onQuit: () => void 
   }
 
   useKeyboard((key) => {
+    if (settingsOpen()) return;
+
     if (pickerOpen()) {
       if (key.name === "escape") {
         setPickerOpen(false);
@@ -239,8 +253,23 @@ export function App(props: { store: Store; actions: Actions; onQuit: () => void 
       return;
     }
 
+    if (pendingG()) {
+      setPendingG(false);
+      if (key.name === "s") {
+        setSettingsOpen(true);
+        return;
+      }
+      if (key.name === "m") {
+        props.actions.toggleMembers();
+        return;
+      }
+    }
+
     const focus = props.store.getState().ui.focus;
     switch (key.name) {
+      case "g":
+        setPendingG(true);
+        return;
       case "q":
         props.onQuit();
         return;
@@ -332,6 +361,15 @@ export function App(props: { store: Store; actions: Actions; onQuit: () => void 
         <box height={1} width="100%" paddingLeft={1}>
           <text>{hint()}</text>
         </box>
+      </Show>
+      <Show when={settingsOpen()}>
+        <SettingsScreen
+          store={props.store}
+          actions={props.actions}
+          deps={props.settingsDeps ?? defaultSettingsDeps}
+          inVoice={false}
+          onClose={() => setSettingsOpen(false)}
+        />
       </Show>
       <Composer text={currentText()} insert={insert()} replyTo={replyTo()} editing={editing()} />
       <StatusBar store={props.store} />
