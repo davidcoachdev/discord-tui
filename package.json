@@ -11,7 +11,9 @@
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "leak-check": "bun scripts/leak-check.ts",
-    "mic-test": "bun scripts/mic-test.tsx"
+    "mic-test": "bun scripts/mic-test.tsx",
+    "demo": "bun scripts/demo.tsx",
+    "voice-spike": "bun scripts/voice-spike.ts"
   },
   "dependencies": {
     "@discordjs/opus": "0.11.0",

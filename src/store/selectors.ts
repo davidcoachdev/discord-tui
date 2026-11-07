@@ -135,3 +135,68 @@ export function selectOutbox(state: AppState, channelId: string): import("./type
     .filter((item) => item.channelId === channelId)
     .sort((a, b) => a.createdAt - b.createdAt);
 }
+
+/** Quiénes están escribiendo en el canal (sin uno mismo ni vencidos). */
+export function selectTyping(state: AppState, channelId: string, now: number): string[] {
+  const entries = state.typing[channelId];
+  if (!entries) return [];
+  return Object.entries(entries)
+    .filter(([userId, until]) => until > now && userId !== state.me?.id)
+    .map(([userId]) => userId);
+}
+
+export interface VoiceParticipant {
+  userId: string;
+  speaking: boolean;
+  muted: boolean;
+  deafened: boolean;
+  me: boolean;
+}
+
+/** Participantes de un canal de voz, con quién habla (uno mismo incluido). */
+export function selectVoiceParticipants(state: AppState, guildId: string, channelId: string): VoiceParticipant[] {
+  const states = state.voice.states[guildId] ?? {};
+  const meId = state.me?.id ?? null;
+  return Object.entries(states)
+    .filter(([, voice]) => voice.channelId === channelId)
+    .map(([userId, voice]) => {
+      const me = userId === meId;
+      return {
+        userId,
+        me,
+        speaking: me ? state.voice.selfSpeaking && state.voice.channelId === channelId : state.voice.speaking[userId] === true,
+        muted: voice.selfMute || voice.mute,
+        deafened: voice.selfDeaf || voice.deaf,
+      };
+    })
+    .sort((a, b) => compareSnowflakes(a.userId, b.userId));
+}
+
+export type MemberRow =
+  | { kind: "group"; label: string; count: number }
+  | { kind: "member"; userId: string; status: string };
+
+const GROUP_LABELS: Record<string, string> = { online: "En línea", offline: "Desconectados" };
+
+/** Filas de la lista de miembros del guild: la que mandó op 37 o, si no llegó, los miembros conocidos. */
+export function selectMemberRows(state: AppState, guildId: string): MemberRow[] {
+  const list = state.memberLists[guildId];
+  const statusOf = (userId: string): string => state.presences[userId]?.status ?? "offline";
+  if (list && list.length > 0) {
+    const roles = state.guilds[guildId]?.roles ?? [];
+    return list.map((row) =>
+      row.kind === "group"
+        ? { kind: "group" as const, label: GROUP_LABELS[row.id] ?? roles.find((role) => role.id === row.id)?.name ?? row.id, count: row.count }
+        : { kind: "member" as const, userId: row.userId, status: statusOf(row.userId) },
+    );
+  }
+  const members = Object.keys(state.members[guildId] ?? {});
+  const online = members.filter((id) => statusOf(id) !== "offline");
+  const offline = members.filter((id) => statusOf(id) === "offline");
+  const rows: MemberRow[] = [];
+  if (online.length > 0) rows.push({ kind: "group", label: "En línea", count: online.length });
+  for (const id of online) rows.push({ kind: "member", userId: id, status: statusOf(id) });
+  if (offline.length > 0) rows.push({ kind: "group", label: "Desconectados", count: offline.length });
+  for (const id of offline) rows.push({ kind: "member", userId: id, status: "offline" });
+  return rows;
+}

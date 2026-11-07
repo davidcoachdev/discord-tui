@@ -119,6 +119,37 @@ export interface OutboxItem {
   createdAt: number;
 }
 
+export type MemberListRow = { kind: "group"; id: string; count: number } | { kind: "member"; userId: string };
+
+export type VoiceStatus = "idle" | "joining" | "connected" | "reconnecting" | "error";
+
+export interface VoiceMemberState {
+  channelId: string;
+  mute: boolean;
+  deaf: boolean;
+  selfMute: boolean;
+  selfDeaf: boolean;
+  selfVideo: boolean;
+  selfStream: boolean;
+}
+
+export interface VoiceSlice {
+  guildId: string | null;
+  channelId: string | null;
+  status: VoiceStatus;
+  error: string | null;
+  selfMute: boolean;
+  selfDeaf: boolean;
+  muteBeforeDeaf: boolean;
+  selfSpeaking: boolean;
+  speaking: Record<string, true>;
+  /** guildId → userId → estado de voz (quién está en cada canal). */
+  states: Record<string, Record<string, VoiceMemberState>>;
+  privacyCode: string | null;
+  pttWarning: string | null;
+  micError: string | null;
+}
+
 export interface AppState {
   me: { id: string; username: string } | null;
   connection: GatewayStatus;
@@ -132,7 +163,13 @@ export interface AppState {
   readState: Record<string, ReadState>;
   guildSettings: { mutedGuilds: string[]; mutedChannels: string[] };
   presences: Record<string, PresenceState>;
-  typing: Record<string, string[]>;
+  /** channelId → userId → vence (ms epoch). */
+  typing: Record<string, Record<string, number>>;
+  /** Lista de miembros por guild, como la manda GUILD_MEMBER_LIST_UPDATE (grupos y miembros en orden). */
+  memberLists: Record<string, MemberListRow[]>;
+  /** Último canal para el que se mandó op 37, por guild. */
+  subscribedChannels: Record<string, string>;
+  voice: VoiceSlice;
   outbox: Record<string, OutboxItem>;
   ui: {
     selectedGuildId: string | "@dms" | null;
@@ -162,4 +199,16 @@ export type Action =
   | { type: "settings/loaded"; settings: Settings }
   | { type: "notice/push"; key: string; level: Notice["level"]; text: string }
   | { type: "notice/dismiss"; id: string }
-  | { type: "notice/sweep"; now: number };
+  | { type: "notice/sweep"; now: number }
+  | { type: "typing/sweep"; now: number }
+  | { type: "members/subscribed"; guildId: string; channelId: string }
+  | { type: "voice/joining"; guildId: string; channelId: string }
+  | { type: "voice/status"; status: VoiceStatus; error?: string | null }
+  | { type: "voice/left"; error?: string | null }
+  | { type: "voice/moved"; channelId: string }
+  | { type: "voice/flags"; selfMute: boolean; selfDeaf: boolean; muteBeforeDeaf: boolean }
+  | { type: "voice/selfSpeaking"; on: boolean }
+  | { type: "voice/speaking"; userId: string; on: boolean }
+  | { type: "voice/privacyCode"; code: string | null }
+  | { type: "voice/pttWarning"; warning: string | null }
+  | { type: "voice/micError"; error: string | null };

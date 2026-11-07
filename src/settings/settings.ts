@@ -18,6 +18,7 @@ export interface Settings {
   userVolumes: Record<string, number>;
   theme: ThemeName;
   idleAfterMinutes: number | null;
+  inlineImages: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -29,6 +30,7 @@ export const DEFAULT_SETTINGS: Settings = {
   userVolumes: {},
   theme: "dark",
   idleAfterMinutes: 10,
+  inlineImages: true,
 };
 
 const MIN_SENSITIVITY = -60;
@@ -94,6 +96,7 @@ export function normalizeSettings(raw: unknown): Settings {
     userVolumes: parseVolumes(record.userVolumes),
     theme: record.theme === "light" || record.theme === "dark" ? record.theme : DEFAULT_SETTINGS.theme,
     idleAfterMinutes: parseIdle(record.idleAfterMinutes),
+    inlineImages: typeof record.inlineImages === "boolean" ? record.inlineImages : DEFAULT_SETTINGS.inlineImages,
   };
 }
 

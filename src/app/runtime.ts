@@ -11,6 +11,12 @@ import { attachSettingsPersistence } from "../settings/persist";
 import type { Settings } from "../settings/settings";
 import { selectMessages } from "../store/selectors";
 import { createStore, type Store } from "../store/store";
+import { createVoiceActions, type VoiceMedia } from "../actions/voice";
+import { createVoiceAdapterCreator } from "../voice/adapter";
+import { startCapture, startPlayback } from "../voice/audio-io";
+import { createOpusCodec } from "../voice/opus";
+import { createDjsVoiceSession, type VoiceSession } from "../voice/session";
+import { createVad } from "../voice/vad";
 
 export interface RuntimeDeps {
   session: Session;
@@ -23,13 +29,23 @@ export interface RuntimeDeps {
   random?: () => number;
   initialSettings?: Settings;
   settingsPath?: string;
+  voiceSession?: VoiceSession;
+  voiceMedia?: VoiceMedia;
+  kittyKeyboard?: () => boolean;
 }
+
+const defaultMedia: VoiceMedia = {
+  startCapture,
+  startPlayback,
+  createCodec: () => createOpusCodec(),
+  createVad: (opts) => createVad(opts),
+};
 
 export interface Runtime {
   store: Store;
   actions: Actions;
   start(): void;
-  stop(): void;
+  stop(): Promise<void>;
   onUnauthorized(fn: () => void): () => void;
   activity(): void;
 }
@@ -51,12 +67,24 @@ export function createRuntime(deps: RuntimeDeps): Runtime {
     setTimer: deps.setTimer,
     random: deps.random,
   });
-  const actions = createActions({ store, rest, gateway });
+  const voiceSession =
+    deps.voiceSession ??
+    createDjsVoiceSession({
+      adapterCreator: createVoiceAdapterCreator({ gateway, meId: () => store.getState().me?.id ?? deps.me.id }),
+      meId: () => store.getState().me?.id ?? deps.me.id,
+    });
+  const voice = createVoiceActions({
+    store,
+    session: voiceSession,
+    media: deps.voiceMedia ?? defaultMedia,
+    kittyKeyboard: deps.kittyKeyboard,
+  });
+  const actions = createActions({ store, rest, gateway, voice, fetch: deps.fetch });
+  store.dispatch({ type: "connection", status: gateway.status });
 
   if (deps.initialSettings) store.dispatch({ type: "settings/loaded", settings: deps.initialSettings });
   const detachSettings = attachSettingsPersistence(store, { path: deps.settingsPath });
 
-  store.dispatch({ type: "connection", status: gateway.status });
   gateway.on("status", (status) => store.dispatch({ type: "connection", status }));
   gateway.on("dispatch", (t, d) => {
     if (t === "READY" && d && typeof d === "object") {
@@ -113,9 +141,24 @@ export function createRuntime(deps: RuntimeDeps): Runtime {
   const idle = createIdlePresence({ gateway, settings: () => store.getState().settings });
 
   const noticeSweep = setInterval(() => {
-    store.dispatch({ type: "notice/sweep", now: Date.now() });
+    const now = Date.now();
+    store.dispatch({ type: "notice/sweep", now });
+    store.dispatch({ type: "typing/sweep", now });
   }, 1000);
   noticeSweep.unref?.();
+
+  // Ack solo del canal abierto que estás mirando, con debounce (spec 7.8).
+  let lastViewed = "";
+  const offAck = store.subscribe(() => {
+    const state = store.getState();
+    const raw = state.ui.selectedChannelId;
+    const channelId = raw !== null && state.channels[raw]?.type !== 2 && state.channels[raw]?.type !== 4 ? raw : null;
+    const newest = channelId === null ? null : state.messages[channelId]?.ids.at(-1) ?? null;
+    const key = `${channelId}:${newest}`;
+    if (key === lastViewed) return;
+    lastViewed = key;
+    actions.viewing?.(channelId, newest);
+  });
 
   return {
     store,
@@ -124,9 +167,13 @@ export function createRuntime(deps: RuntimeDeps): Runtime {
       gateway.connect();
       idle.activity();
     },
-    stop(): void {
+    async stop(): Promise<void> {
       clearInterval(noticeSweep);
+      offAck();
       idle.stop();
+      if (store.getState().voice.channelId !== null) {
+        await Promise.race([voice.leaveVoice(), new Promise((resolve) => setTimeout(resolve, 1_500))]);
+      }
       detachSettings();
       gateway.close();
     },

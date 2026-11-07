@@ -1,39 +1,145 @@
-import { For, type JSX } from "solid-js";
+import { TextAttributes, type ScrollBoxRenderable } from "@opentui/core";
+import { createEffect, For, on, Show, type JSX } from "solid-js";
 
 import type { Actions } from "../../actions";
-import { selectChannelList } from "../../store/selectors";
+import { selectChannelList, selectVoiceParticipants, type ChannelRow } from "../../store/selectors";
 import type { Store } from "../../store/store";
+import { cellWidth, displayName, truncate } from "../format";
 import { useSelector } from "../store-bridge";
+import type { Theme } from "../theme";
 
-function icon(kind: string): string {
-  if (kind === "voice") return "v";
-  if (kind === "category") return "▾";
+export const CHANNEL_WIDTH = 32;
+
+function icon(kind: ChannelRow["kind"]): string {
+  if (kind === "voice") return "🔊";
+  if (kind === "dm") return "@";
+  if (kind === "group_dm") return "👥";
   return "#";
 }
 
-export function ChannelList(props: { store: Store; actions: Actions }): JSX.Element {
-  const rows = useSelector(props.store, (state) =>
-    state.ui.selectedGuildId === null ? [] : selectChannelList(state, state.ui.selectedGuildId),
+export function ChannelList(props: { store: Store; actions: Actions; theme: Theme; focused?: boolean }): JSX.Element {
+  const state = useSelector(props.store, (s) => s);
+  const rows = (): ChannelRow[] =>
+    state().ui.selectedGuildId === null ? [] : selectChannelList(state(), state().ui.selectedGuildId!);
+  const selected = (): string | null => state().ui.selectedChannelId;
+  const guildId = (): string | null => {
+    const id = state().ui.selectedGuildId;
+    return id === null || id === "@dms" ? null : id;
+  };
+  const title = (): string => {
+    const id = state().ui.selectedGuildId;
+    if (id === "@dms") return " Mensajes directos ";
+    const name = id ? state().guilds[id]?.name : null;
+    return ` ${truncate(name ?? "Canales", CHANNEL_WIDTH - 6)} `;
+  };
+  const inner = CHANNEL_WIDTH - 2;
+  let scroll: ScrollBoxRenderable | undefined;
+
+  createEffect(
+    on(selected, (id) => {
+      try {
+        if (id) scroll?.scrollChildIntoView(`chan-${id}`);
+      } catch {
+        // fuera del layout
+      }
+    }),
   );
-  const selected = useSelector(props.store, (state) => state.ui.selectedChannelId);
+
+  function open(row: ChannelRow): void {
+    if (row.kind === "category") return;
+    props.store.dispatch({ type: "ui/selectChannel", id: row.id });
+    if (row.kind === "voice") return;
+    void props.actions.openChannel(row.id).catch(() => {});
+  }
 
   return (
-    <box title="Canales" border width={30} height="100%" flexDirection="column">
-      <For each={rows()}>
-        {(row) => (
-          <text
-            onMouseDown={() => {
-              if (row.kind === "category") return;
-              props.store.dispatch({ type: "ui/selectChannel", id: row.id });
-              void props.actions.openChannel(row.id).catch(() => {});
-            }}
-          >
-            {`${"  ".repeat(row.depth)}${selected() === row.id ? "› " : "  "}${icon(row.kind)} ${row.name}${
-              row.unread ? " ●" : ""
-            }${row.mentions > 0 ? ` (${row.mentions})` : ""}`}
-          </text>
-        )}
-      </For>
+    <box
+      title={title()}
+      titleColor={props.focused ? props.theme.borderFocus : props.theme.header}
+      border
+      borderStyle="rounded"
+      borderColor={props.focused ? props.theme.borderFocus : props.theme.border}
+      width={CHANNEL_WIDTH}
+      height="100%"
+      flexDirection="column"
+    >
+      <Show when={rows().length === 0}>
+        <text fg={props.theme.dim}> (sin canales)</text>
+      </Show>
+      <scrollbox ref={(el: ScrollBoxRenderable) => (scroll = el)} width="100%" flexGrow={1}>
+        <For each={rows()}>
+          {(row) => {
+            if (row.kind === "category") {
+              return (
+                <box id={`chan-${row.id}`} width="100%" marginTop={1}>
+                  <text fg={props.theme.dim} attributes={TextAttributes.BOLD} wrapMode="none">
+                    {`⌄ ${truncate(row.name.toUpperCase(), inner - 2)}`}
+                  </text>
+                </box>
+              );
+            }
+            const isSel = (): boolean => selected() === row.id;
+            const badge = row.mentions > 0 ? ` ${row.mentions > 99 ? "99+" : row.mentions} ` : "";
+            const lead = `${"  ".repeat(row.depth)}${icon(row.kind)} `;
+            const name = truncate(row.name, inner - 1 - cellWidth(lead) - cellWidth(badge));
+            const bright = row.unread && !row.muted;
+            const participants = (): ReturnType<typeof selectVoiceParticipants> =>
+              row.kind === "voice" && guildId() !== null ? selectVoiceParticipants(state(), guildId()!, row.id) : [];
+            const connectedHere = (): boolean => state().voice.channelId === row.id;
+            return (
+              <box flexDirection="column" width="100%">
+                <box
+                  id={`chan-${row.id}`}
+                  flexDirection="row"
+                  width="100%"
+                  backgroundColor={isSel() ? props.theme.selection : undefined}
+                  onMouseDown={() => open(row)}
+                >
+                  <text fg={props.theme.accent}>{isSel() ? "▌" : " "}</text>
+                  <text
+                    flexGrow={1}
+                    wrapMode="none"
+                    fg={
+                      connectedHere()
+                        ? props.theme.speaking
+                        : isSel()
+                          ? props.theme.selectionFg
+                          : bright
+                            ? props.theme.unread
+                            : row.muted
+                              ? props.theme.faint
+                              : props.theme.dim
+                    }
+                    attributes={bright || isSel() ? TextAttributes.BOLD : 0}
+                  >
+                    {`${lead}${name}`}
+                  </text>
+                  <text fg={props.theme.modeFg} bg={props.theme.error} attributes={TextAttributes.BOLD}>
+                    {badge}
+                  </text>
+                </box>
+                <For each={participants()}>
+                  {(p) => (
+                    <box flexDirection="row" width="100%" paddingLeft={row.depth * 2 + 3}>
+                      <text fg={p.speaking ? props.theme.speaking : props.theme.faint}>{p.speaking ? "●" : "○"}</text>
+                      <text
+                        flexGrow={1}
+                        wrapMode="none"
+                        fg={p.speaking ? props.theme.speaking : p.me ? props.theme.fg : props.theme.dim}
+                      >
+                        {` ${truncate(displayName(state(), p.userId, guildId()), inner - row.depth * 2 - 12)}`}
+                      </text>
+                      <text fg={p.deafened ? props.theme.error : props.theme.warn}>
+                        {p.deafened ? "[deaf]" : p.muted ? "[mute]" : ""}
+                      </text>
+                    </box>
+                  )}
+                </For>
+              </box>
+            );
+          }}
+        </For>
+      </scrollbox>
     </box>
   );
 }

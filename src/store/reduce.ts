@@ -17,18 +17,28 @@ import {
 } from "./reducers/outbox";
 import { applySettingsLoaded, applySettingsPatch } from "./reducers/settings";
 import { applyNoticeDismiss, applyNoticePush, applyNoticeSweep } from "./reducers/notices";
-import { compareSnowflakes } from "../util/snowflake";
+import {
+  applyMemberListUpdate,
+  applyPresenceUpdate,
+  applyTypingStart,
+  applyTypingSweep,
+  clearTypingFor,
+} from "./reducers/members";
+import { applyReadyVoiceStates, applyVoiceStateUpdate, reduceVoiceAction } from "./reducers/voice";
 
 export function reduce(state: AppState, action: Action): AppState {
   switch (action.type) {
     case "gw":
       switch (action.t) {
         case "READY":
-          return applyReady(state, action.d);
+          return applyReadyVoiceStates(applyReady(state, action.d), action.d);
         case "READY_SUPPLEMENTAL":
           return applyReadySupplemental(state, action.d);
         case "MESSAGE_CREATE": {
-          const next = applyMessageCreate(state, action.d);
+          let next = applyMessageCreate(state, action.d);
+          if (typeof action.d?.author?.id === "string" && typeof action.d?.channel_id === "string") {
+            next = clearTypingFor(next, action.d.channel_id, action.d.author.id);
+          }
           if (typeof action.d?.nonce === "string" && action.d.nonce in next.outbox) {
             const outbox = { ...next.outbox };
             delete outbox[action.d.nonce];
@@ -51,6 +61,14 @@ export function reduce(state: AppState, action: Action): AppState {
         case "MESSAGE_REACTION_REMOVE_ALL":
         case "MESSAGE_REACTION_REMOVE_EMOJI":
           return applyReaction(state, action.t, action.d);
+        case "GUILD_MEMBER_LIST_UPDATE":
+          return applyMemberListUpdate(state, action.d);
+        case "PRESENCE_UPDATE":
+          return applyPresenceUpdate(state, action.d);
+        case "TYPING_START":
+          return applyTypingStart(state, action.d);
+        case "VOICE_STATE_UPDATE":
+          return applyVoiceStateUpdate(state, action.d);
         default:
           return state;
       }
@@ -98,6 +116,21 @@ export function reduce(state: AppState, action: Action): AppState {
       return applyNoticeDismiss(state, action.id);
     case "notice/sweep":
       return applyNoticeSweep(state, action.now);
+    case "typing/sweep":
+      return applyTypingSweep(state, action.now);
+    case "members/subscribed":
+      return { ...state, subscribedChannels: { ...state.subscribedChannels, [action.guildId]: action.channelId } };
+    case "voice/joining":
+    case "voice/status":
+    case "voice/left":
+    case "voice/moved":
+    case "voice/flags":
+    case "voice/selfSpeaking":
+    case "voice/speaking":
+    case "voice/privacyCode":
+    case "voice/pttWarning":
+    case "voice/micError":
+      return reduceVoiceAction(state, action);
     default:
       return state;
   }

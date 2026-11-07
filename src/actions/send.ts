@@ -8,6 +8,7 @@ import { generateNonce } from "../util/snowflake";
 export interface SendDeps {
   store: Store;
   rest: RestClient;
+  upload?: (channelId: string, files: PendingAttachment[]) => Promise<unknown[]>;
 }
 
 function errorText(error: unknown): string {
@@ -25,7 +26,11 @@ export function createSendActions(deps: SendDeps) {
         body.message_reference = { message_id: replyTo, channel_id: channelId };
         body.allowed_mentions = { parse: ["users", "roles", "everyone"], replied_user: true };
       }
-      if (attachments.length > 0) body.attachments = attachments.map((attachment) => ({ filename: attachment.filename }));
+      if (attachments.length > 0) {
+        body.attachments = deps.upload
+          ? await deps.upload(channelId, attachments)
+          : attachments.map((attachment) => ({ filename: attachment.filename }));
+      }
 
       const message = await postMessage(deps.rest, channelId, body as never);
       deps.store.dispatch({ type: "outbox/sent", nonce, messageId: message.id });

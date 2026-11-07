@@ -76,7 +76,7 @@ test("i, type, Enter sends and clears; q while typing types q", async () => {
   expect(calls[0]).toMatchObject({ channelId: CHANNEL, content: "hola q", opts: {} });
 });
 
-test("r replies to the last message and sends a message_reference", async () => {
+test("r replies to the last message (no selection) and sends a message_reference", async () => {
   const { store, actions, calls } = setup();
   const { mockInput, renderOnce } = await testRender(() => <App store={store} actions={actions} onQuit={() => {}} />, {
     width: 120,
@@ -84,8 +84,7 @@ test("r replies to the last message and sends a message_reference", async () => 
   });
   await renderOnce();
 
-  mockInput.pressKey("r");
-  mockInput.pressKey("i");
+  mockInput.pressKey("r"); // r ya entra al composer en modo respuesta
   await mockInput.typeText("responde");
   mockInput.pressEnter();
   await renderOnce();

@@ -1,4 +1,4 @@
-import type { Action, AppState } from "./types";
+import type { Action, AppState, VoiceSlice } from "./types";
 import { reduce } from "./reduce";
 import { DEFAULT_SETTINGS } from "../settings/settings";
 
@@ -6,6 +6,24 @@ export interface Store {
   getState(): AppState;
   dispatch(action: Action): void;
   subscribe(fn: () => void): () => void;
+}
+
+export function emptyVoice(): VoiceSlice {
+  return {
+    guildId: null,
+    channelId: null,
+    status: "idle",
+    error: null,
+    selfMute: false,
+    selfDeaf: false,
+    muteBeforeDeaf: false,
+    selfSpeaking: false,
+    speaking: {},
+    states: {},
+    privacyCode: null,
+    pttWarning: null,
+    micError: null,
+  };
 }
 
 export function emptyState(): AppState {
@@ -23,6 +41,9 @@ export function emptyState(): AppState {
     guildSettings: { mutedGuilds: [], mutedChannels: [] },
     presences: {},
     typing: {},
+    memberLists: {},
+    subscribedChannels: {},
+    voice: emptyVoice(),
     outbox: {},
     ui: { selectedGuildId: null, selectedChannelId: null, focus: "guilds", membersVisible: true },
     settings: { ...DEFAULT_SETTINGS },

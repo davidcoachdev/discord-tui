@@ -1,6 +1,11 @@
 import type { Gateway } from "../gateway/connection";
 import type { RestClient } from "../rest/client";
-import { getMessages } from "../rest/routes";
+import { getMessages, postAck, postTyping } from "../rest/routes";
+import { buildGuildSubscription } from "../gateway/subscriptions";
+import { uploadAttachments } from "../uploads/upload";
+import { createAckScheduler } from "./ack";
+import { createTypingNotifier } from "./typing";
+import type { VoiceActions } from "./voice";
 import { createEditActions } from "./edit";
 import { createReactActions } from "./react";
 import { createSendActions } from "./send";
@@ -20,12 +25,20 @@ export interface Actions {
   edit(channelId: string, messageId: string, content: string): Promise<void>;
   remove(channelId: string, messageId: string): Promise<void>;
   toggleReaction(channelId: string, messageId: string, emoji: { id: string | null; name: string }): Promise<void>;
+  /** Cada tecla escrita en el composer: manda typing como máximo cada 8 s. */
+  keystroke?(channelId: string, textAfter: string): void;
+  /** El canal que se está mirando y su mensaje más nuevo: ack con debounce. */
+  viewing?(channelId: string | null, newestId: string | null): void;
+  voice?: VoiceActions;
 }
 
 export interface ActionsDeps {
   store: Store;
   rest: RestClient;
-  gateway: Gateway;
+  gateway: Pick<Gateway, "send">;
+  fetch?: typeof fetch;
+  voice?: VoiceActions;
+  now?: () => number;
 }
 
 function noticeText(action: string, error: unknown): string {
@@ -38,8 +51,20 @@ export function createActions(deps: ActionsDeps): Actions {
     deps.store.dispatch({ type: "notice/push", key, level: "warn", text: noticeText(action, error) });
   }
 
+  function subscribeGuild(channelId: string): void {
+    const state = deps.store.getState();
+    const guildId = state.channels[channelId]?.guildId;
+    if (!guildId || state.subscribedChannels[guildId] === channelId) return;
+    const payload = buildGuildSubscription(guildId, channelId);
+    deps.gateway.send(payload.op, payload.d);
+    deps.store.dispatch({ type: "members/subscribed", guildId, channelId });
+  }
+
   async function openChannel(id: string): Promise<void> {
     deps.store.dispatch({ type: "ui/selectChannel", id });
+    const kind = deps.store.getState().channels[id]?.type;
+    if (kind === 2 || kind === 4) return;
+    subscribeGuild(id);
     const slice = deps.store.getState().messages[id];
     if (slice !== undefined && !slice.stale) return;
 
@@ -67,7 +92,19 @@ export function createActions(deps: ActionsDeps): Actions {
     }
   }
 
-  const sendActions = createSendActions({ store: deps.store, rest: deps.rest });
+  const fetchFn = deps.fetch ?? fetch;
+  const sendActions = createSendActions({
+    store: deps.store,
+    rest: deps.rest,
+    upload: (channelId, files) => uploadAttachments(deps.rest, fetchFn, channelId, files),
+  });
+  const typing = createTypingNotifier({ postTyping: (id) => postTyping(deps.rest, id), now: deps.now ?? Date.now });
+  const ack = createAckScheduler({
+    postAck: async (channelId, messageId) => {
+      deps.store.dispatch({ type: "gw", t: "MESSAGE_ACK", d: { channel_id: channelId, message_id: messageId } });
+      await postAck(deps.rest, channelId, messageId);
+    },
+  });
   const editActions = createEditActions({ rest: deps.rest });
   const reactActions = createReactActions({ store: deps.store, rest: deps.rest });
 
@@ -118,7 +155,13 @@ export function createActions(deps: ActionsDeps): Actions {
     toggleMembers(): void {
       deps.store.dispatch({ type: "ui/toggleMembers" });
     },
-    send: sendActions.send,
+    send: async (channelId, content, opts) => {
+      typing.onSent(channelId);
+      await sendActions.send(channelId, content, opts);
+    },
+    keystroke: (channelId, textAfter) => typing.onKeystroke(channelId, textAfter),
+    viewing: (channelId, newestId) => ack.viewing(channelId, newestId),
+    voice: deps.voice,
     retry: sendActions.retry,
     edit,
     remove,

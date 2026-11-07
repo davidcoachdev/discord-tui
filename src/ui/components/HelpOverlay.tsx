@@ -1,21 +1,51 @@
+import { TextAttributes } from "@opentui/core";
 import { For, type JSX } from "solid-js";
 
 import { keysByGroup } from "../keys";
+import type { Theme } from "../theme";
 
-export function HelpOverlay(props: { onClose(): void }): JSX.Element {
-  const groups = keysByGroup();
-
+export function HelpOverlay(props: { onClose(): void; theme?: Theme }): JSX.Element {
+  const groups = [...keysByGroup().entries()];
+  const accent = (): string | undefined => props.theme?.accent;
   return (
-    <box flexDirection="column" width="100%" height="100%" padding={1}>
-      <text>Ayuda · ? o Esc cierra</text>
-      <For each={[...groups.entries()]}>
-        {([group, entries]) => (
-          <box flexDirection="column" marginTop={1}>
-            <text>{group}</text>
-            <For each={entries}>{(entry) => <text>{`  ${entry.key.padEnd(8)} ${entry.desc}`}</text>}</For>
-          </box>
-        )}
-      </For>
+    <box
+      position="absolute"
+      top={1}
+      left={0}
+      width="100%"
+      height="100%"
+      alignItems="center"
+      zIndex={60}
+    >
+      <box
+        border
+        borderStyle="rounded"
+        borderColor={accent()}
+        backgroundColor={props.theme?.panel}
+        title=" Ayuda · ? o Esc cierra "
+        titleColor={accent()}
+        flexDirection="row"
+        flexWrap="wrap"
+        width={96}
+        padding={1}
+        columnGap={3}
+      >
+        <For each={groups}>
+          {([group, entries]) => (
+            <box flexDirection="column" width={44} marginBottom={1}>
+              <text fg={props.theme?.header} attributes={TextAttributes.BOLD}>{group}</text>
+              <For each={entries}>
+                {(entry) => (
+                  <text wrapMode="none">
+                    <span style={{ fg: props.theme?.mention }}>{`  ${entry.key.padEnd(9)}`}</span>
+                    <span style={{ fg: props.theme?.fg }}>{entry.desc}</span>
+                  </text>
+                )}
+              </For>
+            </box>
+          )}
+        </For>
+      </box>
     </box>
   );
 }

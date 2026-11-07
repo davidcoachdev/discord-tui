@@ -20,7 +20,12 @@ export function assertTty(stream: { isTTY?: boolean }): string | null {
   return stream.isTTY ? null : "discord-tui necesita una terminal";
 }
 
-function LoginRoot(props: { buildNumber: number; settings: Settings; onQuit: () => void }): JSX.Element {
+function LoginRoot(props: {
+  buildNumber: number;
+  settings: Settings;
+  onQuit: (runtime: Runtime | null) => void;
+  kittyKeyboard: () => boolean;
+}): JSX.Element {
   const clientProps = createClientProps({ buildNumber: props.buildNumber });
   const auth = createRemoteAuth({ http: createHttp({ props: clientProps }) });
   const [runtime, setRuntime] = createSignal<Runtime | null>(null);
@@ -35,9 +40,10 @@ function LoginRoot(props: { buildNumber: number; settings: Settings; onQuit: () 
       me: { id: userId, username },
       props: clientProps,
       initialSettings: props.settings,
+      kittyKeyboard: props.kittyKeyboard,
     });
     next.onUnauthorized(() => {
-      next.stop();
+      void next.stop();
       setRuntime(null);
     });
     next.start();
@@ -72,7 +78,7 @@ function LoginRoot(props: { buildNumber: number; settings: Settings; onQuit: () 
   }
 
   useKeyboard((key) => {
-    if (runtime() === null && key.name === "q" && !key.ctrl && !key.meta) props.onQuit();
+    if (runtime() === null && key.name === "q" && !key.ctrl && !key.meta) props.onQuit(null);
   });
 
   return (
@@ -81,8 +87,9 @@ function LoginRoot(props: { buildNumber: number; settings: Settings; onQuit: () 
         <App
           store={active().store}
           actions={active().actions}
-          onQuit={props.onQuit}
+          onQuit={() => props.onQuit(active())}
           onActivity={() => active().activity()}
+          images
         />
       )}
     </Show>
@@ -115,22 +122,40 @@ async function main(): Promise<void> {
   }
 
   const renderer = await createCliRenderer({ useKittyKeyboard: { events: true } });
-  const quit = (): void => {
-    renderer.destroy();
-    void renderer.closed.then(() => process.exit(0));
+  const kittyKeyboard = (): boolean => renderer.capabilities?.kitty_keyboard ?? true;
+  let quitting = false;
+  const quit = (runtime: Runtime | null): void => {
+    if (quitting) return;
+    quitting = true;
+    // Primero se sale de voz (op 4 con channel_id null) y se cierra el gateway; después la terminal.
+    void (runtime?.stop() ?? Promise.resolve()).finally(() => {
+      renderer.destroy();
+      void renderer.closed.then(() => process.exit(0));
+    });
   };
 
   if (result.kind === "login") {
-    await render(() => <LoginRoot buildNumber={buildNumber} settings={settings} onQuit={quit} />, renderer);
+    await render(
+      () => <LoginRoot buildNumber={buildNumber} settings={settings} onQuit={quit} kittyKeyboard={kittyKeyboard} />,
+      renderer,
+    );
     return;
   }
 
   const session = result.session;
   const me = result.kind === "main" ? result.me : { id: session.userId, username: "" };
-  const runtime = createRuntime({ session, me, props: createClientProps({ buildNumber }), initialSettings: settings });
+  const runtime = createRuntime({
+    session,
+    me,
+    props: createClientProps({ buildNumber }),
+    initialSettings: settings,
+    kittyKeyboard,
+  });
   runtime.start();
   await render(
-    () => <App store={runtime.store} actions={runtime.actions} onQuit={quit} onActivity={() => runtime.activity()} />,
+    () => (
+      <App store={runtime.store} actions={runtime.actions} onQuit={() => quit(runtime)} onActivity={() => runtime.activity()} images />
+    ),
     renderer,
   );
 }

@@ -189,3 +189,54 @@ test("4004 from the gateway calls onUnauthorized", async () => {
     fake.stop();
   }
 });
+
+test("runtime.stop leaves voice (op 4 with channel_id null) before closing the gateway", async () => {
+  let fake: FakeGateway;
+  let ready = null as ReturnType<typeof readyFor> | null;
+  fake = startFakeGateway({ onIdentify: () => fake.dispatch("READY", ready!.d) });
+  ready = readyFor(fake);
+  const order: string[] = [];
+  const statusListeners = new Set<(s: any, e?: string) => void>();
+  const runtime = createRuntime({
+    session: { token: new Secret(fakeToken()), userId: "100000000000000010", buildNumber: 663810 },
+    me: { id: "100000000000000010", username: "user1" },
+    props: createClientProps({ buildNumber: 663810 }),
+    url: fake.url,
+    fetch: (async () => Response.json([])) as unknown as typeof fetch,
+    setTimer: immediateTimer,
+    random: () => 0.5,
+    voiceSession: {
+      join: async () => statusListeners.forEach((fn) => fn("connected")),
+      setFlags() {},
+      leave: async () => {
+        order.push(`leave (gateway ${runtime.store.getState().connection})`);
+        statusListeners.forEach((fn) => fn("idle"));
+      },
+      onStatus: (fn) => {
+        statusListeners.add(fn);
+        return () => statusListeners.delete(fn);
+      },
+      sendOpus() {},
+      setSpeaking() {},
+      onSpeaking: () => () => {},
+      onOpus: () => () => {},
+      privacyCode: () => null,
+    },
+    voiceMedia: {
+      startCapture: async () => ({ onFrame: () => () => {}, stop: async () => {} }),
+      startPlayback: async () => ({ write() {}, stop: async () => {}, dropped: () => 0 }),
+      createCodec: () => ({ encode: (p: Uint8Array) => p, decode: (o: Uint8Array) => o }),
+      createVad: () => ({ push: () => null, isOpen: false, thresholdDb: -45, levelDb: -96 }),
+    },
+  });
+  try {
+    runtime.start();
+    await waitFor(() => runtime.store.getState().connection === "ready");
+    runtime.store.dispatch({ type: "voice/joining", guildId: "100000000000000001", channelId: "100000000000000003" });
+    await runtime.stop();
+    expect(order).toEqual(["leave (gateway ready)"]);
+    expect(runtime.store.getState().voice.channelId).toBeNull();
+  } finally {
+    fake.stop();
+  }
+});
