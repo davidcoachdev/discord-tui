@@ -7,6 +7,7 @@ import { createEcho } from "../src/voice/echo";
 import { createOpusCodec } from "../src/voice/opus";
 import { createVad } from "../src/voice/vad";
 import { LevelMeter } from "../src/ui/components/LevelMeter";
+import { loadSettings } from "../src/settings/settings";
 
 function MicTest(props: { onQuit: () => void }): JSX.Element {
   const [gate, setGate] = createSignal<"vad" | "always">("vad");
@@ -25,8 +26,9 @@ function MicTest(props: { onQuit: () => void }): JSX.Element {
   onMount(() => {
     void (async () => {
       try {
-        capture = await startCapture();
-        playback = await startPlayback();
+        const settings = await loadSettings();
+        capture = await startCapture({ target: settings.inputDevice ?? undefined });
+        playback = await startPlayback({ target: settings.outputDevice ?? undefined });
         echo = createEcho({
           capture,
           playback,
