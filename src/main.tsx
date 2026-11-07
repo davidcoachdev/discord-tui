@@ -1,6 +1,7 @@
 import { createCliRenderer } from "@opentui/core";
 import { render, useKeyboard } from "@opentui/solid";
 import { createSignal, onCleanup, onMount, Show, type Accessor, type JSX } from "solid-js";
+import { KITTY_KEYBOARD } from "./ui/kitty";
 
 import { boot } from "./app/boot";
 import { createRuntime, type Runtime } from "./app/runtime";
@@ -121,7 +122,7 @@ async function main(): Promise<void> {
     return process.exit(1);
   }
 
-  const renderer = await createCliRenderer({ useKittyKeyboard: { events: true } });
+  const renderer = await createCliRenderer({ useKittyKeyboard: KITTY_KEYBOARD });
   const kittyKeyboard = (): boolean => renderer.capabilities?.kitty_keyboard ?? true;
   let quitting = false;
   const quit = (runtime: Runtime | null): void => {

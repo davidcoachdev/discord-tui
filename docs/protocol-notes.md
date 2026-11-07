@@ -58,3 +58,9 @@ Datos que el agente resuelve y documenta mientras construye. Sin tokens ni ids r
 ## Código de privacidad
 
 - Pendiente E4c Task 1 (Gon + [2ª]): no se sabe todavía si el cliente oficial lo muestra ni con qué formato. Mientras tanto la barra de voz lo muestra en grupos de 5 dígitos **[nuestra]** (`src/voice/privacy-code.ts`).
+
+## Push-to-Talk y el protocolo de teclado de Kitty
+
+- El plan daba por hecho que `useKittyKeyboard: { events: true }` alcanzaba para el PTT. No alcanza: OpenTUI arma los flags `7` (disambiguate + alternate keys + event types) y, sin "report all keys as escape codes" (flag 8), las teclas que producen texto (Espacio incluido) se mandan como texto plano y la terminal **no avisa cuándo se sueltan** (docs del protocolo de Kitty). El PTT habría caído siempre en modo interruptor.
+- Ahora `src/ui/kitty.ts` pide `{ events: true, allKeysAsEscapes: true }` (flags 15). Probado con `parseKeypress`: Enter, Backspace, Esc, Tab, flechas, Ctrl-letra, `ñ`/`Ñ`, Shift+letras (`D`, `M`, `G`, `R`) y `?`/`+` se siguen decodificando bien, y Espacio trae press/repeat/release.
+- Falta la confirmación de Gon en Ghostty (E4b Task 6, punto 3).

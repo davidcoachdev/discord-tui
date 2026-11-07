@@ -2,13 +2,14 @@
 // Uso: bun run demo
 import { createCliRenderer } from "@opentui/core";
 import { render } from "@opentui/solid";
+import { KITTY_KEYBOARD } from "../src/ui/kitty";
 
 import { App } from "../src/ui/App";
 import { buildDemoStore, demoActions } from "./demo-state";
 
 const store = buildDemoStore();
 const actions = demoActions(store);
-const renderer = await createCliRenderer({ useKittyKeyboard: { events: true } });
+const renderer = await createCliRenderer({ useKittyKeyboard: KITTY_KEYBOARD });
 const quit = (): void => {
   renderer.destroy();
   void renderer.closed.then(() => process.exit(0));

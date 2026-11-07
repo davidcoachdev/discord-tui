@@ -132,3 +132,18 @@ test("j walks into a voice channel's participants and +/- change their volume", 
   expect(captureCharFrame()).toMatch(/Ragnar\s+80%/);
   expect(s.calls).toEqual([]);
 });
+
+test("with the kitty protocol, holding Space sends press, repeats and release to PTT", async () => {
+  const s = setup();
+  const { mockInput, renderOnce } = await render(s);
+  await renderOnce();
+  mockInput.pressKeys(["\u001b[32u", "\u001b[32;1:2u", "\u001b[32;1:3u"]);
+  await renderOnce();
+  expect(s.calls).toEqual(["ptt:press", "ptt:repeat", "ptt:release"]);
+});
+
+test("KITTY_KEYBOARD asks for all keys as escapes so Space reports its release", async () => {
+  const { buildKittyKeyboardFlags } = await import("@opentui/core");
+  const { KITTY_KEYBOARD } = await import("../../src/ui/kitty");
+  expect(buildKittyKeyboardFlags(KITTY_KEYBOARD) & 0b1010).toBe(0b1010);
+});
