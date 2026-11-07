@@ -59,6 +59,8 @@ function setup() {
     loadOlder: async () => {},
     focus: (focus) => calls.push(`focus ${focus}`),
     toggleMembers: () => {},
+    send: async () => {},
+    retry: async () => {},
   };
   return { store, actions, calls };
 }

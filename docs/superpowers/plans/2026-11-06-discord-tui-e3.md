@@ -47,7 +47,7 @@
   - `actions.send(channelId: string, content: string, opts?: { replyTo?: string; attachments?: PendingAttachment[] }): Promise<void>`; `actions.retry(nonce: string): Promise<void>`.
   - `selectOutbox(s, channelId): OutboxItem[]`; `MessageView` muestra los `pending` atenuados y los `failed` con `✗ no se envió · R reintenta`.
 
-- [ ] **Step 1: Tests que fallan** (contra `startFakeHttp`)
+- [x] **Step 1: Tests que fallan** (contra `startFakeHttp`)
 
 ```ts
 test("429 then 200: waits retry_after and ends sent with 2 requests", async () => {});
@@ -63,8 +63,23 @@ test("gateway MESSAGE_CREATE with our nonce before the POST resolves leaves a si
 test("failed item stays after other messages arrive", async () => {});
 ```
 
-- [ ] **Step 2–4:** FAIL → implementar → `bun test tests/actions` PASS.
-- [ ] **Step 5:** commit `feat(e3): outbox with nonce reconciliation` + push.
+- [x] **Step 2–4:** FAIL → implementar → `bun test tests/actions` PASS.
+
+```text
+$ bun test tests/actions/outbox.test.ts
+ 6 pass
+ 0 fail
+ 12 expect() calls
+Ran 6 tests across 1 file. [469.00ms]
+
+$ bun test && bun run typecheck
+ 145 pass
+ 0 fail
+ 299 expect() calls
+Ran 145 tests across 30 files. [4.57s]
+$ tsc --noEmit   # sin salida, código 0
+```
+- [x] **Step 5:** commit `feat(e3): outbox with nonce reconciliation` + push.
 
 ---
 

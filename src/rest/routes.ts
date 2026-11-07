@@ -11,3 +11,19 @@ export async function getMessages(
   if (opts.before) params.set("before", opts.before);
   return rest.request<APIMessage[]>("GET", `/channels/${channelId}/messages?${params.toString()}`);
 }
+
+export async function postMessage(
+  rest: RestClient,
+  channelId: string,
+  body: {
+    content: string;
+    nonce: string;
+    tts: false;
+    flags: number;
+    message_reference?: { message_id: string; channel_id: string; guild_id?: string };
+    allowed_mentions?: { parse: string[]; replied_user: boolean };
+    attachments?: unknown[];
+  },
+): Promise<APIMessage> {
+  return rest.request<APIMessage>("POST", `/channels/${channelId}/messages`, body);
+}

@@ -22,6 +22,7 @@ export function emptyState(): AppState {
     guildSettings: { mutedGuilds: [], mutedChannels: [] },
     presences: {},
     typing: {},
+    outbox: {},
     ui: { selectedGuildId: null, selectedChannelId: null, focus: "guilds", membersVisible: true },
   };
 }

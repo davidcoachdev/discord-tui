@@ -8,6 +8,12 @@ import {
   applyPage,
 } from "./reducers/messages";
 import { applyChannelUnreadUpdate, applyMessageAck } from "./reducers/read-state";
+import {
+  applyOutboxEnqueue,
+  applyOutboxFailed,
+  applyOutboxRetry,
+  applyOutboxSent,
+} from "./reducers/outbox";
 import { compareSnowflakes } from "../util/snowflake";
 
 export function reduce(state: AppState, action: Action): AppState {
@@ -18,8 +24,15 @@ export function reduce(state: AppState, action: Action): AppState {
           return applyReady(state, action.d);
         case "READY_SUPPLEMENTAL":
           return applyReadySupplemental(state, action.d);
-        case "MESSAGE_CREATE":
-          return applyMessageCreate(state, action.d);
+        case "MESSAGE_CREATE": {
+          const next = applyMessageCreate(state, action.d);
+          if (typeof action.d?.nonce === "string" && action.d.nonce in next.outbox) {
+            const outbox = { ...next.outbox };
+            delete outbox[action.d.nonce];
+            return { ...next, outbox };
+          }
+          return next;
+        }
         case "MESSAGE_UPDATE":
           return applyMessageUpdate(state, action.d);
         case "MESSAGE_DELETE":
@@ -59,6 +72,14 @@ export function reduce(state: AppState, action: Action): AppState {
       return { ...state, ui: { ...state.ui, focus: action.focus } };
     case "ui/toggleMembers":
       return { ...state, ui: { ...state.ui, membersVisible: !state.ui.membersVisible } };
+    case "outbox/enqueue":
+      return applyOutboxEnqueue(state, action.item);
+    case "outbox/sent":
+      return applyOutboxSent(state, action.nonce);
+    case "outbox/failed":
+      return applyOutboxFailed(state, action.nonce, action.error);
+    case "outbox/retry":
+      return applyOutboxRetry(state, action.nonce);
     default:
       return state;
   }

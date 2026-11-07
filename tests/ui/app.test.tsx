@@ -14,6 +14,8 @@ function setup() {
     loadOlder: async () => {},
     focus: () => {},
     toggleMembers: () => {},
+    send: async () => {},
+    retry: async () => {},
   };
   return { store, actions };
 }

@@ -92,6 +92,23 @@ export interface PresenceState {
 
 export type Focus = "guilds" | "channels" | "messages" | "members" | "composer";
 
+export interface PendingAttachment {
+  filename: string;
+  mime: string;
+  bytes: Uint8Array;
+}
+
+export interface OutboxItem {
+  nonce: string;
+  channelId: string;
+  content: string;
+  replyTo: string | null;
+  attachments: PendingAttachment[];
+  state: "pending" | "sent" | "failed";
+  error: string | null;
+  createdAt: number;
+}
+
 export interface AppState {
   me: { id: string; username: string } | null;
   connection: GatewayStatus;
@@ -106,6 +123,7 @@ export interface AppState {
   guildSettings: { mutedGuilds: string[]; mutedChannels: string[] };
   presences: Record<string, PresenceState>;
   typing: Record<string, string[]>;
+  outbox: Record<string, OutboxItem>;
   ui: {
     selectedGuildId: string | "@dms" | null;
     selectedChannelId: string | null;
@@ -123,4 +141,8 @@ export type Action =
   | { type: "ui/selectGuild"; id: string | "@dms" }
   | { type: "ui/selectChannel"; id: string }
   | { type: "ui/focus"; focus: Focus }
-  | { type: "ui/toggleMembers" };
+  | { type: "ui/toggleMembers" }
+  | { type: "outbox/enqueue"; item: OutboxItem }
+  | { type: "outbox/sent"; nonce: string; messageId: string }
+  | { type: "outbox/failed"; nonce: string; error: string }
+  | { type: "outbox/retry"; nonce: string };

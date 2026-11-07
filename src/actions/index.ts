@@ -1,9 +1,10 @@
 import type { Gateway } from "../gateway/connection";
 import type { RestClient } from "../rest/client";
 import { getMessages } from "../rest/routes";
+import { createSendActions } from "./send";
 import { selectChannelList } from "../store/selectors";
 import type { Store } from "../store/store";
-import type { Focus } from "../store/types";
+import type { Focus, PendingAttachment } from "../store/types";
 
 export interface Actions {
   selectGuild(id: string | "@dms"): void;
@@ -11,6 +12,8 @@ export interface Actions {
   loadOlder(id: string): Promise<void>;
   focus(focus: Focus): void;
   toggleMembers(): void;
+  send(channelId: string, content: string, opts?: { replyTo?: string; attachments?: PendingAttachment[] }): Promise<void>;
+  retry(nonce: string): Promise<void>;
 }
 
 export interface ActionsDeps {
@@ -44,6 +47,8 @@ export function createActions(deps: ActionsDeps): Actions {
     }
   }
 
+  const sendActions = createSendActions({ store: deps.store, rest: deps.rest });
+
   return {
     selectGuild(id: string | "@dms"): void {
       deps.store.dispatch({ type: "ui/selectGuild", id });
@@ -60,5 +65,7 @@ export function createActions(deps: ActionsDeps): Actions {
     toggleMembers(): void {
       deps.store.dispatch({ type: "ui/toggleMembers" });
     },
+    send: sendActions.send,
+    retry: sendActions.retry,
   };
 }

@@ -129,3 +129,9 @@ export function selectMessages(state: AppState, channelId: string): Message[] {
     .filter((message): message is ApiMessage => message !== undefined)
     .map((message) => toMessage(state, message));
 }
+
+export function selectOutbox(state: AppState, channelId: string): import("./types").OutboxItem[] {
+  return Object.values(state.outbox)
+    .filter((item) => item.channelId === channelId)
+    .sort((a, b) => a.createdAt - b.createdAt);
+}
