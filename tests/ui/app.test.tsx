@@ -59,3 +59,79 @@ test("assertTty", () => {
   expect(assertTty({ isTTY: false })).toBe("discord-tui necesita una terminal");
   expect(assertTty({ isTTY: true })).toBeNull();
 });
+
+test("? shows the grouped help and Esc closes only the help", async () => {
+  const { store, actions } = setup();
+  const { mockInput, renderOnce, captureCharFrame } = await testRender(
+    () => <App store={store} actions={actions} onQuit={() => {}} />,
+    { width: 100, height: 40 },
+  );
+  await renderOnce();
+  mockInput.pressKeys(["?"]);
+  await renderOnce();
+  expect(captureCharFrame()).toContain("Navegación");
+  // Esc cierra la ayuda y no dispara nada más (el resto del layout sigue ahí).
+  mockInput.pressKeys(["\u001b[27u"]);
+  await Bun.sleep(1);
+  await renderOnce();
+  const after = captureCharFrame();
+  expect(after).not.toContain("mostrar esta ayuda");
+  expect(after).toContain("Servidores");
+});
+
+test("gm calls toggleMembers", async () => {
+  const { store, actions } = setup();
+  let calls = 0;
+  actions.toggleMembers = () => {
+    calls += 1;
+  };
+  const { mockInput, renderOnce } = await testRender(() => <App store={store} actions={actions} onQuit={() => {}} />, {
+    width: 100,
+    height: 30,
+  });
+  await renderOnce();
+  mockInput.pressKey("g");
+  mockInput.pressKey("m");
+  await renderOnce();
+  expect(calls).toBe(1);
+});
+
+test("click on a channel opens it", async () => {
+  const { store, actions } = setup();
+  let opened: string | null = null as string | null;
+  actions.openChannel = async (id: string) => {
+    opened = id;
+  };
+  store.dispatch({ type: "ui/selectGuild", id: "guild1" });
+  store.dispatch({
+    type: "gw",
+    t: "READY",
+    d: {
+      user: { id: "me1", username: "me" },
+      guilds: [
+        {
+          id: "guild1",
+          name: "Test",
+          owner_id: "me1",
+          roles: [],
+          emojis: [],
+          channels: [{ id: "ch1", type: 0, name: "general", position: 0, permission_overwrites: [] }],
+        },
+      ],
+      private_channels: [],
+      users: [],
+    },
+  });
+  const { mockMouse, renderOnce, captureCharFrame } = await testRender(
+    () => <App store={store} actions={actions} onQuit={() => {}} />,
+    { width: 100, height: 30 },
+  );
+  await renderOnce();
+  const frame = captureCharFrame();
+  const lines = frame.split("\n");
+  const lineIndex = lines.findIndex((line) => line.includes("general"));
+  expect(lineIndex).toBeGreaterThan(-1);
+  await mockMouse.click(25, lineIndex);
+  await renderOnce();
+  expect(opened).toBe("ch1");
+});

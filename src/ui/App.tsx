@@ -9,6 +9,7 @@ import { ChannelList } from "./components/ChannelList";
 import { GuildList } from "./components/GuildList";
 import { MessageView } from "./components/MessageView";
 import { StatusBar } from "./components/StatusBar";
+import { HelpOverlay } from "./components/HelpOverlay";
 import { SettingsScreen, type SettingsDeps } from "./screens/SettingsScreen";
 import { listAudioDevices } from "../voice/devices";
 import { startCapture, startPlayback } from "../voice/audio-io";
@@ -39,6 +40,7 @@ export function App(props: {
   const [pickerQuery, setPickerQuery] = createSignal("");
   const [settingsOpen, setSettingsOpen] = createSignal(false);
   const [pendingG, setPendingG] = createSignal(false);
+  const [helpOpen, setHelpOpen] = createSignal(false);
 
   const channelId = (): string | null => props.store.getState().ui.selectedChannelId;
   const currentText = (): string => {
@@ -195,6 +197,13 @@ export function App(props: {
   useKeyboard((key) => {
     if (settingsOpen()) return;
 
+    if (helpOpen()) {
+      if (key.name === "escape" || (key.name === "?" && !key.ctrl && !key.meta)) {
+        setHelpOpen(false);
+      }
+      return;
+    }
+
     if (pickerOpen()) {
       if (key.name === "escape") {
         setPickerOpen(false);
@@ -269,6 +278,9 @@ export function App(props: {
     switch (key.name) {
       case "g":
         setPendingG(true);
+        return;
+      case "?":
+        setHelpOpen(true);
         return;
       case "q":
         props.onQuit();
@@ -361,6 +373,9 @@ export function App(props: {
         <box height={1} width="100%" paddingLeft={1}>
           <text>{hint()}</text>
         </box>
+      </Show>
+      <Show when={helpOpen()}>
+        <HelpOverlay onClose={() => setHelpOpen(false)} />
       </Show>
       <Show when={settingsOpen()}>
         <SettingsScreen

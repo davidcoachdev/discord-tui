@@ -21,7 +21,13 @@ export function ChannelList(props: { store: Store; actions: Actions }): JSX.Elem
     <box title="Canales" border width={30} height="100%" flexDirection="column">
       <For each={rows()}>
         {(row) => (
-          <text>
+          <text
+            onMouseDown={() => {
+              if (row.kind === "category") return;
+              props.store.dispatch({ type: "ui/selectChannel", id: row.id });
+              void props.actions.openChannel(row.id).catch(() => {});
+            }}
+          >
             {`${"  ".repeat(row.depth)}${selected() === row.id ? "› " : "  "}${icon(row.kind)} ${row.name}${
               row.unread ? " ●" : ""
             }${row.mentions > 0 ? ` (${row.mentions})` : ""}`}

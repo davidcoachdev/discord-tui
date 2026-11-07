@@ -13,10 +13,10 @@ export function GuildList(props: { store: Store; actions: Actions }): JSX.Elemen
 
   return (
     <box title="Servidores" border width={22} height="100%" flexDirection="column">
-      <text>{`${marker("@dms")}Mensajes directos`}</text>
+      <text onMouseDown={() => props.actions.selectGuild("@dms")}>{`${marker("@dms")}Mensajes directos`}</text>
       <For each={rows()}>
         {(row) => (
-          <text>
+          <text onMouseDown={() => props.actions.selectGuild(row.id)}>
             {`${marker(row.id)}${row.name}${row.unread ? " ●" : ""}${row.mentions > 0 ? ` (${row.mentions})` : ""}`}
           </text>
         )}
