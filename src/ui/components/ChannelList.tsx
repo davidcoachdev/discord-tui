@@ -4,8 +4,9 @@ import { createEffect, For, on, Show, type JSX } from "solid-js";
 import type { Actions } from "../../actions";
 import { selectChannelList, selectVoiceParticipants, type ChannelRow } from "../../store/selectors";
 import type { Store } from "../../store/store";
+import type { AppState } from "../../store/types";
 import { cellWidth, displayName, truncate } from "../format";
-import { useSelector } from "../store-bridge";
+import { jsonEqual, useSelector } from "../store-bridge";
 import type { Theme } from "../theme";
 
 export const CHANNEL_WIDTH = 32;
@@ -17,21 +18,48 @@ function icon(kind: ChannelRow["kind"]): string {
   return "#";
 }
 
+interface ParticipantView {
+  userId: string;
+  name: string;
+  speaking: boolean;
+  muted: boolean;
+  deafened: boolean;
+  me: boolean;
+}
+
+interface ListView {
+  title: string;
+  rows: ChannelRow[];
+  participants: Record<string, ParticipantView[]>;
+  voiceChannelId: string | null;
+}
+
+function listView(s: AppState): ListView {
+  const selectedGuild = s.ui.selectedGuildId;
+  const guildId = selectedGuild === null || selectedGuild === "@dms" ? null : selectedGuild;
+  const rows = selectedGuild === null ? [] : selectChannelList(s, selectedGuild);
+  const participants: Record<string, ParticipantView[]> = {};
+  if (guildId !== null) {
+    for (const row of rows) {
+      if (row.kind !== "voice") continue;
+      participants[row.id] = selectVoiceParticipants(s, guildId, row.id).map((p) => ({
+        ...p,
+        name: displayName(s, p.userId, guildId),
+      }));
+    }
+  }
+  const title =
+    selectedGuild === "@dms"
+      ? " Mensajes directos "
+      : ` ${truncate((guildId ? s.guilds[guildId]?.name : null) ?? "Canales", CHANNEL_WIDTH - 6)} `;
+  return { title, rows, participants, voiceChannelId: s.voice.channelId };
+}
+
 export function ChannelList(props: { store: Store; actions: Actions; theme: Theme; focused?: boolean }): JSX.Element {
-  const state = useSelector(props.store, (s) => s);
-  const rows = (): ChannelRow[] =>
-    state().ui.selectedGuildId === null ? [] : selectChannelList(state(), state().ui.selectedGuildId!);
-  const selected = (): string | null => state().ui.selectedChannelId;
-  const guildId = (): string | null => {
-    const id = state().ui.selectedGuildId;
-    return id === null || id === "@dms" ? null : id;
-  };
-  const title = (): string => {
-    const id = state().ui.selectedGuildId;
-    if (id === "@dms") return " Mensajes directos ";
-    const name = id ? state().guilds[id]?.name : null;
-    return ` ${truncate(name ?? "Canales", CHANNEL_WIDTH - 6)} `;
-  };
+  const view = useSelector(props.store, listView, jsonEqual);
+  const selected = useSelector(props.store, (s) => s.ui.selectedChannelId);
+  const rows = (): ChannelRow[] => view().rows;
+  const title = (): string => view().title;
   const inner = CHANNEL_WIDTH - 2;
   let scroll: ScrollBoxRenderable | undefined;
 
@@ -83,9 +111,8 @@ export function ChannelList(props: { store: Store; actions: Actions; theme: Them
             const lead = `${"  ".repeat(row.depth)}${icon(row.kind)} `;
             const name = truncate(row.name, inner - 1 - cellWidth(lead) - cellWidth(badge));
             const bright = row.unread && !row.muted;
-            const participants = (): ReturnType<typeof selectVoiceParticipants> =>
-              row.kind === "voice" && guildId() !== null ? selectVoiceParticipants(state(), guildId()!, row.id) : [];
-            const connectedHere = (): boolean => state().voice.channelId === row.id;
+            const participants = (): ParticipantView[] => view().participants[row.id] ?? [];
+            const connectedHere = (): boolean => view().voiceChannelId === row.id;
             return (
               <box flexDirection="column" width="100%">
                 <box
@@ -127,7 +154,7 @@ export function ChannelList(props: { store: Store; actions: Actions; theme: Them
                         wrapMode="none"
                         fg={p.speaking ? props.theme.speaking : p.me ? props.theme.fg : props.theme.dim}
                       >
-                        {` ${truncate(displayName(state(), p.userId, guildId()), inner - row.depth * 2 - 12)}`}
+                        {` ${truncate(p.name, inner - row.depth * 2 - 12)}`}
                       </text>
                       <text fg={p.deafened ? props.theme.error : props.theme.warn}>
                         {p.deafened ? "[deaf]" : p.muted ? "[mute]" : ""}

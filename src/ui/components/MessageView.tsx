@@ -1,11 +1,12 @@
 import type { ScrollBoxRenderable } from "@opentui/core";
-import { createEffect, For, on, Show, type JSX } from "solid-js";
+import { createEffect, createMemo, For, on, Show, type JSX } from "solid-js";
 
-import { selectMessages, selectOutbox, selectTyping } from "../../store/selectors";
+import { toMessage } from "../../store/reducers/messages";
+import { selectOutbox, selectTyping } from "../../store/selectors";
 import type { Store } from "../../store/store";
 import type { AppState, Message, OutboxItem } from "../../store/types";
 import { dayLabel, displayName, sameDay, truncate, typingText } from "../format";
-import { useSelector } from "../store-bridge";
+import { jsonEqual, shallowEqual, useSelector } from "../store-bridge";
 import type { Theme } from "../theme";
 import { MessageItem } from "./MessageItem";
 
@@ -28,17 +29,48 @@ export function MessageView(props: {
   focused?: boolean;
   images?: boolean;
 }): JSX.Element {
-  const state = useSelector(props.store, (s) => s);
-  const channelId = (): string | null => state().ui.selectedChannelId;
-  const messages = (): Message[] => (channelId() === null ? [] : selectMessages(state(), channelId()!));
-  const outbox = (): OutboxItem[] => (channelId() === null ? [] : selectOutbox(state(), channelId()!));
-  const guildId = (): string | null => (channelId() ? state().channels[channelId()!]?.guildId ?? null : null);
-  const slice = () => (channelId() ? state().messages[channelId()!] : undefined);
-  const typing = (): string | null =>
-    channelId() === null
-      ? null
-      : typingText(selectTyping(state(), channelId()!, Date.now()).map((id) => displayName(state(), id, guildId())));
+  // Solo lo que la vista usa: las ráfagas de presencia, typing o voz no re-renderizan los mensajes.
+  const view = useSelector(
+    props.store,
+    (s) => {
+      const id = s.ui.selectedChannelId;
+      return { channelId: id, slice: id ? s.messages[id] : undefined, channels: s.channels, outbox: s.outbox, me: s.me };
+    },
+    shallowEqual,
+  );
+  // Nombres, roles y canales para resolver menciones: cambian poco, y un mensaje nuevo no los toca.
+  const names = useSelector(
+    props.store,
+    (s) => ({ users: s.users, members: s.members, guilds: s.guilds, channels: s.channels, me: s.me }),
+    shallowEqual,
+  );
+  const state = (): AppState => names() as unknown as AppState;
+  const channelId = (): string | null => view().channelId;
+  const slice = () => view().slice;
+  const messages = createMemo((): Message[] => {
+    const current = slice();
+    if (!current) return [];
+    const me = { me: view().me } as AppState;
+    return current.ids
+      .map((id) => current.byId[id])
+      .filter((raw) => raw !== undefined)
+      .map((raw) => toMessage(me, raw!));
+  });
+  const outbox = (): OutboxItem[] =>
+    channelId() === null ? [] : selectOutbox(view() as unknown as AppState, channelId()!);
+  const guildId = (): string | null => (channelId() ? view().channels[channelId()!]?.guildId ?? null : null);
+  const typing = useSelector(
+    props.store,
+    (s) => {
+      const id = s.ui.selectedChannelId;
+      if (id === null) return null;
+      const guild = s.channels[id]?.guildId ?? null;
+      return typingText(selectTyping(s, id, Date.now()).map((userId) => displayName(s, userId, guild)));
+    },
+    jsonEqual,
+  );
 
+  const title = useSelector(props.store, channelTitle);
   let scroll: ScrollBoxRenderable | undefined;
 
   createEffect(
@@ -84,13 +116,13 @@ export function MessageView(props: {
   };
 
   const isText = (): boolean => {
-    const type = channelId() ? state().channels[channelId()!]?.type : undefined;
+    const type = channelId() ? view().channels[channelId()!]?.type : undefined;
     return type !== 2 && type !== 4;
   };
 
   return (
     <box
-      title={` ${truncate(channelTitle(state()), 60)} `}
+      title={` ${truncate(title(), 60)} `}
       titleColor={props.focused ? props.theme.borderFocus : props.theme.header}
       border
       borderStyle="rounded"

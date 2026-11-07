@@ -4,21 +4,34 @@ import { For, Show, type JSX } from "solid-js";
 import { selectMemberRows } from "../../store/selectors";
 import type { Store } from "../../store/store";
 import { displayName, hashIndex, memberColor, truncate } from "../format";
-import { useSelector } from "../store-bridge";
+import { jsonEqual, useSelector } from "../store-bridge";
 import { presenceColor, roleHex, type Theme } from "../theme";
 
 export const MEMBER_WIDTH = 26;
 
 export function MemberList(props: { store: Store; theme: Theme }): JSX.Element {
-  const state = useSelector(props.store, (s) => s);
-  const guildId = (): string | null => {
-    const channelId = state().ui.selectedChannelId;
-    const fromChannel = channelId ? state().channels[channelId]?.guildId : null;
-    if (fromChannel) return fromChannel;
-    const selected = state().ui.selectedGuildId;
-    return selected && selected !== "@dms" ? selected : null;
-  };
-  const rows = () => (guildId() ? selectMemberRows(state(), guildId()!).slice(0, 200) : []);
+  const view = useSelector(
+    props.store,
+    (s) => {
+      const channelId = s.ui.selectedChannelId;
+      const fromChannel = channelId ? s.channels[channelId]?.guildId : null;
+      const selected = s.ui.selectedGuildId;
+      const guildId = fromChannel ?? (selected && selected !== "@dms" ? selected : null);
+      const rows = guildId
+        ? selectMemberRows(s, guildId)
+            .slice(0, 200)
+            .map((row) =>
+              row.kind === "group"
+                ? row
+                : { ...row, name: displayName(s, row.userId, guildId), color: memberColor(s, row.userId, guildId) },
+            )
+        : [];
+      return { guildId, rows };
+    },
+    jsonEqual,
+  );
+  const guildId = (): string | null => view().guildId;
+  const rows = () => view().rows;
   const inner = MEMBER_WIDTH - 2;
 
   return (
@@ -52,11 +65,11 @@ export function MemberList(props: { store: Store; theme: Theme }): JSX.Element {
                   fg={
                     row.status === "offline"
                       ? props.theme.faint
-                      : roleHex(memberColor(state(), row.userId, guildId())) ??
+                      : roleHex(row.color) ??
                         props.theme.names[hashIndex(row.userId, props.theme.names.length)]
                   }
                 >
-                  {` ${truncate(displayName(state(), row.userId, guildId()), inner - 4)}`}
+                  {` ${truncate(row.name, inner - 4)}`}
                 </text>
               </box>
             )

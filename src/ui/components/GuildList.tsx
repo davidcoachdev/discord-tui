@@ -5,7 +5,7 @@ import type { Actions } from "../../actions";
 import { selectChannelList, selectGuildList } from "../../store/selectors";
 import type { Store } from "../../store/store";
 import { cellWidth, truncate } from "../format";
-import { useSelector } from "../store-bridge";
+import { jsonEqual, useSelector } from "../store-bridge";
 import type { Theme } from "../theme";
 
 export const GUILD_WIDTH = 24;
@@ -49,13 +49,13 @@ function Row(props: {
 }
 
 export function GuildList(props: { store: Store; actions: Actions; theme: Theme; focused?: boolean }): JSX.Element {
-  const rows = useSelector(props.store, (state) => selectGuildList(state));
+  const rows = useSelector(props.store, (state) => selectGuildList(state), jsonEqual);
   const selected = useSelector(props.store, (state) => state.ui.selectedGuildId);
   const voiceGuild = useSelector(props.store, (state) => state.voice.guildId);
   const dms = useSelector(props.store, (state) => {
     const list = selectChannelList(state, "@dms");
     return { unread: list.some((row) => row.unread && !row.muted), mentions: list.reduce((n, row) => n + row.mentions, 0) };
-  });
+  }, jsonEqual);
   let scroll: ScrollBoxRenderable | undefined;
 
   createEffect(

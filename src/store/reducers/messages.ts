@@ -130,8 +130,19 @@ export function applyPage(
   };
 }
 
+const messageCache = new WeakMap<ApiMessage, { me: string | null; message: Message }>();
+
+/** Igual que `buildMessage`, pero devuelve el mismo objeto mientras el mensaje crudo no cambie (la UI lo usa de key). */
 export function toMessage(state: AppState, raw: ApiMessage): Message {
   const me = state.me?.id ?? null;
+  const hit = messageCache.get(raw);
+  if (hit && hit.me === me) return hit.message;
+  const message = buildMessage(me, raw);
+  messageCache.set(raw, { me, message });
+  return message;
+}
+
+function buildMessage(me: string | null, raw: ApiMessage): Message {
   const referencedRaw = (raw as any).referenced_message;
   const referenced =
     referencedRaw && typeof referencedRaw === "object"

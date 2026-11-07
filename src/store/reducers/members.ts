@@ -93,14 +93,20 @@ export function applyMemberListUpdate(state: AppState, d: any): AppState {
 export function applyPresenceUpdate(state: AppState, d: any): AppState {
   const userId = d?.user?.id;
   if (typeof userId !== "string") return state;
-  const users = d.user.username ? { ...state.users, [userId]: { ...(state.users[userId] ?? toUser(d.user)), ...toUser(d.user) } } : state.users;
+  // Las ráfagas de presencia de servers grandes no tienen que invalidar la lista de usuarios.
+  const users = d.user.username && !state.users[userId] ? { ...state.users, [userId]: toUser(d.user) } : state.users;
+  const previous = state.presences[userId];
+  const status = typeof d.status === "string" ? d.status : "offline";
+  if (previous && previous.status === status && users === state.users && (previous.activities as unknown[]).length === 0 && !(Array.isArray(d.activities) && d.activities.length > 0)) {
+    return state;
+  }
   return {
     ...state,
     users,
     presences: {
       ...state.presences,
       [userId]: {
-        status: typeof d.status === "string" ? d.status : "offline",
+        status,
         activities: Array.isArray(d.activities) ? d.activities : [],
       },
     },
