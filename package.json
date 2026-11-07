@@ -13,15 +13,22 @@
     "leak-check": "bun scripts/leak-check.ts"
   },
   "dependencies": {
+    "@discordjs/opus": "0.11.0",
+    "@discordjs/voice": "0.19.2",
     "@opentui/core": "0.8.2",
     "@opentui/keymap": "0.8.2",
     "@opentui/qrcode": "0.8.2",
     "@opentui/solid": "0.8.2",
+    "@snazzah/davey": "0.1.12",
     "discord-api-types": "0.38.57",
+    "opusscript": "0.1.1",
     "solid-js": "1.9.18"
   },
   "devDependencies": {
     "@types/bun": "1.4.4",
     "typescript": "5.9.3"
+  },
+  "overrides": {
+    "@snazzah/davey": "0.1.12"
   }
 }
