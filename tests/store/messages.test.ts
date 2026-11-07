@@ -164,3 +164,17 @@ test("MESSAGE_CREATE from fixture parses attachments, embeds and custom emoji co
   expect(parsed.reactions[0]?.emoji.name).toBe("partyparrot");
   expect(parsed.content).toBe("hola");
 });
+
+test("message authors are remembered as users", () => {
+  const state = reduce(baseState(), {
+    type: "gw",
+    t: "MESSAGE_CREATE",
+    d: {
+      id: "100000000000000100",
+      channel_id: CHANNEL,
+      author: { id: "100000000000000011", username: "user2", global_name: "User Two" },
+      content: "x",
+    },
+  });
+  expect(state.users["100000000000000011"]?.username).toBe("user2");
+});

@@ -3,6 +3,23 @@ import { compareSnowflakes } from "../../util/snowflake";
 
 const RING_SIZE = 500;
 
+
+function rememberAuthor(state: AppState, raw: any): AppState {
+  const author = raw?.author;
+  if (!author || typeof author.id !== "string") return state;
+  const users = {
+    ...state.users,
+    [author.id]: {
+      id: author.id,
+      username: author.username ?? author.id,
+      globalName: author.global_name ?? null,
+      avatar: author.avatar ?? null,
+      bot: author.bot === true,
+    },
+  };
+  return { ...state, users };
+}
+
 function emptySlice(): MessageSlice {
   return { ids: [], byId: {}, hasMoreBefore: true, loadingOlder: false, stale: false };
 }
@@ -41,7 +58,10 @@ function updateMessage(state: AppState, raw: Partial<ApiMessage>): AppState {
   if (!slice || !previous) return state;
 
   const merged = { ...previous, ...raw } as ApiMessage;
-  return { ...state, messages: { ...state.messages, [channelId]: { ...slice, byId: { ...slice.byId, [raw.id]: merged } } } };
+  return {
+    ...rememberAuthor(state, raw),
+    messages: { ...state.messages, [channelId]: { ...slice, byId: { ...slice.byId, [raw.id!]: merged } } },
+  };
 }
 
 function removeMessages(state: AppState, channelId: string, ids: string[]): AppState {
@@ -57,7 +77,7 @@ function removeMessages(state: AppState, channelId: string, ids: string[]): AppS
 
 export function applyMessageCreate(state: AppState, d: any): AppState {
   if (!d || typeof d.id !== "string" || typeof d.channel_id !== "string") return state;
-  return appendMessage(state, d as ApiMessage);
+  return appendMessage(rememberAuthor(state, d), d as ApiMessage);
 }
 
 export function applyMessageUpdate(state: AppState, d: any): AppState {
@@ -81,6 +101,9 @@ export function applyPage(
   messages: ApiMessage[],
   mode: "older" | "latest",
 ): AppState {
+  let nextState = state;
+  for (const message of messages) nextState = rememberAuthor(nextState, message);
+  state = nextState;
   const previous = state.messages[channelId] ?? emptySlice();
   const byId = { ...previous.byId };
   const ids = new Set(previous.ids);

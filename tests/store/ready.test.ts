@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { emptyState } from "../../src/store/store";
 import { reduce } from "../../src/store/reduce";
-import { selectChannelList } from "../../src/store/selectors";
+import { selectChannelList, selectGuildList } from "../../src/store/selectors";
 import { compareSnowflakes } from "../../src/util/snowflake";
 
 const ready = JSON.parse(
@@ -92,4 +92,16 @@ test("READY also accepts object-shaped maps for read_state, settings and private
   });
   expect(state.guildSettings.mutedGuilds).toContain("100000000000000001");
   expect(state.guildSettings.mutedChannels).toContain("100000000000000002");
+});
+
+test("guild data comes from properties when READY omits the root fields", () => {
+  const payload = structuredClone(ready);
+  const guild = payload.d.guilds[0];
+  guild.properties = { name: "Mi Server", icon: "abc", owner_id: "999" };
+  delete guild.name;
+  delete guild.icon;
+  delete guild.owner_id;
+
+  const state = reduceReady(payload.d);
+  expect(selectGuildList(state)[0]?.name).toBe("Mi Server");
 });

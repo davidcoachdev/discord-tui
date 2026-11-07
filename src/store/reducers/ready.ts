@@ -75,11 +75,12 @@ export function applyReady(state: AppState, d: any): AppState {
 
   for (const rawGuild of asList(d.guilds, "id")) {
     guildOrder.push(rawGuild.id);
+    const properties = rawGuild.properties ?? {};
     guilds[rawGuild.id] = {
       id: rawGuild.id,
-      name: rawGuild.name ?? rawGuild.id,
-      icon: rawGuild.icon ?? null,
-      ownerId: rawGuild.owner_id ?? "",
+      name: typeof properties.name === "string" ? properties.name : rawGuild.name ?? rawGuild.id,
+      icon: properties.icon ?? rawGuild.icon ?? null,
+      ownerId: properties.owner_id ?? rawGuild.owner_id ?? "",
       roles: asList(rawGuild.roles, "id").map(toRole),
       emojis: asList(rawGuild.emojis, "id").map((emoji: any) => ({
         id: emoji.id ?? "",
