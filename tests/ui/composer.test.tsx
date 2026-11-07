@@ -52,6 +52,8 @@ function setup() {
       calls.push({ channelId, content, opts });
     },
     retry: async () => {},
+    edit: async () => {},
+    remove: async () => {},
   };
   return { store, actions, calls };
 }

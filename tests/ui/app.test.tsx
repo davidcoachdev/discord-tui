@@ -16,6 +16,8 @@ function setup() {
     toggleMembers: () => {},
     send: async () => {},
     retry: async () => {},
+    edit: async () => {},
+    remove: async () => {},
   };
   return { store, actions };
 }

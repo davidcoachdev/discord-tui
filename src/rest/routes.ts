@@ -35,3 +35,16 @@ export async function postTyping(rest: RestClient, channelId: string): Promise<v
 export async function postAck(rest: RestClient, channelId: string, messageId: string): Promise<void> {
   await rest.request("POST", `/channels/${channelId}/messages/${messageId}/ack`, { token: null, last_viewed: 0 });
 }
+
+export async function patchMessage(
+  rest: RestClient,
+  channelId: string,
+  messageId: string,
+  body: { content: string },
+): Promise<APIMessage> {
+  return rest.request<APIMessage>("PATCH", `/channels/${channelId}/messages/${messageId}`, body);
+}
+
+export async function deleteMessage(rest: RestClient, channelId: string, messageId: string): Promise<void> {
+  await rest.request("DELETE", `/channels/${channelId}/messages/${messageId}`);
+}

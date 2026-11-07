@@ -8,7 +8,7 @@ function clockTime(timestamp: string): string {
   return date.toTimeString().slice(0, 5);
 }
 
-export function MessageItem(props: { message: Message; author: string; grouped: boolean }): JSX.Element {
+export function MessageItem(props: { message: Message; author: string; grouped: boolean; selected?: boolean }): JSX.Element {
   return (
     <box flexDirection="column">
       <Show when={props.message.referenced}>
@@ -17,7 +17,7 @@ export function MessageItem(props: { message: Message; author: string; grouped: 
       <Show when={!props.grouped}>
         <text>{`${clockTime(props.message.timestamp)} ${props.author}`}</text>
       </Show>
-      <text>{`${props.message.content}${props.message.editedTimestamp ? " (editado)" : ""}`}</text>
+      <text>{`${props.selected ? "› " : ""}${props.message.content}${props.message.editedTimestamp ? " (editado)" : ""}`}</text>
     </box>
   );
 }

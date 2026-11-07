@@ -8,7 +8,7 @@ import { MessageItem } from "./MessageItem";
 
 const GROUP_WINDOW_MS = 7 * 60_000;
 
-export function MessageView(props: { store: Store }): JSX.Element {
+export function MessageView(props: { store: Store; selectedId?: string | null }): JSX.Element {
   const messages = useSelector(props.store, (state) =>
     state.ui.selectedChannelId === null ? [] : selectMessages(state, state.ui.selectedChannelId),
   );
@@ -40,7 +40,7 @@ export function MessageView(props: { store: Store }): JSX.Element {
         </For>
         <For each={messages()}>
           {(message, index) => (
-            <MessageItem message={message} author={authorName(message.authorId)} grouped={isGrouped(message, index())} />
+            <MessageItem message={message} author={authorName(message.authorId)} grouped={isGrouped(message, index())} selected={props.selectedId === message.id} />
           )}
         </For>
       </scrollbox>

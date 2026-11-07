@@ -19,7 +19,11 @@ export function App(props: { store: Store; actions: Actions; onQuit: () => void 
   const [insert, setInsert] = createSignal(false);
   const [replyTo, setReplyTo] = createSignal<string | null>(null);
   const [editing, setEditing] = createSignal<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = createSignal<string | null>(null);
+  const [hint, setHint] = createSignal<string | null>(null);
+  const [selectedId, setSelectedId] = createSignal<string | null>(null);
   const [drafts, setDrafts] = createSignal<Record<string, string>>({});
+  const [lastD, setLastD] = createSignal(0);
 
   const channelId = (): string | null => props.store.getState().ui.selectedChannelId;
   const currentText = (): string => {
@@ -33,21 +37,32 @@ export function App(props: { store: Store; actions: Actions; onQuit: () => void 
     setDrafts((previous) => ({ ...previous, [id]: updater(previous[id] ?? "") }));
   }
 
-  function move(delta: number): void {
+  function moveGuild(delta: number): void {
     const state = props.store.getState();
-    if (state.ui.focus === "channels" && state.ui.selectedGuildId !== null) {
-      const rows = selectChannelList(state, state.ui.selectedGuildId);
-      if (rows.length === 0) return;
-      const index = Math.max(0, rows.findIndex((row) => row.id === state.ui.selectedChannelId));
-      const next = rows[Math.min(rows.length - 1, Math.max(0, index + delta))];
-      if (next) props.store.dispatch({ type: "ui/selectChannel", id: next.id });
-      return;
-    }
-
     const ids = ["@dms", ...state.guildOrder];
     const index = Math.max(0, ids.indexOf(state.ui.selectedGuildId ?? "@dms"));
     const next = ids[Math.min(ids.length - 1, Math.max(0, index + delta))];
     if (next !== undefined) props.actions.selectGuild(next);
+  }
+
+  function moveChannel(delta: number): void {
+    const state = props.store.getState();
+    if (state.ui.selectedGuildId === null) return;
+    const rows = selectChannelList(state, state.ui.selectedGuildId);
+    if (rows.length === 0) return;
+    const index = Math.max(0, rows.findIndex((row) => row.id === state.ui.selectedChannelId));
+    const next = rows[Math.min(rows.length - 1, Math.max(0, index + delta))];
+    if (next) props.store.dispatch({ type: "ui/selectChannel", id: next.id });
+  }
+
+  function moveMessage(delta: number): void {
+    const id = channelId();
+    if (id === null) return;
+    const ids = selectMessages(props.store.getState(), id).map((message) => message.id);
+    if (ids.length === 0) return;
+    const index = selectedId() === null ? ids.length - 1 : ids.indexOf(selectedId()!);
+    const next = ids[Math.min(ids.length - 1, Math.max(0, index + delta))];
+    if (next) setSelectedId(next);
   }
 
   function focusChannels(): void {
@@ -66,22 +81,41 @@ export function App(props: { store: Store; actions: Actions; onQuit: () => void 
     }
     if (state.ui.selectedChannelId !== null) {
       void props.actions.openChannel(state.ui.selectedChannelId).catch(() => {});
+      props.actions.focus("messages");
     }
   }
 
-  async function sendCurrent(): Promise<void> {
+  function clearComposer(): void {
+    const id = channelId();
+    if (id !== null) setDrafts((previous) => ({ ...previous, [id]: "" }));
+    setReplyTo(null);
+    setEditing(null);
+    setInsert(false);
+    setHint(null);
+  }
+
+  async function submitComposer(): Promise<void> {
     const id = channelId();
     if (id === null) return;
     const text = currentText();
     const validation = validateOutgoing(text, 0);
     if (!validation.ok) return;
 
+    if (editing() !== null) {
+      const editId = editing()!;
+      try {
+        await props.actions.edit(id, editId, text);
+      } catch {
+        setHint("no se pudo editar");
+        return;
+      }
+      clearComposer();
+      return;
+    }
+
     const reply = replyTo();
     await props.actions.send(id, text, reply === null ? {} : { replyTo: reply });
-    setDrafts((previous) => ({ ...previous, [id]: "" }));
-    setReplyTo(null);
-    setEditing(null);
-    setInsert(false);
+    clearComposer();
   }
 
   function retryFirstFailed(): void {
@@ -93,20 +127,64 @@ export function App(props: { store: Store; actions: Actions; onQuit: () => void 
     if (failed) void props.actions.retry(failed.nonce);
   }
 
+  function ownSelectedMessage(): any | undefined {
+    const id = channelId();
+    if (id === null || selectedId() === null) return undefined;
+    return props.store.getState().messages[id]?.byId[selectedId()!];
+  }
+
+  function startEdit(): void {
+    const id = channelId();
+    if (id === null || selectedId() === null) return;
+    const message = ownSelectedMessage();
+    if (!message || message.author.id !== props.store.getState().me?.id) {
+      setHint("solo podés editar o borrar tus mensajes");
+      return;
+    }
+    setEditing(selectedId());
+    setDrafts((previous) => ({ ...previous, [id]: String(message.content ?? "") }));
+    setInsert(true);
+  }
+
+  function requestDelete(): void {
+    if (selectedId() === null) return;
+    const now = Date.now();
+    if (now - lastD() < 500) {
+      const message = ownSelectedMessage();
+      if (!message || message.author.id !== props.store.getState().me?.id) {
+        setHint("solo podés editar o borrar tus mensajes");
+        return;
+      }
+      setConfirmDelete(selectedId());
+    }
+    setLastD(now);
+  }
+
   useKeyboard((key) => {
+    if (confirmDelete() !== null) {
+      if (key.name === "y") {
+        const id = channelId();
+        const messageId = confirmDelete();
+        if (id !== null && messageId !== null) void props.actions.remove(id, messageId);
+        setConfirmDelete(null);
+        setSelectedId(null);
+        return;
+      }
+      if (key.name === "n") {
+        setConfirmDelete(null);
+        return;
+      }
+      return;
+    }
+
     if (insert()) {
       if (key.name === "escape") {
-        setInsert(false);
-        setReplyTo(null);
-        setEditing(null);
+        clearComposer();
         return;
       }
       if (key.name === "return") {
-        if (key.shift || key.option) {
-          setText((previous) => `${previous}\n`);
-          return;
-        }
-        void sendCurrent();
+        if (key.shift || key.option) setText((previous) => `${previous}\n`);
+        else void submitComposer();
         return;
       }
       if (key.name === "backspace") {
@@ -120,6 +198,7 @@ export function App(props: { store: Store; actions: Actions; onQuit: () => void 
       return;
     }
 
+    const focus = props.store.getState().ui.focus;
     switch (key.name) {
       case "q":
         props.onQuit();
@@ -128,23 +207,25 @@ export function App(props: { store: Store; actions: Actions; onQuit: () => void 
         setInsert(true);
         return;
       case "j":
-        move(1);
+        if (focus === "messages") moveMessage(1);
+        else if (focus === "channels") moveChannel(1);
+        else moveGuild(1);
         return;
       case "k":
-        move(-1);
+        if (focus === "messages") moveMessage(-1);
+        else if (focus === "channels") moveChannel(-1);
+        else moveGuild(-1);
         return;
       case "h":
-        props.actions.focus("guilds");
+        if (focus === "messages") props.actions.focus("channels");
+        else props.actions.focus("guilds");
         return;
       case "l":
-        if (props.store.getState().ui.focus === "channels") openSelected();
+        if (focus === "channels") openSelected();
         else focusChannels();
         return;
       case "return":
         openSelected();
-        return;
-      case "R":
-        retryFirstFailed();
         return;
       case "r": {
         const id = channelId();
@@ -153,6 +234,15 @@ export function App(props: { store: Store; actions: Actions; onQuit: () => void 
         if (last) setReplyTo(last.id);
         return;
       }
+      case "e":
+        startEdit();
+        return;
+      case "d":
+        requestDelete();
+        return;
+      case "R":
+        retryFirstFailed();
+        return;
       default:
         return;
     }
@@ -173,11 +263,21 @@ export function App(props: { store: Store; actions: Actions; onQuit: () => void 
       <box flexDirection="row" flexGrow={1} width="100%">
         <GuildList store={props.store} actions={props.actions} />
         <ChannelList store={props.store} actions={props.actions} />
-        <MessageView store={props.store} />
+        <MessageView store={props.store} selectedId={selectedId()} />
       </box>
+      <Show when={confirmDelete() !== null}>
+        <box height={1} width="100%" paddingLeft={1}>
+          <text>¿Borrar este mensaje? y/n</text>
+        </box>
+      </Show>
       <Show when={replyTo() !== null || editing() !== null}>
         <box height={1} width="100%" paddingLeft={1}>
           <text>{editing() !== null ? "editando · Esc cancela" : "respondiendo · Esc cancela"}</text>
+        </box>
+      </Show>
+      <Show when={hint() !== null}>
+        <box height={1} width="100%" paddingLeft={1}>
+          <text>{hint()}</text>
         </box>
       </Show>
       <Composer text={currentText()} insert={insert()} replyTo={replyTo()} editing={editing()} />

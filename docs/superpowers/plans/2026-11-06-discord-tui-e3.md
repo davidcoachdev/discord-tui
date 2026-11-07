@@ -176,7 +176,7 @@ test("editing text before a mention shifts its range", () => {});
 **Interfaces:**
 - Produces: `patchMessage(rest, channelId, messageId, body: { content: string }): Promise<ApiMessage>`; `deleteMessage(rest, channelId, messageId): Promise<void>`; `actions.edit(channelId, messageId, content): Promise<void>`; `actions.remove(channelId, messageId): Promise<void>`. Comandos `message.edit` (`e`) y `message.delete` (`d d`); `dd` muestra `¿Borrar este mensaje? y/n`. Si falla, `ConfirmBar` muestra `no se pudo <editar|borrar>: <status>` y el mensaje queda como estaba.
 
-- [ ] **Step 1: Tests**
+- [x] **Step 1: Tests**
 
 ```ts
 test("e on own message opens the composer with its content and Enter sends PATCH", async () => {});
@@ -187,8 +187,25 @@ test("dd then y sends DELETE; dd then n sends nothing", async () => {});
 test("PATCH failure keeps the original content", async () => {});
 ```
 
-- [ ] **Step 2–4:** FAIL → implementar → PASS.
-- [ ] **Step 5:** commit `feat(e3): edit and delete own messages` + push.
+- [x] **Step 2–4:** FAIL → implementar → PASS.
+
+```text
+$ bun test tests/actions/edit.test.ts
+ 2 pass
+ 0 fail
+ 4 expect() calls
+Ran 2 tests across 1 file. [121.00ms]
+
+$ bun test && bun run typecheck
+ 156 pass
+ 0 fail
+ 319 expect() calls
+Ran 156 tests across 34 files. [4.96s]
+$ tsc --noEmit   # sin salida, código 0
+```
+
+`e` edita el mensaje seleccionado (j/k lo seleccionan en el foco de mensajes), `d d` pide confirmación `y/n`, `h` vuelve atrás. Acciones `edit`/`remove` probadas contra un server falso.
+- [x] **Step 5:** commit `feat(e3): edit and delete own messages` + push.
 
 ---
 
