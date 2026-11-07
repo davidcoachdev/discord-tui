@@ -7,6 +7,7 @@ import { createSendActions } from "./send";
 import { selectChannelList } from "../store/selectors";
 import type { Store } from "../store/store";
 import type { Focus, PendingAttachment } from "../store/types";
+import { HttpError } from "../rest/errors";
 
 export interface Actions {
   selectGuild(id: string | "@dms"): void;
@@ -27,14 +28,28 @@ export interface ActionsDeps {
   gateway: Gateway;
 }
 
+function noticeText(action: string, error: unknown): string {
+  const status = error instanceof HttpError ? error.status : null;
+  return status !== null ? `no se pudo ${action}: ${status}` : `no se pudo ${action}`;
+}
+
 export function createActions(deps: ActionsDeps): Actions {
+  function reportError(key: string, action: string, error: unknown): void {
+    deps.store.dispatch({ type: "notice/push", key, level: "warn", text: noticeText(action, error) });
+  }
+
   async function openChannel(id: string): Promise<void> {
     deps.store.dispatch({ type: "ui/selectChannel", id });
     const slice = deps.store.getState().messages[id];
     if (slice !== undefined && !slice.stale) return;
 
-    const messages = await getMessages(deps.rest, id, { limit: 50 });
-    deps.store.dispatch({ type: "messages/page", channelId: id, messages, mode: "latest" });
+    try {
+      const messages = await getMessages(deps.rest, id, { limit: 50 });
+      deps.store.dispatch({ type: "messages/page", channelId: id, messages, mode: "latest" });
+    } catch (error) {
+      reportError("open-channel", "abrir el canal", error);
+      throw error;
+    }
   }
 
   async function loadOlder(id: string): Promise<void> {
@@ -56,6 +71,37 @@ export function createActions(deps: ActionsDeps): Actions {
   const editActions = createEditActions({ rest: deps.rest });
   const reactActions = createReactActions({ store: deps.store, rest: deps.rest });
 
+  async function edit(channelId: string, messageId: string, content: string): Promise<void> {
+    try {
+      await editActions.edit(channelId, messageId, content);
+    } catch (error) {
+      reportError("edit-message", "editar el mensaje", error);
+      throw error;
+    }
+  }
+
+  async function remove(channelId: string, messageId: string): Promise<void> {
+    try {
+      await editActions.remove(channelId, messageId);
+    } catch (error) {
+      reportError("remove-message", "borrar el mensaje", error);
+      throw error;
+    }
+  }
+
+  async function toggleReaction(
+    channelId: string,
+    messageId: string,
+    emoji: { id: string | null; name: string },
+  ): Promise<void> {
+    try {
+      await reactActions.toggleReaction(channelId, messageId, emoji);
+    } catch (error) {
+      reportError("toggle-reaction", "reaccionar", error);
+      throw error;
+    }
+  }
+
   return {
     selectGuild(id: string | "@dms"): void {
       deps.store.dispatch({ type: "ui/selectGuild", id });
@@ -74,8 +120,8 @@ export function createActions(deps: ActionsDeps): Actions {
     },
     send: sendActions.send,
     retry: sendActions.retry,
-    edit: editActions.edit,
-    remove: editActions.remove,
-    toggleReaction: reactActions.toggleReaction,
+    edit,
+    remove,
+    toggleReaction,
   };
 }

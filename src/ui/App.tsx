@@ -10,6 +10,7 @@ import { GuildList } from "./components/GuildList";
 import { MessageView } from "./components/MessageView";
 import { StatusBar } from "./components/StatusBar";
 import { HelpOverlay } from "./components/HelpOverlay";
+import { Notices } from "./components/Notices";
 import { SettingsScreen, type SettingsDeps } from "./screens/SettingsScreen";
 import { listAudioDevices } from "../voice/devices";
 import { startCapture, startPlayback } from "../voice/audio-io";
@@ -27,6 +28,7 @@ export function App(props: {
   actions: Actions;
   onQuit: () => void;
   settingsDeps?: SettingsDeps;
+  onActivity?(): void;
 }): JSX.Element {
   const [insert, setInsert] = createSignal(false);
   const [replyTo, setReplyTo] = createSignal<string | null>(null);
@@ -195,6 +197,7 @@ export function App(props: {
   }
 
   useKeyboard((key) => {
+    props.onActivity?.();
     if (settingsOpen()) return;
 
     if (helpOpen()) {
@@ -386,6 +389,7 @@ export function App(props: {
           onClose={() => setSettingsOpen(false)}
         />
       </Show>
+      <Notices store={props.store} />
       <Composer text={currentText()} insert={insert()} replyTo={replyTo()} editing={editing()} />
       <StatusBar store={props.store} />
     </box>

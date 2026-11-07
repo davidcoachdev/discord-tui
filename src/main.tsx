@@ -77,7 +77,14 @@ function LoginRoot(props: { buildNumber: number; settings: Settings; onQuit: () 
 
   return (
     <Show when={runtime()} fallback={<LoginScreen auth={auth} onPasteToken={onPasteToken} />}>
-      {(active: Accessor<Runtime>) => <App store={active().store} actions={active().actions} onQuit={props.onQuit} />}
+      {(active: Accessor<Runtime>) => (
+        <App
+          store={active().store}
+          actions={active().actions}
+          onQuit={props.onQuit}
+          onActivity={() => active().activity()}
+        />
+      )}
     </Show>
   );
 }
@@ -122,7 +129,10 @@ async function main(): Promise<void> {
   const me = result.kind === "main" ? result.me : { id: session.userId, username: "" };
   const runtime = createRuntime({ session, me, props: createClientProps({ buildNumber }), initialSettings: settings });
   runtime.start();
-  await render(() => <App store={runtime.store} actions={runtime.actions} onQuit={quit} />, renderer);
+  await render(
+    () => <App store={runtime.store} actions={runtime.actions} onQuit={quit} onActivity={() => runtime.activity()} />,
+    renderer,
+  );
 }
 
 if (import.meta.main) await main();

@@ -93,6 +93,15 @@ export interface PresenceState {
 
 export type Focus = "guilds" | "channels" | "messages" | "members" | "composer";
 
+export interface Notice {
+  id: string;
+  key: string;
+  level: "info" | "warn" | "error";
+  text: string;
+  count: number;
+  at: number;
+}
+
 export interface PendingAttachment {
   filename: string;
   mime: string;
@@ -132,6 +141,7 @@ export interface AppState {
     membersVisible: boolean;
   };
   settings: Settings;
+  notices: Record<string, Notice>;
 }
 
 export type Action =
@@ -149,4 +159,7 @@ export type Action =
   | { type: "outbox/failed"; nonce: string; error: string }
   | { type: "outbox/retry"; nonce: string }
   | { type: "settings/set"; patch: Partial<Settings> }
-  | { type: "settings/loaded"; settings: Settings };
+  | { type: "settings/loaded"; settings: Settings }
+  | { type: "notice/push"; key: string; level: Notice["level"]; text: string }
+  | { type: "notice/dismiss"; id: string }
+  | { type: "notice/sweep"; now: number };

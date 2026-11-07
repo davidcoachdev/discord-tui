@@ -26,6 +26,7 @@ export function emptyState(): AppState {
     outbox: {},
     ui: { selectedGuildId: null, selectedChannelId: null, focus: "guilds", membersVisible: true },
     settings: { ...DEFAULT_SETTINGS },
+    notices: {},
   };
 }
 

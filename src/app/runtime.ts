@@ -1,4 +1,5 @@
 import { createActions, type Actions } from "../actions";
+import { createIdlePresence } from "../actions/presence";
 import type { Session } from "../auth/session";
 import type { ClientProps } from "../client-props/props";
 import { createGateway } from "../gateway/connection";
@@ -30,6 +31,7 @@ export interface Runtime {
   start(): void;
   stop(): void;
   onUnauthorized(fn: () => void): () => void;
+  activity(): void;
 }
 
 export function createRuntime(deps: RuntimeDeps): Runtime {
@@ -98,17 +100,38 @@ export function createRuntime(deps: RuntimeDeps): Runtime {
     if (open !== null) void actions.openChannel(open).catch(() => {});
   });
 
-  gateway.on("fatal", () => notifyUnauthorized());
+  gateway.on("fatal", (reason) => {
+    store.dispatch({
+      type: "notice/push",
+      key: "identify-rejected",
+      level: "error",
+      text: "Discord rechazó la conexión (" + reason + "): puede que haya cambiado el protocolo. Revisá el log.",
+    });
+    notifyUnauthorized();
+  });
+
+  const idle = createIdlePresence({ gateway, settings: () => store.getState().settings });
+
+  const noticeSweep = setInterval(() => {
+    store.dispatch({ type: "notice/sweep", now: Date.now() });
+  }, 1000);
+  noticeSweep.unref?.();
 
   return {
     store,
     actions,
     start(): void {
       gateway.connect();
+      idle.activity();
     },
     stop(): void {
+      clearInterval(noticeSweep);
+      idle.stop();
       detachSettings();
       gateway.close();
+    },
+    activity(): void {
+      idle.activity();
     },
     onUnauthorized(fn: () => void): () => void {
       unauthorizedHandlers.add(fn);

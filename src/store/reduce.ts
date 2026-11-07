@@ -16,6 +16,7 @@ import {
   applyOutboxSent,
 } from "./reducers/outbox";
 import { applySettingsLoaded, applySettingsPatch } from "./reducers/settings";
+import { applyNoticeDismiss, applyNoticePush, applyNoticeSweep } from "./reducers/notices";
 import { compareSnowflakes } from "../util/snowflake";
 
 export function reduce(state: AppState, action: Action): AppState {
@@ -91,6 +92,12 @@ export function reduce(state: AppState, action: Action): AppState {
       return applySettingsPatch(state, action.patch);
     case "settings/loaded":
       return applySettingsLoaded(state, action.settings);
+    case "notice/push":
+      return applyNoticePush(state, action.key, action.level, action.text, Date.now());
+    case "notice/dismiss":
+      return applyNoticeDismiss(state, action.id);
+    case "notice/sweep":
+      return applyNoticeSweep(state, action.now);
     default:
       return state;
   }
