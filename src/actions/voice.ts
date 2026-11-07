@@ -5,6 +5,7 @@ import { createMixer, type Mixer } from "../voice/mixer";
 import { createPtt, type Ptt, type PttKey } from "../voice/ptt";
 import { createReceiver, type Receiver } from "../voice/rx";
 import type { VoiceSession } from "../voice/session";
+import { createVoiceStats } from "../voice/stats";
 import { createTransmitter, type Transmitter } from "../voice/tx";
 import type { Vad } from "../voice/vad";
 
@@ -46,6 +47,7 @@ export function createVoiceActions(deps: {
   let vad: Vad | null = null;
   let ptt: Ptt | null = null;
   let codeTimer: ReturnType<typeof setInterval> | null = null;
+  let stats: { stop(): void } | null = null;
   let media = 0;
 
   const voice = () => store.getState().voice;
@@ -109,6 +111,10 @@ export function createVoiceActions(deps: {
       store.dispatch({ type: "notice/push", key: "voice-mic", level: "warn", text: errorText(error) });
     }
 
+    stats = createVoiceStats({
+      log,
+      read: () => ({ ...(rx?.stats() ?? { packets: 0, decodeErrors: 0 }), state: voice().status }),
+    });
     codeTimer = setInterval(() => {
       store.dispatch({ type: "voice/privacyCode", code: session.privacyCode() });
     }, 1_000);
@@ -119,6 +125,8 @@ export function createVoiceActions(deps: {
     media += 1;
     if (codeTimer !== null) clearInterval(codeTimer);
     codeTimer = null;
+    stats?.stop();
+    stats = null;
     tx?.stop();
     tx = null;
     rx?.stop();

@@ -117,3 +117,18 @@ test("space goes to PTT only in normal mode; typing in the composer does not tra
   await renderOnce();
   expect(s.calls).toEqual(["ptt:press"]);
 });
+
+test("j walks into a voice channel's participants and +/- change their volume", async () => {
+  const s = setup();
+  s.store.dispatch({ type: "ui/selectChannel", id: DEMO.voice });
+  s.store.dispatch({ type: "ui/focus", focus: "channels" });
+  const { mockInput, renderOnce, captureCharFrame } = await render(s);
+  await renderOnce();
+  mockInput.pressKey("j"); // primer participante (Ragnar)
+  mockInput.pressKey("-");
+  mockInput.pressKey("-");
+  await renderOnce();
+  expect(s.store.getState().settings.userVolumes["900000000000000101"]).toBe(80);
+  expect(captureCharFrame()).toMatch(/Ragnar\s+80%/);
+  expect(s.calls).toEqual([]);
+});

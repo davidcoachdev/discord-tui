@@ -51,7 +51,7 @@ Sin el TUI: Gon desde el teléfono y la segunda cuenta o el amigo desde su clien
   - `mixFrames(frames: Uint8Array[]): Uint8Array` (s16le, suma con saturación; sin frames → silencio de 3840 bytes).
   - `createMixer(deps: { playback: Pick<AudioPlayback, "write">; now?: () => number; setTimer?: typeof setInterval }): { buffer(userId: string): JitterBuffer; remove(userId: string): void; start(): void; stop(): void; setMuted(m: boolean): void }`: en cada tick calcula cuántos frames de 20 ms tocan por tiempo transcurrido; si el atraso pasa de 100 ms, descarta y se realinea.
 
-- [ ] **Step 1: Tests**
+- [x] **Step 1: Tests**
 
 ```ts
 test("jitter: null until 3 frames, then FIFO", () => {});
@@ -67,8 +67,8 @@ test("mixer resyncs when lag exceeds 100 ms", () => {});
 test("muted mixer writes nothing", () => {});
 ```
 
-- [ ] **Step 2–4:** FAIL → implementar → `bun test tests/voice` PASS.
-- [ ] **Step 5:** commit `feat(e4c): jitter buffer and saturating mixer` + push.
+- [x] **Step 2–4:** FAIL → implementar → `bun test tests/voice` PASS.
+- [x] **Step 5:** commit `feat(e4c): jitter buffer and saturating mixer` + push.
 
 ---
 
@@ -84,7 +84,7 @@ test("muted mixer writes nothing", () => {});
 - Consumes: `createOpusCodec` (un decoder por usuario), `createMixer`, `startPlayback`.
 - Produces: `createReceiver(deps: { session: Pick<VoiceSession, "onOpus" | "onSpeaking">; mixer; makeDecoder: () => { decode(o: Uint8Array): Uint8Array }; isDeaf: () => boolean; onSpeaking(userId: string, on: boolean): void }): { stats(): { packets: number; decodeErrors: number; usersActive: number }; stop(): void }`. Un frame `F8 FF FE` no se decodifica; 5 seguidos marcan fin de habla. Sin paquetes de un usuario por 300 ms → `onSpeaking(userId, false)`. Usuario que sale del canal (`VOICE_STATE_UPDATE` con otro `channel_id`) → `mixer.remove` y se libera su decoder.
 
-- [ ] **Step 1: Tests**
+- [x] **Step 1: Tests**
 
 ```ts
 test("opus from two users ends up mixed in playback", async () => {});
@@ -96,8 +96,8 @@ test("user leaving the channel frees its decoder and buffer", () => {});
 test("plan A: receiver.speaking start subscribes once per user with AfterSilence 300", () => {});
 ```
 
-- [ ] **Step 2–4:** FAIL → implementar → PASS.
-- [ ] **Step 5:** commit `feat(e4c): voice receive path` + push.
+- [x] **Step 2–4:** FAIL → implementar → PASS.
+- [x] **Step 5:** commit `feat(e4c): voice receive path` + push.
 
 ---
 
@@ -115,7 +115,7 @@ test("plan A: receiver.speaking start subscribes once per user with AfterSilence
   - `formatPrivacyCode(code: string): string` con el agrupamiento que anotó Task 1 (si no hubo, grupos de 5 dígitos separados por espacio **[nuestra]**). La barra muestra `🔒 <código>` cuando `privacyCode` no es `null`; se actualiza en cada transición de época.
   - `createVoiceStats(deps: { log; every?: number })`: cada 60 s loguea `event: "voice.stats"` con `packets`, `decode_errors` y `state` (campos de la lista blanca; nada de ids de usuarios).
 
-- [ ] **Step 1: Tests**
+- [x] **Step 1: Tests**
 
 ```tsx
 test("speaking users get a dot and appear in the bar", async () => {});
@@ -125,8 +125,8 @@ test("privacy code is formatted and hidden when null", async () => {});
 test("stats log only allowlisted fields every 60 s", () => {});
 ```
 
-- [ ] **Step 2–4:** FAIL → implementar → PASS.
-- [ ] **Step 5:** commit `feat(e4c): speaking indicators, privacy code and voice stats` + push.
+- [x] **Step 2–4:** FAIL → implementar → PASS.
+- [x] **Step 5:** commit `feat(e4c): speaking indicators, privacy code and voice stats` + push.
 
 ---
 

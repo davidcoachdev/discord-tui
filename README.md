@@ -4,4 +4,11 @@ Un cliente de Discord para la terminal, para usar todos los días, hecho con Ope
 Se loguea con la cuenta personal: eso va contra los ToS de Discord y la cuenta puede terminar baneada (riesgo aceptado).
 Corre en Linux con PipeWire, en Ghostty o Kitty, y se maneja con el teclado estilo vim.
 Diseño: docs/superpowers/specs/2026-11-06-discord-tui-design.md
-Estado: diseño listo, todavía no hay código.
+Estado (2026-11-07): texto completo y voz implementados; falta la prueba con la cuenta real (`docs/PRUEBAS-GON.md`).
+
+Cómo correrlo:
+
+- `bun install` una vez.
+- `bun run dev`: la app real (login por QR o token la primera vez).
+- `bun run demo`: la UI con datos falsos, sin conectarse a Discord (para mirar y probar teclas).
+- `?` dentro de la app muestra todas las teclas. `bun test` y `bun run typecheck` para el código.

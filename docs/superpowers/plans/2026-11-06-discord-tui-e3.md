@@ -151,7 +151,7 @@ Nota: la navegación y el modo insert quedaron en `useKeyboard` en `App` (en vez
   - `serializeComposer(text: string, mentions: ComposerState["mentions"]): string`: cambia cada rango `@nombre` elegido del popup por `<@id>`; el `@algo` escrito a mano sin elegir queda como texto.
   - En insert, `@` + letras abre el popup; `tab` o `return` elige; `escape` lo cierra sin salir de insert.
 
-- [ ] **Step 1: Tests**
+- [x] **Step 1: Tests**
 
 ```ts
 test("candidates rank by fuzzyScore and include recent authors", () => {});
@@ -161,8 +161,8 @@ test("serializeComposer converts only picked mentions", () => {
 test("editing text before a mention shifts its range", () => {});
 ```
 
-- [ ] **Step 2–4:** FAIL → implementar → PASS.
-- [ ] **Step 5:** commit `feat(e3): mention autocomplete` + push.
+- [x] **Step 2–4:** FAIL → implementar → PASS.
+- [x] **Step 5:** commit `feat(e3): mention autocomplete` + push.
 
 ---
 
@@ -317,7 +317,7 @@ $ tsc --noEmit   # sin salida, código 0
   - `uploadAttachments(rest: RestClient, fetchFn: typeof fetch, channelId: string, files: PendingAttachment[]): Promise<unknown[]>` que sigue el flujo de `docs/protocol-notes.md` y devuelve el array `attachments` para `postMessage`.
   - Composer: `📎 captura-….png (120 KB) · x quita`.
 
-- [ ] **Step 1: Tests**
+- [x] **Step 1: Tests**
 
 ```ts
 test("cleanEnv keeps only the allowlist", () => {
@@ -332,8 +332,8 @@ test("message is posted with the attachments returned by the upload step", async
 test("Ctrl-v with no image pastes text normally", async () => {});
 ```
 
-- [ ] **Step 2–4:** FAIL → implementar → PASS.
-- [ ] **Step 5:** commit `feat(e3): file uploads from clipboard and path` + push.
+- [x] **Step 2–4:** FAIL → implementar → PASS.
+- [x] **Step 5:** commit `feat(e3): file uploads from clipboard and path` + push.
 
 ---
 

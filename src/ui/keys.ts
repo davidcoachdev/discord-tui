@@ -33,6 +33,7 @@ export const SPEC_KEYS: KeyEntry[] = [
   { key: "D", desc: "ensordecer (deafen)", group: "Voz" },
   { key: "M", desc: "modo VAD o Push-to-Talk", group: "Voz" },
   { key: "Espacio", desc: "push-to-talk (mantener)", group: "Voz" },
+  { key: "j + / -", desc: "volumen de un participante (±10 %)", group: "Voz" },
   { key: "gs", desc: "settings (audio, tema, imágenes)", group: "App" },
   { key: "?", desc: "mostrar esta ayuda", group: "App" },
   { key: "q", desc: "salir", group: "App" },

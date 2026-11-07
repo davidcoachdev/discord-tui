@@ -23,6 +23,8 @@ export const ALLOWED_FIELDS = [
   "msg",
   "count",
   "mode",
+  "packets",
+  "decode_errors",
 ] as const;
 
 export type AllowedField = (typeof ALLOWED_FIELDS)[number];

@@ -5,7 +5,7 @@ import { createSignal, onCleanup, onMount, Show } from "solid-js";
 import type { Actions } from "../actions";
 import { COMMON_EMOJI } from "../emoji/common";
 import { parseMarkdown, plainText } from "../markdown/parse";
-import { selectChannelList, selectMessages, selectNextUnread } from "../store/selectors";
+import { selectChannelList, selectMessages, selectNextUnread, selectVoiceParticipants } from "../store/selectors";
 import type { Store } from "../store/store";
 import type { PendingAttachment } from "../store/types";
 import { readClipboardImage, readClipboardText } from "../uploads/clipboard";
@@ -91,6 +91,7 @@ export function App(props: {
   const [switcherOpen, setSwitcherOpen] = createSignal(false);
   const [switcherQuery, setSwitcherQuery] = createSignal("");
   const [switcherIndex, setSwitcherIndex] = createSignal(0);
+  const [participant, setParticipant] = createSignal<string | null>(null);
 
   let hintTimer: ReturnType<typeof setTimeout> | null = null;
   function flash(text: string): void {
@@ -226,13 +227,42 @@ export function App(props: {
     return selectChannelList(state, state.ui.selectedGuildId).filter((row) => row.kind !== "category");
   }
 
+  function participantsOf(channelId: string | null): string[] {
+    const state = props.store.getState();
+    const channel = channelId ? state.channels[channelId] : undefined;
+    if (!channel || channel.type !== 2 || channel.guildId === null) return [];
+    return selectVoiceParticipants(state, channel.guildId, channel.id).map((p) => p.userId);
+  }
+
+  /** j/k en la lista de canales; en un canal de voz recorre también sus participantes (para el volumen). */
   function moveChannel(delta: number): void {
     const rows = channelRows();
     if (rows.length === 0) return;
     const current = props.store.getState().ui.selectedChannelId;
+    const users = participantsOf(current);
+    const at = participant() === null ? -1 : users.indexOf(participant()!);
+    if (delta > 0 && at + 1 < users.length) return void setParticipant(users[at + 1]!);
+    if (delta < 0 && at > 0) return void setParticipant(users[at - 1]!);
+    if (delta < 0 && at === 0) return void setParticipant(null);
+    setParticipant(null);
     const index = rows.findIndex((row) => row.id === current);
     const next = rows[Math.min(rows.length - 1, Math.max(0, (index === -1 ? -1 : index) + delta))] ?? rows[0];
-    if (next) props.store.dispatch({ type: "ui/selectChannel", id: next.id });
+    if (!next) return;
+    props.store.dispatch({ type: "ui/selectChannel", id: next.id });
+    if (delta < 0) {
+      const previousUsers = participantsOf(next.id);
+      if (previousUsers.length > 0 && next.id !== current) setParticipant(previousUsers.at(-1)!);
+    }
+  }
+
+  function nudgeVolume(delta: number): void {
+    const userId = participant();
+    const state = props.store.getState();
+    if (userId === null || userId === state.me?.id) return;
+    const current = state.settings.userVolumes[userId] ?? 100;
+    const next = Math.max(0, Math.min(200, current + delta));
+    props.store.dispatch({ type: "settings/set", patch: { userVolumes: { ...state.settings.userVolumes, [userId]: next } } });
+    flash(`volumen de ${displayName(state, userId, state.channels[state.ui.selectedChannelId ?? ""]?.guildId ?? null)}: ${next} %`);
   }
 
   function jumpChannel(toEnd: boolean): void {
@@ -462,6 +492,7 @@ export function App(props: {
     if (path.trim().length === 0) return;
     try {
       addAttachment(await deps().readAttachmentFromPath(path));
+      setHint(null);
       setInsert(true);
     } catch (error) {
       flash(`no se pudo adjuntar: ${error instanceof Error ? error.message : "error"}`);
@@ -698,6 +729,7 @@ export function App(props: {
           return;
         case "h":
         case "left":
+          setParticipant(null);
           if (focused === "messages") props.actions.focus("channels");
           else props.actions.focus("guilds");
           return;
@@ -750,6 +782,10 @@ export function App(props: {
           break;
       }
 
+      if (participant() !== null && focused === "channels" && (key.sequence === "+" || key.sequence === "-")) {
+        nudgeVolume(key.sequence === "+" ? 10 : -10);
+        return;
+      }
       if (key.sequence === "+") {
         setPickerOpen(true);
         setPickerQuery("");
@@ -805,7 +841,13 @@ export function App(props: {
     <box flexDirection="column" width="100%" height="100%" backgroundColor={theme().bg}>
       <box flexDirection="row" flexGrow={1} width="100%">
         <GuildList store={props.store} actions={props.actions} theme={theme()} focused={focus() === "guilds"} />
-        <ChannelList store={props.store} actions={props.actions} theme={theme()} focused={focus() === "channels"} />
+        <ChannelList
+          store={props.store}
+          actions={props.actions}
+          theme={theme()}
+          focused={focus() === "channels"}
+          selectedParticipant={focus() === "channels" ? participant() : null}
+        />
         <MessageView
           store={props.store}
           theme={theme()}

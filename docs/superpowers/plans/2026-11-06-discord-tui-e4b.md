@@ -45,7 +45,7 @@
   - `sanitizeVoiceDebug(line: string): string | null`: deja pasar solo cambios de estado, `op <n>` y `close code <n>`; todo lo que tenga `{` o la palabra `token` devuelve `null`.
   - `scripts/voice-spike.ts <guild_id> <channel_id>` (lo corre Gon): usa la sesión, levanta el runtime de E2, hace `joinVoiceChannel` con `selfMute: true, selfDeaf: false, daveEncryption: true`, imprime cada `stateChange` (`signalling → connecting → ready`) y cada código de cierre, se queda 60 s y sale con `destroy()`. Imprime al final `SPIKE OK` o `SPIKE FAIL <motivo>`.
 
-- [ ] **Step 1: Tests**
+- [x] **Step 1: Tests**
 
 ```ts
 test("joinVoiceChannel through the adapter sends op 4 with the captured shape", () => {
@@ -59,8 +59,8 @@ test("sanitizeVoiceDebug drops payloads and tokens", () => {
 });
 ```
 
-- [ ] **Step 2–4:** FAIL → implementar → `bun test tests/voice` PASS.
-- [ ] **Step 5:** commit `feat(e4b): gateway adapter for @discordjs/voice and voice spike` + push.
+- [x] **Step 2–4:** FAIL → implementar → `bun test tests/voice` PASS.
+- [x] **Step 5:** commit `feat(e4b): gateway adapter for @discordjs/voice and voice spike` + push.
 - [ ] **Step 6: 🧍 Paso de Gon — spike.** Con la sesión activa y nadie más usando su cuenta en voz (el teléfono **no** en voz, spec 8.2):
   `bun scripts/voice-spike.ts <id del servidor de prueba> <id del canal Voz>`
   En el teléfono, mirando el canal `Voz` sin entrar, tiene que verse a sí mismo dentro del canal (con el ícono de muteado) durante un minuto. Le pasa al agente la salida del script (no tiene datos sensibles) y si se vio en el teléfono.
@@ -83,7 +83,7 @@ test("sanitizeVoiceDebug drops payloads and tokens", () => {
   - `closeCodeMessage(code: number): string`: 4014 `te desconectaron del canal`, 4017 `Discord exige cifrado E2EE (DAVE) y no se pudo negociar`, 4006 `la sesión de voz ya no es válida`, otro `se cortó la voz (código <n>)`.
   - Acciones: `actions.toggleVoice(channelId: string)`, `actions.toggleMute()`, `actions.toggleDeaf()`, `actions.setInputMode(m)`.
 
-- [ ] **Step 1: Tests** (con un `VoiceSession` falso para las acciones y un `@discordjs/voice` real sobre el gateway falso para `session.ts` hasta `signalling`)
+- [x] **Step 1: Tests** (con un `VoiceSession` falso para las acciones y un `@discordjs/voice` real sobre el gateway falso para `session.ts` hasta `signalling`)
 
 ```ts
 test("toggleVoice joins, and again leaves", async () => {});
@@ -95,8 +95,8 @@ test("runtime.stop leaves voice before closing the gateway", async () => {});
 test("READY voice_states and VOICE_STATE_UPDATE fill who is in each channel", () => {});
 ```
 
-- [ ] **Step 2–4:** FAIL → implementar → PASS.
-- [ ] **Step 5:** commit `feat(e4b): voice session, store slice and actions` + push.
+- [x] **Step 2–4:** FAIL → implementar → PASS.
+- [x] **Step 5:** commit `feat(e4b): voice session, store slice and actions` + push.
 
 ---
 
@@ -111,7 +111,7 @@ test("READY voice_states and VOICE_STATE_UPDATE fill who is in each channel", ()
 - Consumes: `startCapture`, `createOpusCodec`, `createVad` (E4a), `VoiceSession.playSpurt`.
 - Produces: `createTransmitter(deps: { capture: AudioCapture; codec; vad; session: Pick<VoiceSession, "playSpurt">; getGate: () => "vad" | "ptt"; isMuted: () => boolean; onSelfSpeaking(on: boolean): void }): { setPtt(on: boolean): void; stop(): void }`. La compuerta abre con el VAD (modo `vad`) o con `setPtt(true)` (modo `ptt`); muteado nunca abre. Al abrir: `playSpurt` con un iterable que entrega los frames Opus mientras siga abierta y termina al cerrar.
 
-- [ ] **Step 1: Tests**
+- [x] **Step 1: Tests**
 
 ```ts
 test("vad mode: one spurt per open/close, with only the frames while open", async () => {});
@@ -121,8 +121,8 @@ test("we do not push F8 FF FE frames ourselves (the player pads 5)", async () =>
 test("onSelfSpeaking toggles with each spurt", async () => {});
 ```
 
-- [ ] **Step 2–4:** FAIL → implementar → PASS.
-- [ ] **Step 5:** commit `feat(e4b): voice transmitter with vad and ptt gate` + push.
+- [x] **Step 2–4:** FAIL → implementar → PASS.
+- [x] **Step 5:** commit `feat(e4b): voice transmitter with vad and ptt gate` + push.
 
 ---
 
@@ -136,7 +136,7 @@ test("onSelfSpeaking toggles with each spurt", async () => {});
 **Interfaces:**
 - Produces: `createPtt(opts: { kittyKeyboard: boolean }): { onKey(e: { name: string; eventType: "press" | "repeat" | "release"; repeated?: boolean }): void; transmitting: boolean; mode: "hold" | "toggle"; warning: string | null; onChange(fn: () => void): () => void }`. `kittyKeyboard` sale de `renderer.capabilities?.kitty_keyboard`. Sin protocolo → arranca en `toggle` con `warning = "tu terminal no avisa cuando soltás la tecla: el PTT funciona como interruptor"`. En `hold`, si llega un `press` no repetido estando `transmitting` sin un `release` antes, pasa a `toggle` con el mismo aviso.
 
-- [ ] **Step 1: Tests**
+- [x] **Step 1: Tests**
 
 ```ts
 test("hold: press starts, repeats are ignored, release stops", () => {});
@@ -148,8 +148,8 @@ test("space does nothing in voice_activity mode or while typing in the composer"
 test("m, D and M dispatch mute, deafen and input mode", async () => {});
 ```
 
-- [ ] **Step 2–4:** FAIL → implementar → PASS.
-- [ ] **Step 5:** commit `feat(e4b): push-to-talk and voice keys` + push.
+- [x] **Step 2–4:** FAIL → implementar → PASS.
+- [x] **Step 5:** commit `feat(e4b): push-to-talk and voice keys` + push.
 
 ---
 
@@ -163,7 +163,7 @@ test("m, D and M dispatch mute, deafen and input mode", async () => {});
 **Interfaces:**
 - Produces: `VoiceBar(props: { store: Store })`. Textos: `🔊 <canal> · 🔒 E2EE · VAD|PTT`, `● vos` cuando `selfSpeaking`, `[mute]`, `[deaf]`, el error de `closeCodeMessage` en rojo, `pttWarning` en amarillo. Participantes en `ChannelList`: `  · <usuario> [mute]`, y `●` delante del que habla.
 
-- [ ] **Step 1: Tests**
+- [x] **Step 1: Tests**
 
 ```tsx
 test("connected bar shows channel, E2EE and input mode", async () => {});
@@ -172,8 +172,8 @@ test("mute/deaf badges and error text", async () => {});
 test("participants appear under the voice channel", async () => {});
 ```
 
-- [ ] **Step 2–4:** FAIL → implementar → PASS.
-- [ ] **Step 5:** commit `feat(e4b): voice bar and channel participants` + push.
+- [x] **Step 2–4:** FAIL → implementar → PASS.
+- [x] **Step 5:** commit `feat(e4b): voice bar and channel participants` + push.
 
 ---
 

@@ -404,7 +404,7 @@ $ tsc --noEmit   # sin salida, código 0
 **Interfaces:**
 - Produces: `fuzzyScore(query: string, target: string): number | null` (subsecuencia sin distinguir mayúsculas ni tildes; más puntos a matches contiguos y al inicio de palabra; `null` si no matchea); `rankSwitcherItems(s: AppState, query: string): { channelId: string; label: string }[]` (máx. 20; label `servidor › #canal` o `@usuario`; con query vacía, los no leídos primero).
 
-- [ ] **Step 1: Tests**
+- [x] **Step 1: Tests**
 
 ```ts
 test("fuzzyScore matches subsequences and prefers word starts", () => {
@@ -416,8 +416,8 @@ test("fuzzyScore matches subsequences and prefers word starts", () => {
 test("Ctrl-k opens, typing filters, Enter opens the channel, Esc closes", async () => {});
 ```
 
-- [ ] **Step 2–4:** FAIL → implementar → PASS.
-- [ ] **Step 5:** commit `feat(e2): quick switcher` + push.
+- [x] **Step 2–4:** FAIL → implementar → PASS.
+- [x] **Step 5:** commit `feat(e2): quick switcher` + push.
 
 ---
 
@@ -430,7 +430,7 @@ test("Ctrl-k opens, typing filters, Enter opens the channel, Esc closes", async 
 **Interfaces:**
 - Produces: `parseMarkdown(src: string): MdNode[]` con `MdNode = { type: "text"; text: string } | { type: "bold" | "italic" | "underline" | "strike" | "spoiler" | "quote"; children: MdNode[] } | { type: "code"; text: string } | { type: "codeblock"; lang: string | null; text: string } | { type: "mention"; kind: "user" | "channel" | "role" | "everyone" | "here"; id: string | null } | { type: "emoji"; name: string; id: string; animated: boolean } | { type: "link"; url: string; label: string | null } | { type: "timestamp"; unix: number; style: string | null }`. `Markdown(props: { nodes: MdNode[]; state: AppState })` resuelve nombres de menciones y corta code blocks a 20 líneas con `… (N líneas más)`.
 
-- [ ] **Step 1: Tests**
+- [x] **Step 1: Tests**
 
 ```ts
 test("bold, italic, underline, strike, spoiler", () => {
@@ -455,8 +455,8 @@ test("unclosed markers stay as text", () => { expect(parseMarkdown("**abierto"))
 test("Markdown cuts a 300-line code block to 20 lines", async () => { expect(frame).toContain("… (280 líneas más)"); });
 ```
 
-- [ ] **Step 2–4:** FAIL → implementar → PASS. `MessageItem` pasa a usar `Markdown`.
-- [ ] **Step 5:** commit `feat(e2): discord markdown` + push.
+- [x] **Step 2–4:** FAIL → implementar → PASS. `MessageItem` pasa a usar `Markdown`.
+- [x] **Step 5:** commit `feat(e2): discord markdown` + push.
 
 ---
 
@@ -475,7 +475,7 @@ test("Markdown cuts a 300-line code block to 20 lines", async () => { expect(fra
   - `attachmentView(a: ApiAttachment, mode: ImageMode): { kind: "image"; url: string; cols: number; rows: number } | { kind: "link"; label: string }` (imágenes hasta 40x12 celdas manteniendo proporción; otro tipo → `📎 nombre (tamaño)`).
   - `Embed`: barra de color a la izquierda, `título` en negrita, `descripción` con `Markdown` cortada a 6 líneas, imagen o thumbnail con `attachmentView`.
 
-- [ ] **Step 1: Tests**
+- [x] **Step 1: Tests**
 
 ```ts
 test("emojiUrl", () => {
@@ -494,8 +494,8 @@ test("custom emoji renders :name: when mode is links or the fetch fails", async 
 test("embed shows title and truncated description", async () => {});
 ```
 
-- [ ] **Step 2–4:** FAIL → implementar → PASS.
-- [ ] **Step 5:** commit `feat(e2): inline images, custom emoji, attachments and embeds` + push.
+- [x] **Step 2–4:** FAIL → implementar → PASS.
+- [x] **Step 5:** commit `feat(e2): inline images, custom emoji, attachments and embeds` + push.
 
 ---
 
@@ -513,7 +513,7 @@ test("embed shows title and truncated description", async () => {});
   - `PRESENCE_UPDATE` → `presences[userId] = "online" | "idle" | "dnd" | "offline"`.
   - `TYPING_START` → `typing[channelId][userId] = timestamp*1000 + 10_000`; `selectTyping(s, channelId, now): string[]` filtra vencidos y a uno mismo. Texto: `<a> está escribiendo…`, `<a> y <b> están escribiendo…`, `varias personas están escribiendo…` (3 o más).
 
-- [ ] **Step 1: Tests**
+- [x] **Step 1: Tests**
 
 ```ts
 test("buildGuildSubscription has the same shape as the captured op 37", () => {
@@ -525,8 +525,8 @@ test("typing expires after 10 s and excludes me", () => {});
 test("presence update changes the dot in MemberList", async () => {});
 ```
 
-- [ ] **Step 2–4:** FAIL → implementar → PASS.
-- [ ] **Step 5:** commit `feat(e2): member list, presence and typing` + push.
+- [x] **Step 2–4:** FAIL → implementar → PASS.
+- [x] **Step 5:** commit `feat(e2): member list, presence and typing` + push.
 
 ---
 

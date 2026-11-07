@@ -15,6 +15,9 @@ checkpoint de Gon de E5 (Task 6).
 - `@discordjs/opus` 0.11.0 no trae prebuild para el ABI de Bun 1.4.3; el códec cae a `opusscript` (WASM).
   Si en la máquina de Gon carga el nativo, se usa ese y esto se puede borrar.
 - El handshake DAVE de dos sesiones no se probó en local (salió el camino (b) del spike): se verifica en E4b/E4c.
-- E4b y E4c (voz real con Discord) están sin implementar: requieren la cuenta real de Gon.
+- E4b y E4c (voz real con Discord) están implementadas y probadas contra un servidor de voz falso local; falta
+  el spike de Gon contra Discord real (DAVE con cuenta de usuario) y la llamada de 10 minutos con [2ª].
+- Emojis custom se muestran como `:nombre:` (no como imagen inline). Las imágenes de adjuntos y embeds sí van inline.
+- El composer escribe siempre al final del texto (no hay cursor movible con flechas).
 - La integración con `@opentui/keymap` no se hizo: la app usa `useKeyboard` crudo y `SPEC_KEYS` es solo la
   tabla de datos para la ayuda. Unificarlo es opcional.

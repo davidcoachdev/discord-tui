@@ -45,3 +45,16 @@ Datos que el agente resuelve y documenta mientras construye. Sin tokens ni ids r
 - **Fallback (decisión nuestra):** como salió (b), no se prueba el handshake MLS de dos sesiones en local con la API pública de davey 0.1.12. Lo que queda probado acá: una sesión llega a `ready`, tiene `voicePrivacyCode` no vacío, `getSerializedKeyPackage()` no se repite entre llamadas, `setPassthroughMode(true)` dejapasar el Opus, y protocolo inválido (`0`) tira. El handshake real de dos sesiones se verifica en E4b (DAVE activo, sin cierre 4017) y en E4c (`voicePrivacyCode` igual al del otro cliente).
 - `@discordjs/opus` 0.11.0 figura en el reporte pero su prebuild nativo no carga con Bun 1.4.3 (`prebuild/node-v147-napi-v3-linux-x64-glibc-2.44/opus.node` no existe para esta versión de Node ABI). `createOpusCodec()` cae a `opusscript` (WASM) y lo reporta en `backend`. Anotado como el fallback que el plan permite; si en la máquina de Gon el nativo carga, se usa ese.
 - Opus tiene delay algorítmico y normaliza ganancia: los tests comparan forma de onda con correlación a mejor desfasaje (`bestCorrelation` en `tests/helpers/pcm.ts`), no fase ni nivel exactos.
+
+## Voz real (E4b/E4c) — verificación local, 2026-11-07
+
+- **Plan A** (`@discordjs/voice` 0.19.2 con adapter propio), sin rama B por ahora. Falta el spike de Gon contra Discord real (`bun run voice-spike <guild> <canal>`): es lo único que confirma DAVE con cuenta de usuario.
+- Probado en Bun 1.4.3 contra un **servidor de voz falso local** (`tests/fakes/fake-voice-server.ts`: WS TLS `?v=8` + UDP): identify con `max_dave_protocol_version >= 1`, IP discovery, `aead_aes256_gcm_rtpsize`, Speaking 1/0, envío y recepción de Opus, op 4 de mute/deaf, cierre 4017 sin loop de reintentos (`tests/voice/session-e2e.test.ts`). El server falso responde `dave_protocol_version: 0`, así que el handshake MLS no se ejercita acá.
+- Pipeline completo (`tests/voice/pipeline-e2e.test.ts`): tono sintético → VAD → Opus real (opusscript) → servidor; audio de otro usuario → descifrado → decoder por usuario → jitter → mixer → salida; mute no transmite, deafen no reproduce.
+- **Desvío del plan:** el plan decía transmitir con `AudioPlayer` + `AudioResource` por ráfaga. Se usa `connection.playOpusPacket()` por cada frame capturado + `setSpeaking()`, porque el `AudioPlayer` corta Speaking si en un tick de 20 ms no hay frame (con mic en vivo pasa seguido). Los 5 silencios `F8 FF FE` los manda `voice/tx.ts` (davey no cifra los silencios).
+- **Gotchas de la librería:** arma `wss://${endpoint}?v=8` fijo; ante cualquier cierre que no sea 4014 hace rejoin sola, así que `voice/session.ts` escucha `networking.once("close")` y destruye la conexión en los códigos fatales (4014, 4016, 4017, 4004, 4011) o después de 3 rejoins. Los mensajes de debug pasan por `sanitizeVoiceDebug` (nada con `{`, `token`, `session_id` o `secret`).
+- Mensajes de cierre en español: `src/voice/close-codes.ts`.
+
+## Código de privacidad
+
+- Pendiente E4c Task 1 (Gon + [2ª]): no se sabe todavía si el cliente oficial lo muestra ni con qué formato. Mientras tanto la barra de voz lo muestra en grupos de 5 dígitos **[nuestra]** (`src/voice/privacy-code.ts`).

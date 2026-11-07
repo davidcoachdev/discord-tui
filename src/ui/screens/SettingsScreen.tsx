@@ -9,6 +9,7 @@ import { createVad } from "../../voice/vad";
 import type { AudioDevice } from "../../voice/devices";
 import { LevelMeter } from "../components/LevelMeter";
 import { useSelector } from "../store-bridge";
+import { useTheme } from "../theme";
 
 export interface SettingsDeps {
   listAudioDevices(): Promise<{ inputs: AudioDevice[]; outputs: AudioDevice[] }>;
@@ -16,8 +17,8 @@ export interface SettingsDeps {
   startPlayback: (opts?: { target?: string }) => Promise<any>;
 }
 
-type Section = "input" | "output" | "inputMode" | "sensitivity" | "testMic" | "theme";
-const SECTIONS: Section[] = ["input", "output", "inputMode", "sensitivity", "testMic", "theme"];
+type Section = "input" | "output" | "inputMode" | "sensitivity" | "testMic" | "theme" | "images";
+const SECTIONS: Section[] = ["input", "output", "inputMode", "sensitivity", "testMic", "theme", "images"];
 
 export function SettingsScreen(props: {
   store: Store;
@@ -118,36 +119,56 @@ export function SettingsScreen(props: {
     if (row() === "theme" && key.name === "return") {
       patch({ theme: settings().theme === "dark" ? "light" : "dark" });
     }
+    if (row() === "images" && key.name === "return") {
+      patch({ inlineImages: !settings().inlineImages });
+    }
   });
 
   onCleanup(() => {
     void stopTest();
   });
 
+  const theme = useTheme(props.store);
+  const line = (section: Section, text: string): JSX.Element => (
+    <box flexDirection="row" backgroundColor={row() === section ? theme().selection : undefined}>
+      <text fg={row() === section ? theme().selectionFg : theme().fg}>{`${row() === section ? "> " : "  "}${text}`}</text>
+    </box>
+  );
+
   return (
-    <box flexDirection="column" width="100%" height="100%" padding={1}>
-      <text>Settings · j/k mueve, Enter cambia, h/l ajusta, Esc cierra</text>
-      <text>{`${row() === "input" ? "> " : "  "}entrada: ${settings().inputDevice ?? "predeterminada"}`}</text>
-      <text>{`${row() === "output" ? "> " : "  "}salida: ${settings().outputDevice ?? "predeterminada"}`}</text>
-      <text>
-        {`${row() === "inputMode" ? "> " : "  "}modo de entrada: ${
-          settings().inputMode === "voice_activity" ? "Actividad de voz" : "Push-to-Talk"
-        }`}
-      </text>
-      <text>
-        {`${row() === "sensitivity" ? "> " : "  "}sensibilidad: ${
-          settings().vadSensitivity === "auto" ? "auto" : `${settings().vadSensitivity} dBFS`
-        }`}
-      </text>
-      <Show when={testing()}>
-        <LevelMeter levelDb={level()} thresholdDb={threshold()} open={open()} width={40} />
-      </Show>
-      <text>
-        {`${row() === "testMic" ? "> " : "  "}${
-          props.inVoice ? "salí de voz para probar el mic" : testing() ? "probando mic · Enter detiene" : "probar mic · Enter"
-        }`}
-      </text>
-      <text>{`${row() === "theme" ? "> " : "  "}tema: ${settings().theme === "dark" ? "oscuro" : "claro"}`}</text>
+    <box position="absolute" top={2} left={0} width="100%" alignItems="center" zIndex={70}>
+      <box
+        border
+        borderStyle="rounded"
+        borderColor={theme().accent}
+        backgroundColor={theme().panel}
+        title=" Settings "
+        titleColor={theme().accent}
+        bottomTitle=" j/k mueve · Enter cambia · h/l ajusta · Esc cierra "
+        bottomTitleAlignment="right"
+        flexDirection="column"
+        width={72}
+        padding={1}
+      >
+        <text fg={theme().header}>Audio</text>
+        {line("input", `entrada: ${settings().inputDevice ?? "predeterminada"}  (h/l)`)}
+        {line("output", `salida: ${settings().outputDevice ?? "predeterminada"}  (h/l)`)}
+        {line("inputMode", `modo de entrada: ${settings().inputMode === "voice_activity" ? "Actividad de voz" : "Push-to-Talk"}`)}
+        {line(
+          "sensitivity",
+          `sensibilidad: ${settings().vadSensitivity === "auto" ? "auto" : `${settings().vadSensitivity} dBFS`}  (h/l, a = auto)`,
+        )}
+        <Show when={testing()}>
+          <LevelMeter levelDb={level()} thresholdDb={threshold()} open={open()} width={40} />
+        </Show>
+        {line(
+          "testMic",
+          props.inVoice ? "salí de voz para probar el mic" : testing() ? "probando mic · Enter detiene" : "probar mic · Enter",
+        )}
+        <text fg={theme().header}>Apariencia</text>
+        {line("theme", `tema: ${settings().theme === "dark" ? "oscuro" : "claro"}`)}
+        {line("images", `imágenes inline: ${settings().inlineImages ? "sí" : "no (solo links)"}`)}
+      </box>
     </box>
   );
 }

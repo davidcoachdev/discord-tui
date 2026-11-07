@@ -25,6 +25,7 @@ interface ParticipantView {
   muted: boolean;
   deafened: boolean;
   me: boolean;
+  volume: number;
 }
 
 interface ListView {
@@ -45,6 +46,7 @@ function listView(s: AppState): ListView {
       participants[row.id] = selectVoiceParticipants(s, guildId, row.id).map((p) => ({
         ...p,
         name: displayName(s, p.userId, guildId),
+        volume: s.settings.userVolumes[p.userId] ?? 100,
       }));
     }
   }
@@ -55,7 +57,13 @@ function listView(s: AppState): ListView {
   return { title, rows, participants, voiceChannelId: s.voice.channelId };
 }
 
-export function ChannelList(props: { store: Store; actions: Actions; theme: Theme; focused?: boolean }): JSX.Element {
+export function ChannelList(props: {
+  store: Store;
+  actions: Actions;
+  theme: Theme;
+  focused?: boolean;
+  selectedParticipant?: string | null;
+}): JSX.Element {
   const view = useSelector(props.store, listView, jsonEqual);
   const selected = useSelector(props.store, (s) => s.ui.selectedChannelId);
   const rows = (): ChannelRow[] => view().rows;
@@ -147,7 +155,12 @@ export function ChannelList(props: { store: Store; actions: Actions; theme: Them
                 </box>
                 <For each={participants()}>
                   {(p) => (
-                    <box flexDirection="row" width="100%" paddingLeft={row.depth * 2 + 3}>
+                    <box
+                      flexDirection="row"
+                      width="100%"
+                      paddingLeft={row.depth * 2 + 3}
+                      backgroundColor={isSel() && props.selectedParticipant === p.userId ? props.theme.selection : undefined}
+                    >
                       <text fg={p.speaking ? props.theme.speaking : props.theme.faint}>{p.speaking ? "●" : "○"}</text>
                       <text
                         flexGrow={1}
@@ -156,6 +169,7 @@ export function ChannelList(props: { store: Store; actions: Actions; theme: Them
                       >
                         {` ${truncate(p.name, inner - row.depth * 2 - 12)}`}
                       </text>
+                      <text fg={props.theme.accent}>{p.volume !== 100 ? `${p.volume}% ` : ""}</text>
                       <text fg={p.deafened ? props.theme.error : props.theme.warn}>
                         {p.deafened ? "[deaf]" : p.muted ? "[mute]" : ""}
                       </text>
