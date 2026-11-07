@@ -27,3 +27,11 @@ export async function postMessage(
 ): Promise<APIMessage> {
   return rest.request<APIMessage>("POST", `/channels/${channelId}/messages`, body);
 }
+
+export async function postTyping(rest: RestClient, channelId: string): Promise<void> {
+  await rest.request("POST", `/channels/${channelId}/typing`);
+}
+
+export async function postAck(rest: RestClient, channelId: string, messageId: string): Promise<void> {
+  await rest.request("POST", `/channels/${channelId}/messages/${messageId}/ack`, { token: null, last_viewed: 0 });
+}

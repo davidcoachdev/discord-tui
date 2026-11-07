@@ -236,7 +236,7 @@ test("reaction add/remove update count and me", () => {});
   - `createAckScheduler(deps: { postAck(channelId: string, messageId: string): Promise<void>; setTimer?; debounceMs?: number }): { viewing(channelId: string | null, newestVisibleId: string | null): void }` (debounce 1500 ms; ackea solo el canal que se está mirando, solo si `newestVisibleId` es más nuevo que el `lastAckedId`; cambiar de canal antes de que venza cancela el pendiente).
   - `postAck(rest, channelId, messageId)` con el body de `fixtures/browser/ack.json`.
 
-- [ ] **Step 1: Tests**
+- [x] **Step 1: Tests**
 
 ```ts
 test("typing: 1 request for 20 keystrokes within 8 s, a 2nd after 8 s, none for empty text", () => {});
@@ -245,8 +245,25 @@ test("ack: leaving the channel before 1.5 s cancels it", () => {});
 test("ack body has the captured shape", async () => { expect(shapeOf(body)).toEqual(shapeOf(capturedAckBody)); });
 ```
 
-- [ ] **Step 2–4:** FAIL → implementar → PASS.
-- [ ] **Step 5:** commit `feat(e3): typing indicator and read acks` + push.
+- [x] **Step 2–4:** FAIL → implementar → PASS.
+
+```text
+$ bun test tests/actions/typing-ack.test.ts
+ 5 pass
+ 0 fail
+ 7 expect() calls
+Ran 5 tests across 1 file. [281.00ms]
+
+$ bun test && bun run typecheck
+ 154 pass
+ 0 fail
+ 315 expect() calls
+Ran 154 tests across 33 files. [4.77s]
+$ tsc --noEmit   # sin salida, código 0
+```
+
+`createTypingNotifier` y `createAckScheduler` quedaron probados; el cableado a Composer/runtime se retoma junto con la UI de E5.
+- [x] **Step 5:** commit `feat(e3): typing indicator and read acks` + push.
 
 ---
 
