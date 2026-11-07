@@ -4,6 +4,7 @@ import type { ClientProps } from "../client-props/props";
 import { createGateway } from "../gateway/connection";
 import { createHttp } from "../rest/http";
 import { createRestClient } from "../rest/client";
+import { log } from "../log/logger";
 import { notify, notificationTitle, shouldNotify } from "../notify/notify";
 import { selectMessages } from "../store/selectors";
 import { createStore, type Store } from "../store/store";
@@ -49,7 +50,12 @@ export function createRuntime(deps: RuntimeDeps): Runtime {
   store.dispatch({ type: "connection", status: gateway.status });
   gateway.on("status", (status) => store.dispatch({ type: "connection", status }));
   gateway.on("dispatch", (t, d) => {
-    store.dispatch({ type: "gw", t, d });
+    try {
+      store.dispatch({ type: "gw", t, d });
+    } catch (error) {
+      log.error("store.dispatch-failed", { error_name: error instanceof Error ? error.name : "unknown", t });
+      return;
+    }
     if (t === "MESSAGE_CREATE" && typeof d?.channel_id === "string" && typeof d?.id === "string") {
       const state = store.getState();
       const message = selectMessages(state, d.channel_id).find((candidate) => candidate.id === d.id);
