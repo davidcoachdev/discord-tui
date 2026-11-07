@@ -1,8 +1,8 @@
 import { TextAttributes, type ScrollBoxRenderable } from "@opentui/core";
-import { createEffect, For, on, Show, type JSX } from "solid-js";
+import { createEffect, createSignal, For, on, Show, type JSX } from "solid-js";
 
 import type { Actions } from "../../actions";
-import { selectChannelList, selectVoiceParticipants, type ChannelRow } from "../../store/selectors";
+import { selectVisibleChannelList, selectVoiceParticipants, type ChannelRow } from "../../store/selectors";
 import type { Store } from "../../store/store";
 import type { AppState } from "../../store/types";
 import { cellWidth, displayName, truncate } from "../format";
@@ -29,6 +29,7 @@ interface ParticipantView {
 }
 
 interface ListView {
+  collapsed: string[];
   title: string;
   rows: ChannelRow[];
   participants: Record<string, ParticipantView[]>;
@@ -38,7 +39,7 @@ interface ListView {
 function listView(s: AppState): ListView {
   const selectedGuild = s.ui.selectedGuildId;
   const guildId = selectedGuild === null || selectedGuild === "@dms" ? null : selectedGuild;
-  const rows = selectedGuild === null ? [] : selectChannelList(s, selectedGuild);
+  const rows = selectedGuild === null ? [] : selectVisibleChannelList(s, selectedGuild);
   const participants: Record<string, ParticipantView[]> = {};
   if (guildId !== null) {
     for (const row of rows) {
@@ -54,7 +55,7 @@ function listView(s: AppState): ListView {
     selectedGuild === "@dms"
       ? " Mensajes directos "
       : ` ${truncate((guildId ? s.guilds[guildId]?.name : null) ?? "Canales", CHANNEL_WIDTH - 6)} `;
-  return { title, rows, participants, voiceChannelId: s.voice.channelId };
+  return { title, rows, participants, voiceChannelId: s.voice.channelId, collapsed: s.ui.collapsedCategories };
 }
 
 export function ChannelList(props: {
@@ -63,7 +64,11 @@ export function ChannelList(props: {
   theme: Theme;
   focused?: boolean;
   selectedParticipant?: string | null;
+  /** Click en un participante de voz (para el control de volumen). */
+  onParticipant?(channelId: string, userId: string): void;
+  onVolume?(userId: string, delta: number): void;
 }): JSX.Element {
+  const [hovered, setHovered] = createSignal<string | null>(null);
   const view = useSelector(props.store, listView, jsonEqual);
   const selected = useSelector(props.store, (s) => s.ui.selectedChannelId);
   const rows = (): ChannelRow[] => view().rows;
@@ -81,11 +86,20 @@ export function ChannelList(props: {
     }),
   );
 
+  /** Como Discord: texto/DM abre el canal; 🔊 entra a voz; la categoría se colapsa. */
   function open(row: ChannelRow): void {
-    if (row.kind === "category") return;
+    if (row.kind === "category") {
+      props.store.dispatch({ type: "ui/toggleCategory", id: row.id });
+      return;
+    }
     props.store.dispatch({ type: "ui/selectChannel", id: row.id });
-    if (row.kind === "voice") return;
+    props.actions.focus("channels");
+    if (row.kind === "voice") {
+      if (view().voiceChannelId !== row.id) void props.actions.voice?.toggleVoice(row.id);
+      return;
+    }
     void props.actions.openChannel(row.id).catch(() => {});
+    props.actions.focus("messages");
   }
 
   return (
@@ -106,10 +120,22 @@ export function ChannelList(props: {
         <For each={rows()}>
           {(row) => {
             if (row.kind === "category") {
+              const closed = (): boolean => view().collapsed.includes(row.id);
               return (
-                <box id={`chan-${row.id}`} width="100%" marginTop={1}>
-                  <text fg={props.theme.dim} attributes={TextAttributes.BOLD} wrapMode="none">
-                    {`⌄ ${truncate(row.name.toUpperCase(), inner - 2)}`}
+                <box
+                  id={`chan-${row.id}`}
+                  width="100%"
+                  marginTop={1}
+                  onMouseDown={() => open(row)}
+                  onMouseOver={() => setHovered(row.id)}
+                  onMouseOut={() => setHovered((h) => (h === row.id ? null : h))}
+                >
+                  <text
+                    fg={hovered() === row.id ? props.theme.fg : props.theme.dim}
+                    attributes={TextAttributes.BOLD}
+                    wrapMode="none"
+                  >
+                    {`${closed() ? "›" : "⌄"} ${truncate(row.name.toUpperCase(), inner - 2)}`}
                   </text>
                 </box>
               );
@@ -127,8 +153,10 @@ export function ChannelList(props: {
                   id={`chan-${row.id}`}
                   flexDirection="row"
                   width="100%"
-                  backgroundColor={isSel() ? props.theme.selection : undefined}
+                  backgroundColor={isSel() ? props.theme.selection : hovered() === row.id ? props.theme.panel : undefined}
                   onMouseDown={() => open(row)}
+                  onMouseOver={() => setHovered(row.id)}
+                  onMouseOut={() => setHovered((h) => (h === row.id ? null : h))}
                 >
                   <text fg={props.theme.accent}>{isSel() ? "▌" : " "}</text>
                   <text
@@ -154,27 +182,65 @@ export function ChannelList(props: {
                   </text>
                 </box>
                 <For each={participants()}>
-                  {(p) => (
-                    <box
-                      flexDirection="row"
-                      width="100%"
-                      paddingLeft={row.depth * 2 + 3}
-                      backgroundColor={isSel() && props.selectedParticipant === p.userId ? props.theme.selection : undefined}
-                    >
-                      <text fg={p.speaking ? props.theme.speaking : props.theme.faint}>{p.speaking ? "●" : "○"}</text>
-                      <text
-                        flexGrow={1}
-                        wrapMode="none"
-                        fg={p.speaking ? props.theme.speaking : p.me ? props.theme.fg : props.theme.dim}
-                      >
-                        {` ${truncate(p.name, inner - row.depth * 2 - 12)}`}
-                      </text>
-                      <text fg={props.theme.accent}>{p.volume !== 100 ? `${p.volume}% ` : ""}</text>
-                      <text fg={p.deafened ? props.theme.error : props.theme.warn}>
-                        {p.deafened ? "[deaf]" : p.muted ? "[mute]" : ""}
-                      </text>
-                    </box>
-                  )}
+                  {(p) => {
+                    const chosen = (): boolean => props.selectedParticipant === p.userId && isSel();
+                    return (
+                      <box flexDirection="column" width="100%">
+                        <box
+                          flexDirection="row"
+                          width="100%"
+                          paddingLeft={row.depth * 2 + 3}
+                          backgroundColor={chosen() ? props.theme.selection : hovered() === `p-${p.userId}` ? props.theme.panel : undefined}
+                          onMouseDown={() => {
+                            props.store.dispatch({ type: "ui/selectChannel", id: row.id });
+                            props.actions.focus("channels");
+                            props.onParticipant?.(row.id, p.userId);
+                          }}
+                          onMouseOver={() => setHovered(`p-${p.userId}`)}
+                          onMouseOut={() => setHovered((h) => (h === `p-${p.userId}` ? null : h))}
+                        >
+                          <text fg={p.speaking ? props.theme.speaking : props.theme.faint}>{p.speaking ? "●" : "○"}</text>
+                          <text
+                            flexGrow={1}
+                            wrapMode="none"
+                            fg={p.speaking ? props.theme.speaking : p.me ? props.theme.fg : props.theme.dim}
+                          >
+                            {` ${truncate(p.name, inner - row.depth * 2 - 12)}`}
+                          </text>
+                          <text fg={props.theme.accent}>{p.volume !== 100 ? `${p.volume}% ` : ""}</text>
+                          <text fg={p.deafened ? props.theme.error : props.theme.warn}>
+                            {p.deafened ? "[deaf]" : p.muted ? "[mute]" : ""}
+                          </text>
+                        </box>
+                        <Show when={chosen() && !p.me}>
+                          <box flexDirection="row" width="100%" paddingLeft={row.depth * 2 + 5}>
+                            <text fg={props.theme.dim}>vol </text>
+                            <text
+                              fg={props.theme.modeFg}
+                              bg={props.theme.accent}
+                              onMouseDown={(e: { stopPropagation(): void }) => {
+                                e.stopPropagation();
+                                props.onVolume?.(p.userId, -10);
+                              }}
+                            >
+                              {" − "}
+                            </text>
+                            <text fg={props.theme.fg}>{` ${String(p.volume).padStart(3)} % `}</text>
+                            <text
+                              fg={props.theme.modeFg}
+                              bg={props.theme.accent}
+                              onMouseDown={(e: { stopPropagation(): void }) => {
+                                e.stopPropagation();
+                                props.onVolume?.(p.userId, 10);
+                              }}
+                            >
+                              {" + "}
+                            </text>
+                          </box>
+                        </Show>
+                      </box>
+                    );
+                  }}
                 </For>
               </box>
             );

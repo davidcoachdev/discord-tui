@@ -95,6 +95,17 @@ export function selectChannelList(state: AppState, guildId: string | "@dms"): Ch
   return rows;
 }
 
+/** Lista de canales sin los hijos de las categorías colapsadas (la categoría queda visible). */
+export function selectVisibleChannelList(state: AppState, guildId: string | "@dms"): ChannelRow[] {
+  const collapsed = new Set(state.ui.collapsedCategories);
+  if (collapsed.size === 0) return selectChannelList(state, guildId);
+  return selectChannelList(state, guildId).filter((row) => {
+    if (row.kind === "category" || row.depth === 0) return true;
+    const parent = state.channels[row.id]?.parentId;
+    return parent == null || !collapsed.has(parent);
+  });
+}
+
 export function selectGuildList(state: AppState): GuildRow[] {
   return state.guildOrder.map((id) => {
     const guild = state.guilds[id];

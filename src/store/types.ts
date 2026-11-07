@@ -176,6 +176,7 @@ export interface AppState {
     selectedChannelId: string | null;
     focus: Focus;
     membersVisible: boolean;
+    collapsedCategories: string[];
   };
   settings: Settings;
   notices: Record<string, Notice>;
@@ -191,6 +192,7 @@ export type Action =
   | { type: "ui/selectChannel"; id: string }
   | { type: "ui/focus"; focus: Focus }
   | { type: "ui/toggleMembers" }
+  | { type: "ui/toggleCategory"; id: string }
   | { type: "outbox/enqueue"; item: OutboxItem }
   | { type: "outbox/sent"; nonce: string; messageId: string }
   | { type: "outbox/failed"; nonce: string; error: string }

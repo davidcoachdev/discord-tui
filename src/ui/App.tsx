@@ -1,11 +1,17 @@
 import type { KeyEvent, PasteEvent } from "@opentui/core";
 import { useKeyboard, usePaste, useTerminalDimensions, type JSX } from "@opentui/solid";
-import { createSignal, onCleanup, onMount, Show } from "solid-js";
+import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
 
 import type { Actions } from "../actions";
 import { COMMON_EMOJI } from "../emoji/common";
 import { parseMarkdown, plainText } from "../markdown/parse";
-import { selectChannelList, selectMessages, selectNextUnread, selectVoiceParticipants } from "../store/selectors";
+import {
+  selectChannelList,
+  selectMessages,
+  selectNextUnread,
+  selectVisibleChannelList,
+  selectVoiceParticipants,
+} from "../store/selectors";
 import type { Store } from "../store/store";
 import type { PendingAttachment } from "../store/types";
 import { readClipboardImage, readClipboardText } from "../uploads/clipboard";
@@ -18,6 +24,8 @@ import { GuildList } from "./components/GuildList";
 import { HelpOverlay } from "./components/HelpOverlay";
 import { MemberList } from "./components/MemberList";
 import { MessageView } from "./components/MessageView";
+import type { MessageAction } from "./components/MessageItem";
+import { Button } from "./components/Button";
 import { Notices } from "./components/Notices";
 import { QuickSwitcher } from "./components/QuickSwitcher";
 import { StatusBar, VoiceBar } from "./components/StatusBar";
@@ -69,6 +77,11 @@ export function App(props: {
     return channelId !== null && state.channels[channelId]?.guildId != null;
   });
   const inlineImages = useSelector(props.store, (state) => state.settings.inlineImages);
+  const textChannel = useSelector(props.store, (state) => {
+    const id = state.ui.selectedChannelId;
+    const type = id === null ? undefined : state.channels[id]?.type;
+    return id !== null && type !== 2 && type !== 4;
+  });
 
   const [insert, setInsert] = createSignal(false);
   const [replyTo, setReplyTo] = createSignal<string | null>(null);
@@ -165,10 +178,10 @@ export function App(props: {
     return { ...query, candidates };
   };
 
-  function pickMention(): boolean {
+  function pickMention(index: number = mentionIndex()): boolean {
     const popup = mentionState();
     if (!popup) return false;
-    const candidate = popup.candidates[Math.min(mentionIndex(), popup.candidates.length - 1)];
+    const candidate = popup.candidates[Math.min(index, popup.candidates.length - 1)];
     if (!candidate) return false;
     const text = currentText();
     const next = applyPick(text, popup.start, text.length, candidate.label, candidate.userId, currentMentions());
@@ -224,7 +237,7 @@ export function App(props: {
   function channelRows() {
     const state = props.store.getState();
     if (state.ui.selectedGuildId === null) return [];
-    return selectChannelList(state, state.ui.selectedGuildId).filter((row) => row.kind !== "category");
+    return selectVisibleChannelList(state, state.ui.selectedGuildId).filter((row) => row.kind !== "category");
   }
 
   function participantsOf(channelId: string | null): string[] {
@@ -255,8 +268,8 @@ export function App(props: {
     }
   }
 
-  function nudgeVolume(delta: number): void {
-    const userId = participant();
+  function nudgeVolume(delta: number, target: string | null = participant()): void {
+    const userId = target;
     const state = props.store.getState();
     if (userId === null || userId === state.me?.id) return;
     const current = state.settings.userVolumes[userId] ?? 100;
@@ -456,14 +469,14 @@ export function App(props: {
     return [...common, ...custom];
   }
 
-  function togglePickedReaction(): void {
+  function togglePickedReaction(index = 0): void {
     const id = channelId();
     const target = selectedId() ?? (id ? selectMessages(props.store.getState(), id).at(-1)?.id ?? null : null);
     if (id === null || target === null) {
       flash("seleccioná un mensaje");
       return;
     }
-    const match = pickerMatches()[0];
+    const match = pickerMatches()[index];
     if (match) {
       const emoji = match.id ? { id: match.id, name: match.name } : { id: null, name: match.char };
       void props.actions.toggleReaction(id, target, emoji).catch(() => {});
@@ -497,6 +510,56 @@ export function App(props: {
     } catch (error) {
       flash(`no se pudo adjuntar: ${error instanceof Error ? error.message : "error"}`);
     }
+  }
+
+  /** Barra de acciones de un mensaje (click): igual que r / e / dd / +. */
+  function messageAction(action: MessageAction, messageId: string): void {
+    setSelectedId(messageId);
+    props.actions.focus("messages");
+    if (action === "reply") return startReply();
+    if (action === "edit") return startEdit();
+    if (action === "react") {
+      setPickerOpen(true);
+      setPickerQuery("");
+      return;
+    }
+    const message = selectedMessage();
+    if (!message || message.author?.id !== props.store.getState().me?.id) {
+      flash("solo podés editar o borrar tus mensajes");
+      return;
+    }
+    setConfirmDelete(messageId);
+  }
+
+  function confirmDeleteNow(yes: boolean): void {
+    const id = channelId();
+    const messageId = confirmDelete();
+    if (yes && id !== null && messageId !== null) void props.actions.remove(id, messageId).catch(() => {});
+    setConfirmDelete(null);
+    if (yes) setSelectedId(null);
+  }
+
+  /** Click en un miembro: lo menciona en el composer (sale como <@id> al mandar). */
+  function mentionMember(userId: string): void {
+    const state = props.store.getState();
+    const id = channelId();
+    if (id === null || !isTextChannel()) return;
+    const label = displayName(state, userId, state.channels[id]?.guildId ?? null);
+    const before = currentText();
+    const glue = before.length === 0 || before.endsWith(" ") ? "" : " ";
+    const start = before.length + glue.length;
+    const text = `${before}${glue}@${label} `;
+    setText(text, [...currentMentions(), { start, end: start + label.length + 1, userId }]);
+    setInsert(true);
+  }
+
+  function startComposer(): void {
+    if (!isTextChannel()) {
+      flash("abrí un canal de texto para escribir");
+      return;
+    }
+    setInsert(true);
+    props.actions.focus("messages");
   }
 
   function printable(key: KeyEvent): string | null {
@@ -593,15 +656,8 @@ export function App(props: {
       }
 
       if (confirmDelete() !== null) {
-        if (key.name === "y") {
-          const id = channelId();
-          const messageId = confirmDelete();
-          if (id !== null && messageId !== null) void props.actions.remove(id, messageId).catch(() => {});
-          setConfirmDelete(null);
-          setSelectedId(null);
-          return;
-        }
-        if (key.name === "n" || key.name === "escape") setConfirmDelete(null);
+        if (key.name === "y") return confirmDeleteNow(true);
+        if (key.name === "n" || key.name === "escape") confirmDeleteNow(false);
         return;
       }
 
@@ -835,7 +891,7 @@ export function App(props: {
     const id = state.ui.selectedChannelId;
     const channel = id ? state.channels[id] : undefined;
     if (!channel) return "elegí un canal";
-    if (channel.type === 2) return "canal de voz · v entra o sale";
+    if (channel.type === 2) return "canal de voz · click en el canal o v para entrar";
     return channel.guildId === null ? `i para escribirle a @${channel.name}` : `i para escribir en #${channel.name}`;
   });
 
@@ -851,6 +907,8 @@ export function App(props: {
           theme={theme()}
           focused={focus() === "channels"}
           selectedParticipant={focus() === "channels" ? participant() : null}
+          onParticipant={(_channelId, userId) => setParticipant(userId)}
+          onVolume={(userId, delta) => nudgeVolume(delta, userId)}
         />
         <MessageView
           store={props.store}
@@ -858,25 +916,41 @@ export function App(props: {
           selectedId={selectedId()}
           focused={focus() === "messages"}
           images={props.images === true && inlineImages()}
+          onSelect={(id) => {
+            setSelectedId(id);
+            props.actions.focus("messages");
+          }}
+          onAction={messageAction}
+          onReact={(messageId, emoji) => {
+            const id = channelId();
+            if (id !== null) void props.actions.toggleReaction(id, messageId, emoji).catch(() => {});
+          }}
+          onOpen={(url) => props.actions.openUrl?.(url)}
+          onLoadOlder={() => {
+            const id = channelId();
+            if (id !== null) void props.actions.loadOlder(id).catch(() => {});
+          }}
+          onFocus={() => props.actions.focus("messages")}
+          onVoiceToggle={(id) => void props.actions.voice?.toggleVoice(id)}
         />
         <Show when={showMembers()}>
-          <MemberList store={props.store} theme={theme()} />
+          <MemberList store={props.store} theme={theme()} onMember={mentionMember} />
         </Show>
       </box>
       <Show when={confirmDelete() !== null}>
-        <box height={1} width="100%" paddingLeft={1} flexShrink={0}>
+        <box height={1} width="100%" paddingLeft={1} flexShrink={0} flexDirection="row" columnGap={1}>
           <text fg={theme().error}>¿Borrar este mensaje? y/n</text>
+          <Button label="sí, borrar" theme={theme()} danger onPress={() => confirmDeleteNow(true)} />
+          <Button label="no" theme={theme()} onPress={() => confirmDeleteNow(false)} />
         </box>
       </Show>
       <Show when={pickerOpen()}>
-        <box height={1} width="100%" paddingLeft={1} flexShrink={0}>
-          <text fg={theme().fg} wrapMode="none">
-            <span style={{ fg: theme().accent }}>{`reacción ❯ ${pickerQuery()}█  `}</span>
-            {pickerMatches()
-              .slice(0, 8)
-              .map((emoji) => `${emoji.char} ${emoji.name}`)
-              .join("   ")}
-          </text>
+        <box height={1} width="100%" paddingLeft={1} flexShrink={0} flexDirection="row" columnGap={1}>
+          <text fg={theme().accent} wrapMode="none" flexShrink={0}>{`reacción ❯ ${pickerQuery()}█`}</text>
+          <For each={pickerMatches().slice(0, 10)}>
+            {(emoji, i) => <Button label={`${emoji.char} ${emoji.name}`} theme={theme()} onPress={() => togglePickedReaction(i())} />}
+          </For>
+          <Button label="✕" theme={theme()} onPress={() => (setPickerOpen(false), setPickerQuery(""))} />
         </box>
       </Show>
       <Show when={hint() !== null}>
@@ -886,7 +960,7 @@ export function App(props: {
       </Show>
       <Show when={mentionState()}>
         {(popup: () => NonNullable<ReturnType<typeof mentionState>>) => (
-          <MentionPopup candidates={popup().candidates} index={mentionIndex()} theme={theme()} />
+          <MentionPopup candidates={popup().candidates} index={mentionIndex()} theme={theme()} onPick={(i) => pickMention(i)} />
         )}
       </Show>
       <Notices store={props.store} theme={theme()} />
@@ -900,11 +974,42 @@ export function App(props: {
         context={composerContext()}
         attachments={currentAttachments()}
         prompt={attachPrompt()}
+        onClick={startComposer}
+        onAttach={textChannel() ? () => setAttachPrompt("") : undefined}
+        onPaste={textChannel() ? () => void pasteFromClipboard() : undefined}
+        onRemoveAttachment={(index) => {
+          const id = channelId();
+          if (id !== null) setAttachments((previous) => ({ ...previous, [id]: (previous[id] ?? []).filter((_, i) => i !== index) }));
+        }}
       />
-      <VoiceBar store={props.store} theme={theme()} />
-      <StatusBar store={props.store} theme={theme()} mode={insert() || attachPrompt() !== null ? "INSERT" : "NORMAL"} />
+      <VoiceBar store={props.store} theme={theme()} actions={props.actions} />
+      <StatusBar
+        store={props.store}
+        theme={theme()}
+        mode={insert() || attachPrompt() !== null ? "INSERT" : "NORMAL"}
+        onHelp={() => setHelpOpen(true)}
+        onSettings={() => setSettingsOpen(true)}
+        onSwitcher={() => {
+          setSwitcherOpen(true);
+          setSwitcherQuery("");
+          setSwitcherIndex(0);
+        }}
+      />
       <Show when={switcherOpen()}>
-        <QuickSwitcher query={switcherQuery()} items={switcherItems()} index={switcherIndex()} theme={theme()} />
+        <QuickSwitcher
+          query={switcherQuery()}
+          items={switcherItems()}
+          index={switcherIndex()}
+          theme={theme()}
+          onPick={(i) => {
+            setSwitcherIndex(i);
+            openFromSwitcher();
+          }}
+          onClose={() => {
+            setSwitcherOpen(false);
+            setSwitcherQuery("");
+          }}
+        />
       </Show>
       <Show when={helpOpen()}>
         <HelpOverlay onClose={() => setHelpOpen(false)} theme={theme()} />

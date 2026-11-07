@@ -5,6 +5,8 @@ import type { Store } from "../../store/store";
 import { formatPrivacyCode } from "../../voice/privacy-code";
 import { displayName } from "../format";
 import { useSelector } from "../store-bridge";
+import type { Actions } from "../../actions";
+import { Button } from "./Button";
 import type { Theme } from "../theme";
 
 export function connectionLabel(connection: string): string {
@@ -15,7 +17,15 @@ export function connectionLabel(connection: string): string {
   return "desconectado";
 }
 
-export function StatusBar(props: { store: Store; theme: Theme; mode: "NORMAL" | "INSERT"; hint?: string | null }): JSX.Element {
+export function StatusBar(props: {
+  store: Store;
+  theme: Theme;
+  mode: "NORMAL" | "INSERT";
+  hint?: string | null;
+  onHelp?(): void;
+  onSettings?(): void;
+  onSwitcher?(): void;
+}): JSX.Element {
   const connection = useSelector(props.store, (state) => state.connection);
   const me = useSelector(props.store, (state) => state.me);
   const inputMode = useSelector(props.store, (state) => state.settings.inputMode);
@@ -35,12 +45,22 @@ export function StatusBar(props: { store: Store; theme: Theme; mode: "NORMAL" | 
       <text fg={props.theme.dim}>{` · logueado como ${me()?.username ?? "…"}`}</text>
       <text fg={props.theme.faint}>{` · mic ${inputMode() === "push_to_talk" ? "PTT" : "VAD"}`}</text>
       <box flexGrow={1} />
-      <text fg={props.theme.dim} wrapMode="none">{`${props.hint ?? "? ayuda · Ctrl-k saltar · q salir"} `}</text>
+      <Show
+        when={props.onHelp}
+        fallback={<text fg={props.theme.dim} wrapMode="none">{`${props.hint ?? "? ayuda · Ctrl-k saltar · q salir"} `}</text>}
+      >
+        <box flexDirection="row" columnGap={1} flexShrink={0}>
+          <Button label="⌕ Ctrl-k saltar" theme={props.theme} onPress={() => props.onSwitcher?.()} />
+          <Button label="⚙ settings" theme={props.theme} onPress={() => props.onSettings?.()} />
+          <Button label="? ayuda" theme={props.theme} onPress={() => props.onHelp?.()} />
+          <text fg={props.theme.dim}>q salir </text>
+        </box>
+      </Show>
     </box>
   );
 }
 
-export function VoiceBar(props: { store: Store; theme: Theme }): JSX.Element {
+export function VoiceBar(props: { store: Store; theme: Theme; actions?: Actions }): JSX.Element {
   const state = useSelector(props.store, (s) => s);
   const voice = () => state().voice;
   const channelName = (): string => {
@@ -92,7 +112,36 @@ export function VoiceBar(props: { store: Store; theme: Theme }): JSX.Element {
           <text fg={props.theme.warn} wrapMode="none">{voice().pttWarning ? ` · ${voice().pttWarning}` : ""}</text>
           <text fg={props.theme.warn} wrapMode="none">{voice().micError ? ` · sin mic: ${voice().micError}` : ""}</text>
           <box flexGrow={1} />
-          <text fg={props.theme.dim} wrapMode="none">{"m mute · D deaf · M modo · v salir "}</text>
+          <Show
+            when={props.actions?.voice}
+            fallback={<text fg={props.theme.dim} wrapMode="none">{"m mute · D deaf · M modo · v salir "}</text>}
+          >
+            {(voiceActions: () => NonNullable<Actions["voice"]>) => (
+              <box flexDirection="row" columnGap={1} flexShrink={0}>
+                <Button
+                  label={voice().selfMute ? "🎙 muteado" : "🎙 mic"}
+                  theme={props.theme}
+                  active={voice().selfMute}
+                  danger={voice().selfMute}
+                  onPress={() => voiceActions().toggleMute()}
+                />
+                <Button
+                  label={voice().selfDeaf ? "🎧 sordo" : "🎧 audio"}
+                  theme={props.theme}
+                  active={voice().selfDeaf}
+                  danger={voice().selfDeaf}
+                  onPress={() => voiceActions().toggleDeaf()}
+                />
+                <Button
+                  label={state().settings.inputMode === "push_to_talk" ? "🎚 PTT" : "🎚 VAD"}
+                  theme={props.theme}
+                  onPress={() => voiceActions().toggleInputMode()}
+                />
+                <Button label="✕ salir" theme={props.theme} danger onPress={() => void voiceActions().leaveVoice()} />
+                <text> </text>
+              </box>
+            )}
+          </Show>
         </Show>
       </box>
     </Show>

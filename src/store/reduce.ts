@@ -96,6 +96,12 @@ export function reduce(state: AppState, action: Action): AppState {
       return { ...state, ui: { ...state.ui, selectedChannelId: action.id } };
     case "ui/focus":
       return { ...state, ui: { ...state.ui, focus: action.focus } };
+    case "ui/toggleCategory": {
+      const collapsed = state.ui.collapsedCategories.includes(action.id)
+        ? state.ui.collapsedCategories.filter((id) => id !== action.id)
+        : [...state.ui.collapsedCategories, action.id];
+      return { ...state, ui: { ...state.ui, collapsedCategories: collapsed } };
+    }
     case "ui/toggleMembers":
       return { ...state, ui: { ...state.ui, membersVisible: !state.ui.membersVisible } };
     case "outbox/enqueue":

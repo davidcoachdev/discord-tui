@@ -10,6 +10,7 @@ import type { AudioDevice } from "../../voice/devices";
 import { LevelMeter } from "../components/LevelMeter";
 import { useSelector } from "../store-bridge";
 import { useTheme } from "../theme";
+import { Button, type Click } from "../components/Button";
 
 export interface SettingsDeps {
   listAudioDevices(): Promise<{ inputs: AudioDevice[]; outputs: AudioDevice[] }>;
@@ -78,7 +79,32 @@ export function SettingsScreen(props: {
     patch({ vadSensitivity: Math.min(-20, Math.max(-60, base + deltaDb)) });
   }
 
+  /** Lo que hace Enter (dir 0) o h/l (dir −1/+1) sobre una fila; el mouse usa lo mismo. */
+  function activate(section: Section, dir: -1 | 0 | 1): void {
+    if (section === "input" && dir !== 0) return cycleDevice("input", dir);
+    if (section === "output" && dir !== 0) return cycleDevice("output", dir);
+    if ((section === "input" || section === "output") && dir === 0) return cycleDevice(section, 1);
+    if (section === "inputMode" && dir === 0) {
+      const mode = settings().inputMode === "voice_activity" ? "push_to_talk" : "voice_activity";
+      if (props.actions.voice) props.actions.voice.setInputMode(mode);
+      else patch({ inputMode: mode });
+      return;
+    }
+    if (section === "sensitivity") {
+      if (dir !== 0) nudgeSensitivity(dir * 3);
+      return;
+    }
+    if (section === "testMic" && dir === 0) {
+      if (testing()) void stopTest();
+      else void startTest();
+      return;
+    }
+    if (section === "theme" && dir === 0) return patch({ theme: settings().theme === "dark" ? "light" : "dark" });
+    if (section === "images" && dir === 0) patch({ inlineImages: !settings().inlineImages });
+  }
+
   useKeyboard((key) => {
+    if (key.eventType === "release") return;
     if (key.name === "escape") {
       props.onClose();
       return;
@@ -93,37 +119,9 @@ export function SettingsScreen(props: {
       setRow(SECTIONS[Math.max(0, index - 1)]!);
       return;
     }
-    if (row() === "input" && (key.name === "h" || key.name === "l")) {
-      cycleDevice("input", key.name === "l" ? 1 : -1);
-      return;
-    }
-    if (row() === "output" && (key.name === "h" || key.name === "l")) {
-      cycleDevice("output", key.name === "l" ? 1 : -1);
-      return;
-    }
-    if (row() === "inputMode" && key.name === "return") {
-      const mode = settings().inputMode === "voice_activity" ? "push_to_talk" : "voice_activity";
-      if (props.actions.voice) props.actions.voice.setInputMode(mode);
-      else patch({ inputMode: mode });
-      return;
-    }
-    if (row() === "sensitivity") {
-      if (key.name === "h") nudgeSensitivity(-3);
-      if (key.name === "l") nudgeSensitivity(3);
-      if (key.name === "a") patch({ vadSensitivity: "auto" });
-      return;
-    }
-    if (row() === "testMic" && key.name === "return") {
-      if (testing()) void stopTest();
-      else void startTest();
-      return;
-    }
-    if (row() === "theme" && key.name === "return") {
-      patch({ theme: settings().theme === "dark" ? "light" : "dark" });
-    }
-    if (row() === "images" && key.name === "return") {
-      patch({ inlineImages: !settings().inlineImages });
-    }
+    if (row() === "sensitivity" && key.name === "a") return patch({ vadSensitivity: "auto" });
+    if (key.name === "h" || key.name === "l") return activate(row(), key.name === "l" ? 1 : -1);
+    if (key.name === "return") activate(row(), 0);
   });
 
   onCleanup(() => {
@@ -131,22 +129,46 @@ export function SettingsScreen(props: {
   });
 
   const theme = useTheme(props.store);
+  const arrows = (section: Section): boolean => section === "input" || section === "output" || section === "sensitivity";
   const line = (section: Section, text: string): JSX.Element => (
-    <box flexDirection="row" backgroundColor={row() === section ? theme().selection : undefined}>
-      <text fg={row() === section ? theme().selectionFg : theme().fg}>{`${row() === section ? "> " : "  "}${text}`}</text>
+    <box
+      flexDirection="row"
+      backgroundColor={row() === section ? theme().selection : undefined}
+      onMouseDown={() => {
+        setRow(section);
+        if (!arrows(section)) activate(section, 0);
+      }}
+    >
+      <text flexGrow={1} fg={row() === section ? theme().selectionFg : theme().fg}>{`${row() === section ? "> " : "  "}${text}`}</text>
+      <Show when={arrows(section)}>
+        <Button label="◀" theme={theme()} onPress={() => (setRow(section), activate(section, -1))} />
+        <text> </text>
+        <Button label="▶" theme={theme()} onPress={() => (setRow(section), activate(section, 1))} />
+      </Show>
     </box>
   );
 
   return (
-    <box position="absolute" top={2} left={0} width="100%" alignItems="center" zIndex={70}>
+    <box
+      position="absolute"
+      top={0}
+      left={0}
+      width="100%"
+      height="100%"
+      paddingTop={2}
+      alignItems="center"
+      zIndex={70}
+      onMouseDown={() => props.onClose()}
+    >
       <box
+        onMouseDown={(e: Click) => e.stopPropagation()}
         border
         borderStyle="rounded"
         borderColor={theme().accent}
         backgroundColor={theme().panel}
         title=" Settings "
         titleColor={theme().accent}
-        bottomTitle=" j/k mueve · Enter cambia · h/l ajusta · Esc cierra "
+        bottomTitle=" click o Enter cambia · ◀ ▶ o h/l ajusta · Esc cierra "
         bottomTitleAlignment="right"
         flexDirection="column"
         width={72}
@@ -167,6 +189,11 @@ export function SettingsScreen(props: {
           "testMic",
           props.inVoice ? "salí de voz para probar el mic" : testing() ? "probando mic · Enter detiene" : "probar mic · Enter",
         )}
+        <Show when={row() === "sensitivity"}>
+          <box flexDirection="row" paddingLeft={2}>
+            <Button label="auto" theme={theme()} onPress={() => patch({ vadSensitivity: "auto" })} />
+          </box>
+        </Show>
         <text fg={theme().header}>Apariencia</text>
         {line("theme", `tema: ${settings().theme === "dark" ? "oscuro" : "claro"}`)}
         {line("images", `imágenes inline: ${settings().inlineImages ? "sí" : "no (solo links)"}`)}

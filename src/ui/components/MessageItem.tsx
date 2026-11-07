@@ -1,5 +1,7 @@
 import { TextAttributes } from "@opentui/core";
-import { createResource, For, Show, type JSX } from "solid-js";
+import { createResource, createSignal, For, Show, type JSX } from "solid-js";
+
+export type MessageAction = "reply" | "edit" | "delete" | "react";
 
 import { attachmentView, sizedUrl } from "../../images/cdn";
 import { imageCache } from "../../images/cache";
@@ -8,6 +10,7 @@ import { parseMarkdown, plainText } from "../../markdown/parse";
 import type { ApiEmbed, AppState, Message } from "../../store/types";
 import { clockTime, displayName, hashIndex, memberColor, truncate } from "../format";
 import { roleHex, type Theme } from "../theme";
+import { Button, type Click } from "./Button";
 import { Markdown, type MdContext } from "./Markdown";
 
 function authorColor(state: AppState, theme: Theme, userId: string, guildId: string | null): string {
@@ -26,7 +29,8 @@ function InlineImage(props: { url: string; cols: number; rows: number; label: st
   );
 }
 
-function EmbedView(props: { embed: ApiEmbed; ctx: MdContext; images: boolean }): JSX.Element {
+
+function EmbedView(props: { embed: ApiEmbed; ctx: MdContext; images: boolean; onOpen?(url: string): void }): JSX.Element {
   const theme = props.ctx.theme;
   const bar = (): string => roleHex(props.embed.color ?? 0) ?? theme.border;
   const description = (): string => {
@@ -46,7 +50,16 @@ function EmbedView(props: { embed: ApiEmbed; ctx: MdContext; images: boolean }):
           <text fg={theme.fg} attributes={TextAttributes.BOLD}>{props.embed.author?.name}</text>
         </Show>
         <Show when={props.embed.title}>
-          <text fg={props.embed.url ? theme.link : theme.fg} attributes={TextAttributes.BOLD} wrapMode="word">
+          <text
+            fg={props.embed.url ? theme.link : theme.fg}
+            attributes={TextAttributes.BOLD}
+            wrapMode="word"
+            onMouseDown={(e: Click) => {
+              if (!props.embed.url) return;
+              e.stopPropagation();
+              props.onOpen?.(props.embed.url);
+            }}
+          >
             {props.embed.title}
           </text>
         </Show>
@@ -85,12 +98,18 @@ export function MessageItem(props: {
   grouped: boolean;
   selected?: boolean;
   images?: boolean;
+  onSelect?(): void;
+  onAction?(action: MessageAction): void;
+  onReact?(emoji: { id: string | null; name: string }): void;
+  onOpen?(url: string): void;
 }): JSX.Element {
   const theme = (): Theme => props.theme;
+  const [hover, setHover] = createSignal(false);
+  const mine = (): boolean => props.message.authorId === props.state.me?.id;
   const ctx = (): MdContext => ({ state: props.state, theme: props.theme, guildId: props.guildId, revealSpoilers: props.selected === true });
   const author = (): string => displayName(props.state, props.message.authorId, props.guildId);
   const nodes = () => parseMarkdown(props.message.content);
-  const bg = (): string | undefined => (props.selected ? props.theme.selection : undefined);
+  const bg = (): string | undefined => (props.selected ? props.theme.selection : hover() ? props.theme.panel : undefined);
   const gutter = (): string => (props.selected ? props.theme.accent : props.message.mentionsMe ? props.theme.mention : "");
 
   const referenced = (): string | null => {
@@ -111,6 +130,9 @@ export function MessageItem(props: {
       width="100%"
       backgroundColor={bg()}
       marginTop={props.grouped ? 0 : 1}
+      onMouseDown={() => props.onSelect?.()}
+      onMouseOver={() => setHover(true)}
+      onMouseOut={() => setHover(false)}
     >
       <text fg={gutter() || props.theme.bg} width={1}>{gutter() ? "▌" : " "}</text>
       <box flexDirection="column" flexGrow={1} paddingRight={1}>
@@ -136,10 +158,16 @@ export function MessageItem(props: {
         <For each={props.message.attachments}>
           {(attachment) => {
             const view = attachmentView(attachment, props.images ? IMAGE_MODE : "links");
+            const openIt = (e: Click): void => {
+              e.stopPropagation();
+              props.onOpen?.(attachment.url);
+            };
             return view.kind === "image" ? (
-              <InlineImage url={view.url} cols={view.cols} rows={view.rows} label={view.label} theme={props.theme} />
+              <box onMouseDown={openIt}>
+                <InlineImage url={view.url} cols={view.cols} rows={view.rows} label={view.label} theme={props.theme} />
+              </box>
             ) : (
-              <text wrapMode="none">
+              <text wrapMode="none" onMouseDown={openIt}>
                 <a href={view.url} style={{ fg: theme().link }}>
                   {view.label}
                 </a>
@@ -148,26 +176,35 @@ export function MessageItem(props: {
           }}
         </For>
         <For each={props.message.embeds.filter((embed) => embed.title || embed.description || embed.image || embed.thumbnail)}>
-          {(embed) => <EmbedView embed={embed} ctx={ctx()} images={props.images === true} />}
+          {(embed) => <EmbedView embed={embed} ctx={ctx()} images={props.images === true} onOpen={props.onOpen} />}
         </For>
         <Show when={props.message.reactions.length > 0}>
-          <text wrapMode="word">
+          <box flexDirection="row" flexWrap="wrap" columnGap={1}>
             <For each={props.message.reactions}>
               {(reaction) => (
-                <>
-                  <span
-                    style={{
-                      fg: reaction.me ? theme().mentionFg : theme().fg,
-                      bg: reaction.me ? theme().mentionBg : theme().selection,
-                    }}
-                  >
-                    {` ${reaction.emoji.id ? `:${reaction.emoji.name}:` : reaction.emoji.name} ${reaction.count} `}
-                  </span>
-                  {" "}
-                </>
+                <text
+                  fg={reaction.me ? theme().mentionFg : theme().fg}
+                  bg={reaction.me ? theme().mentionBg : theme().selection}
+                  onMouseDown={(e: Click) => {
+                    e.stopPropagation();
+                    props.onReact?.(reaction.emoji);
+                  }}
+                >
+                  {` ${reaction.emoji.id ? `:${reaction.emoji.name}:` : reaction.emoji.name} ${reaction.count} `}
+                </text>
               )}
             </For>
-          </text>
+          </box>
+        </Show>
+        <Show when={props.selected && props.onAction}>
+          <box flexDirection="row" flexWrap="wrap" columnGap={1} marginTop={0}>
+            <Button label="↩ responder" theme={props.theme} onPress={() => props.onAction?.("reply")} />
+            <Show when={mine()}>
+              <Button label="✎ editar" theme={props.theme} onPress={() => props.onAction?.("edit")} />
+              <Button label="🗑 borrar" theme={props.theme} danger onPress={() => props.onAction?.("delete")} />
+            </Show>
+            <Button label="😀 reaccionar" theme={props.theme} onPress={() => props.onAction?.("react")} />
+          </box>
         </Show>
       </box>
     </box>

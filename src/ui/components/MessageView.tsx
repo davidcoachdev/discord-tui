@@ -8,7 +8,8 @@ import type { AppState, Message, OutboxItem } from "../../store/types";
 import { dayLabel, displayName, sameDay, truncate, typingText } from "../format";
 import { jsonEqual, shallowEqual, useSelector } from "../store-bridge";
 import type { Theme } from "../theme";
-import { MessageItem } from "./MessageItem";
+import { Button } from "./Button";
+import { MessageItem, type MessageAction } from "./MessageItem";
 
 const GROUP_WINDOW_MS = 7 * 60_000;
 
@@ -28,7 +29,21 @@ export function MessageView(props: {
   selectedId?: string | null;
   focused?: boolean;
   images?: boolean;
+  onSelect?(messageId: string): void;
+  onAction?(action: MessageAction, messageId: string): void;
+  onReact?(messageId: string, emoji: { id: string | null; name: string }): void;
+  onOpen?(url: string): void;
+  onLoadOlder?(): void;
+  onFocus?(): void;
+  onVoiceToggle?(channelId: string): void;
 }): JSX.Element {
+  const voiceHere = useSelector(props.store, (s) => s.voice.channelId !== null && s.voice.channelId === s.ui.selectedChannelId);
+  const voiceCount = useSelector(props.store, (s) => {
+    const id = s.ui.selectedChannelId;
+    const channel = id ? s.channels[id] : undefined;
+    if (!channel || channel.type !== 2 || !channel.guildId) return 0;
+    return Object.values(s.voice.states[channel.guildId] ?? {}).filter((v) => v.channelId === id).length;
+  });
   // Solo lo que la vista usa: las ráfagas de presencia, typing o voz no re-renderizan los mensajes.
   const view = useSelector(
     props.store,
@@ -130,18 +145,43 @@ export function MessageView(props: {
       flexGrow={1}
       height="100%"
       flexDirection="column"
+      onMouseDown={() => props.onFocus?.()}
     >
       <Show
         when={channelId() !== null && isText()}
         fallback={
-          <box flexGrow={1} justifyContent="center" alignItems="center" flexDirection="column">
-            <text fg={props.theme.dim}>
-              {channelId() !== null ? "Canal de voz: apretá v para entrar o salir" : "Elegí un canal con j/k y l (o Ctrl-k)"}
-            </text>
+          <box flexGrow={1} justifyContent="center" alignItems="center" flexDirection="column" rowGap={1}>
+            <Show
+              when={channelId() !== null}
+              fallback={<text fg={props.theme.dim}>Elegí un canal con el mouse, con j/k y l, o con Ctrl-k</text>}
+            >
+              <text fg={props.theme.header}>{`🔊 ${view().channels[channelId()!]?.name ?? "voz"}`}</text>
+              <text fg={props.theme.dim}>
+                {voiceCount() === 0 ? "no hay nadie todavía" : `${voiceCount()} ${voiceCount() === 1 ? "persona" : "personas"} en el canal`}
+              </text>
+              <Button
+                label={voiceHere() ? "✕ Salir de la llamada" : "🔊 Entrar a voz"}
+                theme={props.theme}
+                danger={voiceHere()}
+                active={!voiceHere()}
+                onPress={() => props.onVoiceToggle?.(channelId()!)}
+              />
+              <text fg={props.theme.faint}>o apretá v</text>
+            </Show>
           </box>
         }
       >
-        <scrollbox ref={(el: ScrollBoxRenderable) => (scroll = el)} width="100%" flexGrow={1} stickyScroll stickyStart="bottom">
+        <scrollbox
+          ref={(el: ScrollBoxRenderable) => (scroll = el)}
+          width="100%"
+          flexGrow={1}
+          stickyScroll
+          stickyStart="bottom"
+          onMouseScroll={(e: { scroll?: { direction: string } }) => {
+            // Con la rueda arriba de todo, como Discord, se piden los mensajes anteriores.
+            if (e.scroll?.direction === "up" && (scroll?.scrollTop ?? 1) <= 0) props.onLoadOlder?.();
+          }}
+        >
           <Show when={slice()?.loadingOlder}>
             <text fg={props.theme.dim}>  cargando mensajes anteriores…</text>
           </Show>
@@ -170,6 +210,10 @@ export function MessageView(props: {
                   grouped={isGrouped(message, index())}
                   selected={props.selectedId === message.id}
                   images={props.images}
+                  onSelect={() => props.onSelect?.(message.id)}
+                  onAction={props.onAction ? (action) => props.onAction?.(action, message.id) : undefined}
+                  onReact={(emoji) => props.onReact?.(message.id, emoji)}
+                  onOpen={(url) => props.onOpen?.(url)}
                 />
               </>
             )}

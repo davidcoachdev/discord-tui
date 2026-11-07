@@ -6,6 +6,7 @@ import { uploadAttachments } from "../uploads/upload";
 import { createAckScheduler } from "./ack";
 import { createTypingNotifier } from "./typing";
 import type { VoiceActions } from "./voice";
+import { openUrl } from "../proc/open-url";
 import { createEditActions } from "./edit";
 import { createReactActions } from "./react";
 import { createSendActions } from "./send";
@@ -30,6 +31,8 @@ export interface Actions {
   /** El canal que se está mirando y su mensaje más nuevo: ack con debounce. */
   viewing?(channelId: string | null, newestId: string | null): void;
   voice?: VoiceActions;
+  /** Abre un link o adjunto en el navegador (solo https). */
+  openUrl?(url: string): void;
 }
 
 export interface ActionsDeps {
@@ -39,6 +42,7 @@ export interface ActionsDeps {
   fetch?: typeof fetch;
   voice?: VoiceActions;
   now?: () => number;
+  openUrl?: (url: string) => boolean;
 }
 
 function noticeText(action: string, error: unknown): string {
@@ -162,6 +166,11 @@ export function createActions(deps: ActionsDeps): Actions {
     keystroke: (channelId, textAfter) => typing.onKeystroke(channelId, textAfter),
     viewing: (channelId, newestId) => ack.viewing(channelId, newestId),
     voice: deps.voice,
+    openUrl: (url) => {
+      if (!(deps.openUrl ?? openUrl)(url)) {
+        deps.store.dispatch({ type: "notice/push", key: "open-url", level: "warn", text: "no pude abrir el link" });
+      }
+    },
     retry: sendActions.retry,
     edit,
     remove,

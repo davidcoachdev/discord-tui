@@ -3,6 +3,7 @@ import { For, type JSX } from "solid-js";
 
 import { keysByGroup } from "../keys";
 import type { Theme } from "../theme";
+import type { Click } from "./Button";
 
 export function HelpOverlay(props: { onClose(): void; theme?: Theme }): JSX.Element {
   const groups = [...keysByGroup().entries()];
@@ -16,13 +17,15 @@ export function HelpOverlay(props: { onClose(): void; theme?: Theme }): JSX.Elem
       height="100%"
       alignItems="center"
       zIndex={60}
+      onMouseDown={() => props.onClose()}
     >
       <box
+        onMouseDown={(e: Click) => e.stopPropagation()}
         border
         borderStyle="rounded"
         borderColor={accent()}
         backgroundColor={props.theme?.panel}
-        title=" Ayuda · ? o Esc cierra "
+        title=" Ayuda · ? o Esc cierra · click afuera cierra "
         titleColor={accent()}
         flexDirection="row"
         flexWrap="wrap"

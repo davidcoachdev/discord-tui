@@ -5,8 +5,14 @@ import { formatBytes } from "../../uploads/file";
 import type { PendingAttachment } from "../../store/types";
 import type { MentionCandidate } from "../mentions";
 import type { Theme } from "../theme";
+import { Button, type Click } from "./Button";
 
-export function MentionPopup(props: { candidates: MentionCandidate[]; index: number; theme: Theme }): JSX.Element {
+export function MentionPopup(props: {
+  candidates: MentionCandidate[];
+  index: number;
+  theme: Theme;
+  onPick?(index: number): void;
+}): JSX.Element {
   return (
     <box
       border
@@ -20,7 +26,14 @@ export function MentionPopup(props: { candidates: MentionCandidate[]; index: num
     >
       <For each={props.candidates}>
         {(candidate, i) => (
-          <box flexDirection="row" backgroundColor={i() === props.index ? props.theme.selection : undefined}>
+          <box
+            flexDirection="row"
+            backgroundColor={i() === props.index ? props.theme.selection : undefined}
+            onMouseDown={(e: Click) => {
+              e.stopPropagation();
+              props.onPick?.(i());
+            }}
+          >
             <text fg={i() === props.index ? props.theme.selectionFg : props.theme.fg} wrapMode="none">
               {` ${candidate.label}`}
             </text>
@@ -42,6 +55,10 @@ export function Composer(props: {
   context?: string | null;
   attachments?: PendingAttachment[];
   prompt?: string | null;
+  onClick?(): void;
+  onAttach?(): void;
+  onPaste?(): void;
+  onRemoveAttachment?(index: number): void;
 }): JSX.Element {
   const over = (): boolean => props.text.length > 2000;
   const counter = (): string => (over() ? ` ${props.text.length}/2000 · muy largo ` : ` ${props.text.length}/2000 `);
@@ -59,15 +76,21 @@ export function Composer(props: {
       width="100%"
       flexDirection="column"
       flexShrink={0}
+      onMouseDown={() => props.onClick?.()}
     >
       <Show when={props.context}>
         <text fg={props.theme.accent} wrapMode="none">{`↪ ${props.context} · Esc cancela`}</text>
       </Show>
       <For each={props.attachments ?? []}>
-        {(file) => (
-          <text fg={props.theme.link} wrapMode="none">{`📎 ${file.filename} (${formatBytes(file.bytes.byteLength)}) · x quita`}</text>
+        {(file, i) => (
+          <box flexDirection="row" columnGap={1}>
+            <text fg={props.theme.link} wrapMode="none">{`📎 ${file.filename} (${formatBytes(file.bytes.byteLength)}) · x quita`}</text>
+            <Button label="✕" theme={props.theme} danger onPress={() => props.onRemoveAttachment?.(i())} />
+          </box>
         )}
       </For>
+      <box flexDirection="row" width="100%">
+      <box flexGrow={1}>
       <Show
         when={props.prompt == null}
         fallback={
@@ -93,6 +116,14 @@ export function Composer(props: {
           </text>
         </Show>
       </Show>
+      </box>
+      <Show when={props.onAttach || props.onPaste}>
+        <box flexDirection="row" columnGap={1} flexShrink={0}>
+          <Button label="📎 adjuntar" theme={props.theme} onPress={() => props.onAttach?.()} />
+          <Button label="📋 pegar" theme={props.theme} onPress={() => props.onPaste?.()} />
+        </box>
+      </Show>
+      </box>
     </box>
   );
 }

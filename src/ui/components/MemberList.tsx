@@ -9,7 +9,7 @@ import { presenceColor, roleHex, type Theme } from "../theme";
 
 export const MEMBER_WIDTH = 26;
 
-export function MemberList(props: { store: Store; theme: Theme }): JSX.Element {
+export function MemberList(props: { store: Store; theme: Theme; onMember?(userId: string): void }): JSX.Element {
   const view = useSelector(
     props.store,
     (s) => {
@@ -58,7 +58,7 @@ export function MemberList(props: { store: Store; theme: Theme }): JSX.Element {
                 </text>
               </box>
             ) : (
-              <box flexDirection="row" width="100%">
+              <box flexDirection="row" width="100%" onMouseDown={() => props.onMember?.(row.userId)}>
                 <text fg={presenceColor(props.theme, row.status)}>{row.status === "offline" ? " ○" : " ●"}</text>
                 <text
                   wrapMode="none"

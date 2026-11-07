@@ -1,5 +1,5 @@
 import { TextAttributes, type ScrollBoxRenderable } from "@opentui/core";
-import { createEffect, For, on, type JSX } from "solid-js";
+import { createEffect, createSignal, For, on, type JSX } from "solid-js";
 
 import type { Actions } from "../../actions";
 import { selectChannelList, selectGuildList } from "../../store/selectors";
@@ -23,14 +23,17 @@ function Row(props: {
   const inner = GUILD_WIDTH - 2;
   const badge = (): string => (props.mentions > 0 ? ` ${props.mentions > 99 ? "99+" : props.mentions} ` : "");
   const marker = (): string => (props.selected ? "▌" : props.unread ? "•" : " ");
+  const [hover, setHover] = createSignal(false);
   const name = (): string => truncate(props.label, inner - 3 - cellWidth(badge()) - (props.inVoice ? 3 : 0));
   return (
     <box
       id={`guild-${props.id}`}
       flexDirection="row"
       width="100%"
-      backgroundColor={props.selected ? props.theme.selection : undefined}
+      backgroundColor={props.selected ? props.theme.selection : hover() ? props.theme.panel : undefined}
       onMouseDown={props.onClick}
+      onMouseOver={() => setHover(true)}
+      onMouseOut={() => setHover(false)}
     >
       <text fg={props.selected ? props.theme.accent : props.theme.unread}>{marker()}</text>
       <text
@@ -88,7 +91,10 @@ export function GuildList(props: { store: Store; actions: Actions; theme: Theme;
           selected={selected() === "@dms"}
           inVoice={false}
           theme={props.theme}
-          onClick={() => props.actions.selectGuild("@dms")}
+          onClick={() => {
+            props.actions.selectGuild("@dms");
+            props.actions.focus("channels");
+          }}
         />
         <box height={1} width="100%">
           <text fg={props.theme.faint} wrapMode="none">{"─".repeat(GUILD_WIDTH - 2)}</text>
@@ -103,7 +109,10 @@ export function GuildList(props: { store: Store; actions: Actions; theme: Theme;
               selected={selected() === row.id}
               inVoice={voiceGuild() === row.id}
               theme={props.theme}
-              onClick={() => props.actions.selectGuild(row.id)}
+              onClick={() => {
+                props.actions.selectGuild(row.id);
+                props.actions.focus("channels");
+              }}
             />
           )}
         </For>
