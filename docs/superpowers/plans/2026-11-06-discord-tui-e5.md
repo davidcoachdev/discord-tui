@@ -42,7 +42,7 @@
   - `loadSettings(): Promise<Settings>` (archivo faltante o JSON roto → defaults; campo inválido → default de ese campo; `vadSensitivity` numérico acotado a [-60, -20]; volúmenes enteros en [0, 200]); `saveSettings(s: Settings): Promise<void>` (atómico, 0600).
   - Acción de store `{ type: "settings/set"; patch: Partial<Settings> }` que guarda con debounce de 500 ms. El `inputMode` de E4b pasa a leerse y escribirse acá.
 
-- [ ] **Step 1: Tests**
+- [x] **Step 1: Tests**
 
 ```ts
 test("missing file gives defaults", async () => { expect(await loadSettings()).toEqual(DEFAULT_SETTINGS); });
@@ -54,8 +54,8 @@ test("saved with mode 0600 and never contains a token-like string", async () => 
 test("settings/set persists after the debounce", async () => {});
 ```
 
-- [ ] **Step 2–4:** FAIL → implementar → `bun test tests/settings` PASS.
-- [ ] **Step 5:** commit `feat(e5): persistent settings` + push.
+- [x] **Step 2–4:** FAIL → implementar → `bun test tests/settings` PASS.
+- [x] **Step 5:** commit `feat(e5): persistent settings` + push.
 
 ---
 
@@ -74,7 +74,7 @@ test("settings/set persists after the debounce", async () => {});
   - `applyGain(pcm: Uint8Array, percent: number): Uint8Array` (s16le, satura; 100 devuelve el mismo buffer).
   - Participante en `ChannelList`: `· <usuario> 150%` cuando no es 100.
 
-- [ ] **Step 1: Tests**
+- [x] **Step 1: Tests**
 
 ```ts
 test("pw-dump parsing splits sources and sinks", () => { /* fixture tests/fixtures/pw-dump.json armada a mano */ });
@@ -87,8 +87,8 @@ test("applyGain", () => {
 test("mixer applies per-user gain from settings", () => {});
 ```
 
-- [ ] **Step 2–4:** FAIL → implementar → PASS.
-- [ ] **Step 5:** commit `feat(e5): audio device selection and per-user volume` + push.
+- [x] **Step 2–4:** FAIL → implementar → PASS.
+- [x] **Step 5:** commit `feat(e5): audio device selection and per-user volume` + push.
 
 ---
 
@@ -103,7 +103,7 @@ test("mixer applies per-user gain from settings", () => {});
 - Consumes: `listAudioDevices`, `LevelMeter` y `createEcho` (E4a), `createVad`, `settings/set`.
 - Produces: `SettingsScreen(props: { store: Store; actions: Actions; deps: { listAudioDevices; startCapture; startPlayback } })` con secciones `Audio` (entrada, salida, modo de entrada `Actividad de voz | Push-to-Talk`, sensibilidad `auto` o dBFS con el `LevelMeter` en vivo y la línea del umbral, `probar mic` que prende y apaga el eco) y `Apariencia` (tema). `j`/`k` se mueven, `Enter` cambia, `h`/`l` ajustan la sensibilidad de a 3 dB, `Esc` cierra. Si la voz está conectada, `probar mic` está deshabilitado con `salí de voz para probar el mic` **[nuestra]**: dos capturas del mismo mic a la vez confunden.
 
-- [ ] **Step 1: Tests**
+- [x] **Step 1: Tests**
 
 ```tsx
 test("lists devices from the fake pw-dump and saves the choice", async () => {});
@@ -112,8 +112,8 @@ test("probar mic starts and stops the echo", async () => {});
 test("probar mic is disabled while in voice", async () => {});
 ```
 
-- [ ] **Step 2–4:** FAIL → implementar → PASS.
-- [ ] **Step 5:** commit `feat(e5): settings screen with live mic meter` + push.
+- [x] **Step 2–4:** FAIL → implementar → PASS.
+- [x] **Step 5:** commit `feat(e5): settings screen with live mic meter` + push.
 
 ---
 
@@ -130,7 +130,7 @@ test("probar mic is disabled while in voice", async () => {});
   - `HelpOverlay`: agrupada por `group` (`Navegación`, `Mensajes`, `Voz`, `App`), generada con `commandBindings` de `@opentui/keymap/extras`; `?` abre, `Esc` o `?` cierra.
   - `Theme = { bg; fg; dim; accent; unread; mention; error; warn; ok }`; `THEMES: Record<"dark" | "light", Theme>`; `useTheme(store)`. Ningún componente usa colores literales fuera de `theme.ts`.
 
-- [ ] **Step 1: Tests**
+- [x] **Step 1: Tests**
 
 ```ts
 test("every key of the spec table is bound to a command with a spanish description", () => {
@@ -144,8 +144,8 @@ test("click on a channel opens it; wheel scrolls messages", async () => {});
 test("switching theme repaints with the light palette", async () => {});
 ```
 
-- [ ] **Step 2–4:** FAIL → implementar → PASS.
-- [ ] **Step 5:** commit `feat(e5): help overlay, full keymap, themes and mouse` + push.
+- [x] **Step 2–4:** FAIL → implementar → PASS.
+- [x] **Step 5:** commit `feat(e5): help overlay, full keymap, themes and mouse` + push.
 
 ---
 
@@ -162,7 +162,7 @@ test("switching theme repaints with the light palette", async () => {});
   - Mensajes fijos: identify rechazado `Discord rechazó la conexión (<código>): puede que haya cambiado el protocolo. Revisá el log.` (spec 10.3); REST que no es de la outbox `no se pudo <acción>: <status>`.
   - `createIdlePresence(deps: { gateway: Gateway; settings: () => Settings; now: () => number; setTimer? }): { activity(): void; stop(): void }`: tras `idleAfterMinutes` sin teclas manda op 3 idle; con la próxima tecla, op 3 online. `idleAfterMinutes: null` lo apaga. Nunca manda op 3 si no cambió el estado.
 
-- [ ] **Step 1: Tests**
+- [x] **Step 1: Tests**
 
 ```ts
 test("same key accumulates count instead of stacking", () => {});
@@ -172,8 +172,8 @@ test("op 3 has the documented shape", () => { expect(shapeOf(sent.d)).toEqual(sh
 test("idleAfterMinutes null never sends op 3", () => {});
 ```
 
-- [ ] **Step 2–4:** FAIL → implementar → PASS.
-- [ ] **Step 5:** commit `feat(e5): visible errors and idle presence` + push.
+- [x] **Step 2–4:** FAIL → implementar → PASS.
+- [x] **Step 5:** commit `feat(e5): visible errors and idle presence` + push.
 
 ---
 
