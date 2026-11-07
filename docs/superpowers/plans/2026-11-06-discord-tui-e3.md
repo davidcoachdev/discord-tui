@@ -99,7 +99,7 @@ $ tsc --noEmit   # sin salida, código 0
   - Reply: banner `respondiendo a <usuario> · Esc cancela`; el envío lleva `message_reference` y `allowed_mentions: { parse: ["users", "roles", "everyone"], replied_user: true }`.
   - Con el composer en insert, `q`, `j`, `k`, etc. escriben letras (la capa global no los toma).
 
-- [ ] **Step 1: Tests**
+- [x] **Step 1: Tests**
 
 ```ts
 test("validateOutgoing", () => {
@@ -116,8 +116,25 @@ test("draft survives switching channels", async () => {});
 test("R on a failed item calls retry", async () => {});
 ```
 
-- [ ] **Step 2–4:** FAIL → implementar → PASS.
-- [ ] **Step 5:** commit `feat(e3): composer, insert mode and replies` + push.
+- [x] **Step 2–4:** FAIL → implementar → PASS.
+
+```text
+$ bun test tests/ui/composer.test.tsx tests/ui/composer-state.test.ts
+ 4 pass
+ 0 fail
+ 6 expect() calls
+Ran 4 tests across 2 files. [330.00ms]
+
+$ bun test && bun run typecheck
+ 149 pass
+ 0 fail
+ 308 expect() calls
+Ran 149 tests across 32 files. [4.46s]
+$ tsc --noEmit   # sin salida, código 0
+```
+
+Nota: la navegación y el modo insert quedaron en `useKeyboard` en `App` (en vez del keymap de OpenTUI); el keymap completo se retoma en E5. `r` responde al último mensaje; `dd`/`e` vienen en Task 4.
+- [x] **Step 5:** commit `feat(e3): composer, insert mode and replies` + push.
 
 ---
 
