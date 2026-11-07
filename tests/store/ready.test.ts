@@ -75,3 +75,21 @@ test("compareSnowflakes compares as BigInt", () => {
   expect(compareSnowflakes("100", "99")).toBe(1);
   expect(compareSnowflakes("100", "100")).toBe(0);
 });
+
+test("READY also accepts object-shaped maps for read_state, settings and private_channels", () => {
+  const payload = structuredClone(ready);
+  payload.d.read_state = {
+    "100000000000000002": { last_message_id: "100000000000000021", mention_count: 2 },
+  };
+  payload.d.user_guild_settings = {
+    "100000000000000001": { muted: true, channel_overrides: { "100000000000000002": { muted: true } } },
+  };
+
+  const state = reduceReady(payload.d);
+  expect(state.readState["100000000000000002"]).toEqual({
+    lastAckedId: "100000000000000021",
+    mentionCount: 2,
+  });
+  expect(state.guildSettings.mutedGuilds).toContain("100000000000000001");
+  expect(state.guildSettings.mutedChannels).toContain("100000000000000002");
+});

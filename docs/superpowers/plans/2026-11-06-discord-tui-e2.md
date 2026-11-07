@@ -246,6 +246,8 @@ $ tsc --noEmit   # sin salida, código 0
 ```
 
 La fixture READY se amplió con `users`, un DM en `private_channels` y `read_state` para cubrir DMs y no leídos.
+
+El READY real puede traer `read_state`, `user_guild_settings`, `private_channels`, `guilds`, `users`, `roles`, `channels`, `members`, `presences` y `emojis` como **mapas por id** en vez de arrays (`{} is not iterable` en la primera prueba real). `applyReady` acepta las dos formas con `asList`.
 - [x] **Step 5:** commit `feat(e2): store, READY reducer and channel permissions` + push.
 
 ---

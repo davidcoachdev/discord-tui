@@ -1,5 +1,19 @@
 import type { AppState, ChannelState, MemberState, OverwriteState, RoleState, UserState } from "../types";
 
+
+function asList(value: unknown, idKey: string): any[] {
+  if (Array.isArray(value)) return value;
+  if (value !== null && typeof value === "object") {
+    return Object.entries(value as Record<string, unknown>).map(([key, entry]) => {
+      if (entry !== null && typeof entry === "object" && !Array.isArray(entry)) {
+        return { [idKey]: key, ...(entry as Record<string, unknown>) };
+      }
+      return { [idKey]: key };
+    });
+  }
+  return [];
+}
+
 function toUser(raw: any): UserState {
   return {
     id: raw.id,
@@ -51,7 +65,7 @@ export function applyReady(state: AppState, d: any): AppState {
     return user;
   };
 
-  for (const raw of d.users ?? []) rememberUser(raw);
+  for (const raw of asList(d.users, "id")) rememberUser(raw);
 
   const guilds = { ...state.guilds };
   const guildOrder: string[] = [];
@@ -59,15 +73,15 @@ export function applyReady(state: AppState, d: any): AppState {
   const members = { ...state.members };
   const presences = { ...state.presences };
 
-  for (const rawGuild of d.guilds ?? []) {
+  for (const rawGuild of asList(d.guilds, "id")) {
     guildOrder.push(rawGuild.id);
     guilds[rawGuild.id] = {
       id: rawGuild.id,
       name: rawGuild.name ?? rawGuild.id,
       icon: rawGuild.icon ?? null,
       ownerId: rawGuild.owner_id ?? "",
-      roles: (rawGuild.roles ?? []).map(toRole),
-      emojis: (rawGuild.emojis ?? []).map((emoji: any) => ({
+      roles: asList(rawGuild.roles, "id").map(toRole),
+      emojis: asList(rawGuild.emojis, "id").map((emoji: any) => ({
         id: emoji.id ?? "",
         name: emoji.name ?? "",
         animated: emoji.animated === true,
@@ -75,7 +89,7 @@ export function applyReady(state: AppState, d: any): AppState {
     };
 
     const guildMembers: Record<string, MemberState> = {};
-    for (const rawMember of rawGuild.members ?? []) {
+    for (const rawMember of asList(rawGuild.members, "user_id")) {
       guildMembers[rawMember.user_id] = {
         userId: rawMember.user_id,
         guildId: rawGuild.id,
@@ -86,21 +100,21 @@ export function applyReady(state: AppState, d: any): AppState {
     }
     members[rawGuild.id] = guildMembers;
 
-    for (const rawPresence of rawGuild.presences ?? []) {
+    for (const rawPresence of asList(rawGuild.presences, "user_id")) {
       presences[rawPresence.user_id] = {
         status: rawPresence.status ?? "offline",
         activities: Array.isArray(rawPresence.activities) ? rawPresence.activities : [],
       };
     }
 
-    for (const rawChannel of rawGuild.channels ?? []) {
+    for (const rawChannel of asList(rawGuild.channels, "id")) {
       channels[rawChannel.id] = toChannel(rawChannel, rawGuild.id);
     }
   }
 
   const privateChannelIds: string[] = [];
   for (const rawChannel of d.private_channels ?? []) {
-    const recipients = (rawChannel.recipients ?? []) as any[];
+    const recipients = asList(rawChannel.recipients, "id");
     for (const recipient of recipients) rememberUser(recipient);
     const name =
       rawChannel.type === 3
@@ -111,7 +125,7 @@ export function applyReady(state: AppState, d: any): AppState {
   }
 
   const readState = { ...state.readState };
-  for (const raw of d.read_state ?? []) {
+  for (const raw of asList(d.read_state, "id")) {
     readState[raw.id] = {
       lastAckedId: raw.last_message_id ?? null,
       mentionCount: typeof raw.mention_count === "number" ? raw.mention_count : 0,
@@ -120,11 +134,11 @@ export function applyReady(state: AppState, d: any): AppState {
 
   const mutedGuilds = [...state.guildSettings.mutedGuilds];
   const mutedChannels = [...state.guildSettings.mutedChannels];
-  for (const raw of d.user_guild_settings ?? []) {
+  for (const raw of asList(d.user_guild_settings, "guild_id")) {
     if (raw.muted === true && typeof raw.guild_id === "string" && !mutedGuilds.includes(raw.guild_id)) {
       mutedGuilds.push(raw.guild_id);
     }
-    for (const override of raw.channel_overrides ?? []) {
+    for (const override of asList(raw.channel_overrides, "channel_id")) {
       if (override.muted === true && typeof override.channel_id === "string" && !mutedChannels.includes(override.channel_id)) {
         mutedChannels.push(override.channel_id);
       }
@@ -151,13 +165,13 @@ export function applyReady(state: AppState, d: any): AppState {
 export function applyReadySupplemental(state: AppState, d: any): AppState {
   let next = state;
   const users = { ...state.users };
-  for (const raw of d.users ?? []) {
+  for (const raw of asList(d.users, "id")) {
     if (raw?.id) users[raw.id] = toUser(raw);
   }
   const channels = { ...state.channels };
   const privateChannelIds = [...state.privateChannelIds];
-  for (const raw of d.lazy_private_channels ?? []) {
-    const recipients = (raw.recipients ?? []) as any[];
+  for (const raw of asList(d.lazy_private_channels, "id")) {
+    const recipients = asList(raw.recipients, "id");
     for (const recipient of recipients) {
       if (recipient?.id) users[recipient.id] = toUser(recipient);
     }
@@ -170,7 +184,7 @@ export function applyReadySupplemental(state: AppState, d: any): AppState {
   }
 
   const presences = { ...state.presences };
-  for (const raw of d.presences ?? []) {
+  for (const raw of asList(d.presences, "user_id")) {
     if (raw?.user_id) presences[raw.user_id] = { status: raw.status ?? "offline", activities: raw.activities ?? [] };
   }
 
