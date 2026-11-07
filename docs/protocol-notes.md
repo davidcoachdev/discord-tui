@@ -65,3 +65,10 @@ Datos que el agente resuelve y documenta mientras construye. Sin tokens ni ids r
 - El plan daba por hecho que `useKittyKeyboard: { events: true }` alcanzaba para el PTT. No alcanza: OpenTUI arma los flags `7` (disambiguate + alternate keys + event types) y, sin "report all keys as escape codes" (flag 8), las teclas que producen texto (Espacio incluido) se mandan como texto plano y la terminal **no avisa cuándo se sueltan** (docs del protocolo de Kitty). El PTT habría caído siempre en modo interruptor.
 - Ahora `src/ui/kitty.ts` pide `{ events: true, allKeysAsEscapes: true }` (flags 15). Probado con `parseKeypress`: Enter, Backspace, Esc, Tab, flechas, Ctrl-letra, `ñ`/`Ñ`, Shift+letras (`D`, `M`, `G`, `R`) y `?`/`+` se siguen decodificando bien, y Espacio trae press/repeat/release.
 - Falta la confirmación de Gon en Ghostty (E4b Task 6, punto 3).
+
+## Mouse (2026-11-07)
+
+- OpenTUI 0.8.2 entrega `onMouseDown`, `onMouseOver`, `onMouseOut` y `onMouseScroll` en `<box>` y `<text>`; los `<span>` dentro de un `<text>` **no** reciben eventos, así que cada botón es su propio `<text>` (`src/ui/components/Button.tsx`) y hace `stopPropagation()` para no disparar la fila de atrás.
+- La barra de acciones de un mensaje aparece solo en el mensaje **seleccionado** (click o j/k), no en el que tiene el mouse encima: mostrarla al pasar el mouse cambia el alto del mensaje, corre todo lo de abajo y el mouse queda sobre otro mensaje (parpadeo). El hover solo resalta el fondo.
+- Los links dentro del texto de un mensaje son hipervínculos OSC 8 (en Ghostty se abren con Ctrl+click o el click que tengas configurado). Adjuntos y títulos de embeds sí se abren con click normal vía `xdg-open` (`src/proc/open-url.ts`, solo https, sin shell).
+- La rueda arriba de todo de un canal pide historial (`actions.loadOlder`).

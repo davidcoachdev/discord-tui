@@ -1,15 +1,21 @@
 # Pruebas de Gon con la cuenta real
 
-Todo lo que el agente pudo probar sin tu cuenta ya está cubierto por `bun test` (387+ tests, incluido un
+Todo lo que el agente pudo probar sin tu cuenta ya está cubierto por `bun test` (415+ tests, incluido un
 servidor de voz falso local). Lo que queda acá necesita tu cuenta, tus ojos o tus oídos. Hacelo en Ghostty, sin
 tmux. Si algo falla, pasale al agente qué viste y las últimas líneas de `~/.local/state/discord-tui/discord-tui.log`
 (el log ya sale redactado; corré `bun run leak-check` antes de pasarlo).
 
 Antes de empezar: `cd ~/projects/discord-tui && git pull && bun install`.
 
+Todo se maneja con el mouse o con el teclado, lo que prefieras. No hace falta ningún id ni script aparte:
+lo único que corrés es `bun run dev` (o `bun run demo` para mirar sin conectarte).
+
 ## 0. Mirar la UI sin conectarte (2 min)
 
 - [ ] `bun run demo` → se ven servidores, canales con categorías, mensajes con colores, miembros a la derecha.
+- [ ] Con el mouse: click en un servidor, en un canal de texto (lo abre), en una categoría (se pliega), en `🔊 Sala 1` (entrás a la voz simulada). Abajo aparecen los botones `🎙 mic`, `🎧 audio`, `🎚 VAD` y `✕ salir`: probalos.
+- [ ] Click en un mensaje → aparece `↩ responder · ✎ editar · 🗑 borrar · 😀 reaccionar` (editar y borrar solo en los tuyos). Click en una reacción la pone o la saca. Click en un miembro de la derecha lo menciona en el composer.
+- [ ] Abajo a la derecha: `⌕ Ctrl-k saltar`, `⚙ settings`, `? ayuda`. Click afuera de un cartel lo cierra.
 - [ ] `?` abre la ayuda; `Esc` la cierra. `Ctrl-k`, escribí `mem`, Enter → abre `#memes`.
 - [ ] `h` hasta la lista de canales, bajá con `j` hasta `🔊 Sala 1`, `v` → abajo aparece la barra de voz verde (es simulada). `m`, `D`, `M` cambian los indicadores. `v` sale. `q` sale de la demo.
 
@@ -40,13 +46,12 @@ Antes de empezar: `cd ~/projects/discord-tui && git pull && bun install`.
 
 Con auriculares y el teléfono mirando el canal de voz **sin entrar** (el teléfono no puede estar en voz con la misma cuenta).
 
-- [ ] Spike primero: `bun run voice-spike <id del servidor> <id del canal de voz>` (ids con "Copiar ID" en modo desarrollador). Tiene que decir `voz: connected` en menos de 15 s, quedarse 60 s y terminar con `SPIKE OK`. En el teléfono te ves en el canal con el mic tachado. **Pasale al agente toda la salida** (no tiene datos sensibles). Si dice `4017` o no llega a `connected`, frená y avisale: hay plan B.
-- [ ] En la app: elegí el canal 🔊 en la lista y `v` (o Enter) → abajo: `🔊 canal · servidor · 🔒 E2EE <código> · VAD · ○ vos`. En el teléfono aparecés en el canal.
+- [ ] `bun run dev`, click en un canal 🔊 de tu servidor de prueba (o el botón grande `🔊 Entrar a voz`, o `v`). En menos de 15 s la barra de abajo dice `🔊 canal · servidor · 🔒 E2EE <código> · VAD · ○ vos`, sin `conectando…` ni error. En el teléfono aparecés en el canal. Si sale `✗ voz: Discord exige cifrado E2EE (DAVE)…` (código 4017) o se queda conectando, frená y pasale al agente esa línea y el final del log: hay plan B.
 - [ ] Hablá → `● vos` se prende (y tu nombre en verde debajo del canal); en el teléfono el anillo verde. Callado, se apaga.
 - [ ] `M` → `PTT`. Mantené `Espacio` y hablá → prende; soltá → se apaga al toque. Si aparece un aviso amarillo de "interruptor", contáselo al agente.
-- [ ] `m` → mic tachado en el teléfono. `D` → auriculares tachados; `D` otra vez → vuelve el mute que tenías.
-- [ ] Con el canal seleccionado en la lista, `j` baja por los participantes; `+`/`-` cambia el volumen de esa persona (se ve `80%` al lado del nombre, se guarda).
-- [ ] `v` → salís; en el teléfono ya no estás. Entrá de nuevo y salí con `q` → también te libera del canal.
+- [ ] `🎙 mic` (o `m`) → mic tachado en el teléfono. `🎧 audio` (o `D`) → auriculares tachados; otra vez → vuelve el mute que tenías.
+- [ ] Click en una persona dentro del canal → aparece `vol − 100 % +`; `−`/`+` cambian su volumen (también con `j` y `+`/`-` desde el teclado). Se guarda.
+- [ ] `✕ salir` (o `v`) → salís; en el teléfono ya no estás. Entrá de nuevo y salí con `q` → también te libera del canal.
 - [ ] `bun run leak-check` → `OK`.
 
 ## 4. Voz con otra persona (E4c) [2ª]
@@ -56,9 +61,9 @@ Con auriculares y el teléfono mirando el canal de voz **sin entrar** (el teléf
 - [ ] 10 minutos de charla (o música de un lado): sin cortes ni voz robótica sostenida.
 - [ ] `D` → dejás de escuchar y la otra persona te ve ensordecido; `D` otra vez → vuelve.
 - [ ] Si el cliente oficial muestra código: coincide con el `🔒` de la barra.
-- [ ] Salí con `v`; pasale al agente las líneas `voice.stats` del log.
+- [ ] Salí con `✕ salir`; pasale al agente las líneas `voice.stats` del log.
 
 ## 5. Settings y día de uso (E5)
 
-- [ ] `gs` → elegir micrófono y salida, mover la sensibilidad mirando el medidor, "probar mic" (eco), tema claro/oscuro, imágenes sí/no.
+- [ ] `⚙ settings` (o `gs`) → elegir micrófono y salida con `◀ ▶`, mover la sensibilidad mirando el medidor, "probar mic" (eco), tema claro/oscuro, imágenes sí/no.
 - [ ] Un día de laburo usando solo discord-tui; anotá todo lo que te hizo abrir la app oficial o te molestó y pasáselo al agente.
