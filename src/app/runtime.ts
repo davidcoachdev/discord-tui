@@ -6,6 +6,8 @@ import { createHttp } from "../rest/http";
 import { createRestClient } from "../rest/client";
 import { log } from "../log/logger";
 import { notify, notificationTitle, shouldNotify } from "../notify/notify";
+import { attachSettingsPersistence } from "../settings/persist";
+import type { Settings } from "../settings/settings";
 import { selectMessages } from "../store/selectors";
 import { createStore, type Store } from "../store/store";
 
@@ -18,6 +20,8 @@ export interface RuntimeDeps {
   fetch?: typeof fetch;
   setTimer?: typeof setTimeout;
   random?: () => number;
+  initialSettings?: Settings;
+  settingsPath?: string;
 }
 
 export interface Runtime {
@@ -46,6 +50,9 @@ export function createRuntime(deps: RuntimeDeps): Runtime {
     random: deps.random,
   });
   const actions = createActions({ store, rest, gateway });
+
+  if (deps.initialSettings) store.dispatch({ type: "settings/loaded", settings: deps.initialSettings });
+  const detachSettings = attachSettingsPersistence(store, { path: deps.settingsPath });
 
   store.dispatch({ type: "connection", status: gateway.status });
   gateway.on("status", (status) => store.dispatch({ type: "connection", status }));
@@ -100,6 +107,7 @@ export function createRuntime(deps: RuntimeDeps): Runtime {
       gateway.connect();
     },
     stop(): void {
+      detachSettings();
       gateway.close();
     },
     onUnauthorized(fn: () => void): () => void {

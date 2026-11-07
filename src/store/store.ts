@@ -1,5 +1,6 @@
 import type { Action, AppState } from "./types";
 import { reduce } from "./reduce";
+import { DEFAULT_SETTINGS } from "../settings/settings";
 
 export interface Store {
   getState(): AppState;
@@ -24,6 +25,7 @@ export function emptyState(): AppState {
     typing: {},
     outbox: {},
     ui: { selectedGuildId: null, selectedChannelId: null, focus: "guilds", membersVisible: true },
+    settings: { ...DEFAULT_SETTINGS },
   };
 }
 

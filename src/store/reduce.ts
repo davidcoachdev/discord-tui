@@ -15,6 +15,7 @@ import {
   applyOutboxRetry,
   applyOutboxSent,
 } from "./reducers/outbox";
+import { applySettingsLoaded, applySettingsPatch } from "./reducers/settings";
 import { compareSnowflakes } from "../util/snowflake";
 
 export function reduce(state: AppState, action: Action): AppState {
@@ -86,6 +87,10 @@ export function reduce(state: AppState, action: Action): AppState {
       return applyOutboxFailed(state, action.nonce, action.error);
     case "outbox/retry":
       return applyOutboxRetry(state, action.nonce);
+    case "settings/set":
+      return applySettingsPatch(state, action.patch);
+    case "settings/loaded":
+      return applySettingsLoaded(state, action.settings);
     default:
       return state;
   }

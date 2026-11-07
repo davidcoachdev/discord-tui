@@ -11,6 +11,7 @@ import { fetchBuildNumber } from "./client-props/build-number";
 import { createClientProps } from "./client-props/props";
 import { CaptchaRequiredError, UnauthorizedError } from "./rest/errors";
 import { createHttp } from "./rest/http";
+import { loadSettings, type Settings } from "./settings/settings";
 import type { Secret } from "./secret";
 import { App } from "./ui/App";
 import { LoginScreen } from "./ui/screens/LoginScreen";
@@ -19,7 +20,7 @@ export function assertTty(stream: { isTTY?: boolean }): string | null {
   return stream.isTTY ? null : "discord-tui necesita una terminal";
 }
 
-function LoginRoot(props: { buildNumber: number; onQuit: () => void }): JSX.Element {
+function LoginRoot(props: { buildNumber: number; settings: Settings; onQuit: () => void }): JSX.Element {
   const clientProps = createClientProps({ buildNumber: props.buildNumber });
   const auth = createRemoteAuth({ http: createHttp({ props: clientProps }) });
   const [runtime, setRuntime] = createSignal<Runtime | null>(null);
@@ -29,7 +30,12 @@ function LoginRoot(props: { buildNumber: number; onQuit: () => void }): JSX.Elem
     const session: Session = { token, userId, buildNumber: props.buildNumber };
     await saveSession(session);
 
-    const next = createRuntime({ session, me: { id: userId, username }, props: clientProps });
+    const next = createRuntime({
+      session,
+      me: { id: userId, username },
+      props: clientProps,
+      initialSettings: props.settings,
+    });
     next.onUnauthorized(() => {
       next.stop();
       setRuntime(null);
@@ -84,6 +90,7 @@ async function main(): Promise<void> {
   }
 
   const { value: buildNumber } = await fetchBuildNumber({ fetch });
+  const settings = await loadSettings();
   const result = await boot(process.argv.slice(2), {
     loadSession,
     deleteSession,
@@ -107,13 +114,13 @@ async function main(): Promise<void> {
   };
 
   if (result.kind === "login") {
-    await render(() => <LoginRoot buildNumber={buildNumber} onQuit={quit} />, renderer);
+    await render(() => <LoginRoot buildNumber={buildNumber} settings={settings} onQuit={quit} />, renderer);
     return;
   }
 
   const session = result.session;
   const me = result.kind === "main" ? result.me : { id: session.userId, username: "" };
-  const runtime = createRuntime({ session, me, props: createClientProps({ buildNumber }) });
+  const runtime = createRuntime({ session, me, props: createClientProps({ buildNumber }), initialSettings: settings });
   runtime.start();
   await render(() => <App store={runtime.store} actions={runtime.actions} onQuit={quit} />, renderer);
 }

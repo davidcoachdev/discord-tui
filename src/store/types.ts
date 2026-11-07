@@ -1,6 +1,7 @@
 import type { APIAttachment, APIEmbed, APIMessage } from "discord-api-types/v9";
 
 import type { GatewayStatus } from "../gateway/connection";
+import type { Settings } from "../settings/settings";
 
 export type ApiMessage = APIMessage;
 export type ApiAttachment = APIAttachment;
@@ -130,6 +131,7 @@ export interface AppState {
     focus: Focus;
     membersVisible: boolean;
   };
+  settings: Settings;
 }
 
 export type Action =
@@ -145,4 +147,6 @@ export type Action =
   | { type: "outbox/enqueue"; item: OutboxItem }
   | { type: "outbox/sent"; nonce: string; messageId: string }
   | { type: "outbox/failed"; nonce: string; error: string }
-  | { type: "outbox/retry"; nonce: string };
+  | { type: "outbox/retry"; nonce: string }
+  | { type: "settings/set"; patch: Partial<Settings> }
+  | { type: "settings/loaded"; settings: Settings };

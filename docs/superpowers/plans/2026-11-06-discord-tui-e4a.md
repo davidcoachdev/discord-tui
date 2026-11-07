@@ -36,15 +36,15 @@
 - Create: `scripts/spike-voice-deps.ts`, `scripts/spike-dave-local.ts`, `tests/fixtures/davey/` (vectores de prueba copiados de `davey-node/test/session.test.ts` de https://github.com/Snazzah/davey, MIT, con la licencia al lado)
 - Modify: `docs/protocol-notes.md` (sección "Voz: dependencias y DAVE local")
 
-- [ ] **Step 1:** `bun add --exact @discordjs/voice@0.19.2 @discordjs/opus@0.11.0 opusscript@0.1.1 @snazzah/davey@0.1.12`. Run: `bun pm ls --all | grep -c "@snazzah/davey@"` · Expected: `1` (una sola copia, 0.1.12).
-- [ ] **Step 2:** `scripts/spike-voice-deps.ts` imprime `generateDependencyReport()` de `@discordjs/voice`. Run: `bun scripts/spike-voice-deps.ts`. **Pass:** el reporte lista `@discordjs/opus`, `@snazzah/davey` y `aes-256-gcm` como presentes. **Fail:** si falta opus nativo, se sigue con `opusscript` y se anota; si falta davey, frenar y avisar a Gon.
-- [ ] **Step 3:** `scripts/spike-dave-local.ts`. Lo que verificamos al escribir este plan: davey **no exporta** un "external sender" (el rol del servidor en MLS); sus tests usan vectores fijos (`EXTERNAL_SENDER`, `APPENDING_PROPOSALS`). Probar en este orden y parar en el primero que pase:
+- [x] **Step 1:** `bun add --exact @discordjs/voice@0.19.2 @discordjs/opus@0.11.0 opusscript@0.1.1 @snazzah/davey@0.1.12`. Run: `bun pm ls --all | grep -c "@snazzah/davey@"` · Expected: `1` (una sola copia, 0.1.12).
+- [x] **Step 2:** `scripts/spike-voice-deps.ts` imprime `generateDependencyReport()` de `@discordjs/voice`. Run: `bun scripts/spike-voice-deps.ts`. **Pass:** el reporte lista `@discordjs/opus`, `@snazzah/davey` y `aes-256-gcm` como presentes. **Fail:** si falta opus nativo, se sigue con `opusscript` y se anota; si falta davey, frenar y avisar a Gon.
+- [x] **Step 3:** `scripts/spike-dave-local.ts`. Lo que verificamos al escribir este plan: davey **no exporta** un "external sender" (el rol del servidor en MLS); sus tests usan vectores fijos (`EXTERNAL_SENDER`, `APPENDING_PROPOSALS`). Probar en este orden y parar en el primero que pase:
   - **(a) dos sesiones:** A y B con `setExternalSender(EXTERNAL_SENDER)`; A procesa `APPENDING_PROPOSALS` → `{ commit, welcome }`; A `processCommit(commit)`; B `processWelcome(welcome)`. **Pass:** `A.ready && B.ready`, `A.voicePrivacyCode === B.voicePrivacyCode` y `B.decrypt(A.userId, MediaType.AUDIO, A.encryptOpus(opus))` devuelve el Opus original.
   - **(b) una sesión:** A llega a `ready` con su propio commit y `A.voicePrivacyCode !== ""`.
   - **(c) solo API:** `getSerializedKeyPackage()` devuelve bytes distintos en cada llamada, `setPassthroughMode(true)` deja pasar Opus sin cifrar, y `encryptOpus` antes de `ready` no corrompe el frame.
   Run: `bun scripts/spike-dave-local.ts` · Expected: imprime `DAVE local: a`, `b` o `c`.
-- [ ] **Step 4: Fallback (decisión nuestra, anotada en `docs/protocol-notes.md`):** si sale (b) o (c), el handshake MLS de dos sesiones que pide la spec 9/E4a no se puede hacer sin servidor con la API pública de davey 0.1.12; se prueba en local lo que salió, y el handshake real queda verificado en E4b (DAVE activo, sin 4017) y E4c (`voicePrivacyCode` igual al del otro cliente).
-- [ ] **Step 5:** commit `chore(e4a): voice deps and DAVE local spike` + push.
+- [x] **Step 4: Fallback (decisión nuestra, anotada en `docs/protocol-notes.md`):** si sale (b) o (c), el handshake MLS de dos sesiones que pide la spec 9/E4a no se puede hacer sin servidor con la API pública de davey 0.1.12; se prueba en local lo que salió, y el handshake real queda verificado en E4b (DAVE activo, sin 4017) y E4c (`voicePrivacyCode` igual al del otro cliente).
+- [x] **Step 5:** commit `chore(e4a): voice deps and DAVE local spike` + push.
 
 ---
 
@@ -62,7 +62,7 @@
   - `createFramer(frameBytes?: number): { push(chunk: Uint8Array): Uint8Array[]; pending(): number }`.
   - `createOpusCodec(opts?: { prefer?: "native" | "wasm" }): { encode(pcm: Uint8Array): Uint8Array; decode(opus: Uint8Array): Uint8Array; backend: "native" | "wasm" }` (cae a `opusscript` si `@discordjs/opus` no carga).
 
-- [ ] **Step 1: Tests**
+- [x] **Step 1: Tests**
 
 ```ts
 test("framer emits exact 3840-byte frames and keeps the remainder", () => {
@@ -81,8 +81,8 @@ test.each(["native", "wasm"] as const)("opus %s round-trips a 440 Hz sine with t
 test("encode+decode p99 under 5 ms per frame", () => {});
 ```
 
-- [ ] **Step 2–4:** FAIL → implementar → `bun test tests/voice` PASS.
-- [ ] **Step 5:** commit `feat(e4a): pcm framer and opus codec` + push.
+- [x] **Step 2–4:** FAIL → implementar → `bun test tests/voice` PASS.
+- [x] **Step 5:** commit `feat(e4a): pcm framer and opus codec` + push.
 
 ---
 
@@ -99,7 +99,7 @@ test("encode+decode p99 under 5 ms per frame", () => {});
   - `startPlayback(opts?: { target?: string; spawn?: typeof spawnClean }): Promise<AudioPlayback>` con `write(pcm: Uint8Array): void` (si stdin está lleno, descarta el frame más viejo en vez de acumular), `stop(): Promise<void>`.
   - `class AudioDeviceError extends Error` con mensaje `no pude abrir el micrófono (pw-record: <motivo>)` o `no pude abrir la salida de audio (pw-cat: <motivo>)`.
 
-- [ ] **Step 1: Tests** (con un `spawn` falso que emite bytes y registra stdin)
+- [x] **Step 1: Tests** (con un `spawn` falso que emite bytes y registra stdin)
 
 ```ts
 test("capture spawns pw-record with the exact args and clean env", async () => {
@@ -111,8 +111,8 @@ test("process that exits immediately rejects with AudioDeviceError", async () =>
 test("stop kills the process and resolves", async () => { expect(fake.killed).toBe(true); });
 ```
 
-- [ ] **Step 2–4:** FAIL → implementar → PASS.
-- [ ] **Step 5:** commit `feat(e4a): pipewire capture and playback` + push.
+- [x] **Step 2–4:** FAIL → implementar → PASS.
+- [x] **Step 5:** commit `feat(e4a): pipewire capture and playback` + push.
 
 ---
 
@@ -127,7 +127,7 @@ test("stop kills the process and resolves", async () => { expect(fake.killed).to
   - `rmsDbfs(pcm: Uint8Array): number` (s16le interleaved; silencio absoluto → `-96`).
   - `createVad(opts?: { sensitivity?: "auto" | number; openFrames?: number; hangoverMs?: number; marginDb?: number }): { push(pcm: Uint8Array): "open" | "close" | null; isOpen: boolean; thresholdDb: number; levelDb: number }`. Defaults: `openFrames 2`, `hangoverMs 300`, **[nuestra]** `marginDb 12`; en `auto` el piso es el percentil 10 de los últimos 3 s de frames con el VAD cerrado, y el umbral = piso + margen, acotado entre **-60** y **-20** dBFS; arranca en -45 hasta juntar 1 s.
 
-- [ ] **Step 1: Tests**
+- [x] **Step 1: Tests**
 
 ```ts
 test("rmsDbfs", () => {
@@ -147,8 +147,8 @@ test("auto threshold follows a -50 dBFS noise floor: -45 does not open, -30 open
 test("threshold is clamped to [-60, -20]", () => {});
 ```
 
-- [ ] **Step 2–4:** FAIL → implementar → PASS.
-- [ ] **Step 5:** commit `feat(e4a): level meter and energy VAD` + push.
+- [x] **Step 2–4:** FAIL → implementar → PASS.
+- [x] **Step 5:** commit `feat(e4a): level meter and energy VAD` + push.
 
 ---
 
@@ -165,7 +165,7 @@ test("threshold is clamped to [-60, -20]", () => {});
   - `LevelMeter(props: { levelDb: number; thresholdDb: number; open: boolean; width: number })`: barra de -60 a 0 dBFS, línea `|` en el umbral, `● hablando` cuando `open`.
   - Script: `"mic-test": "bun scripts/mic-test.tsx"`; teclas `g` alterna `vad`/`always`, `+`/`-` mueven la sensibilidad manual de a 3 dB, `a` vuelve a `auto`, `q` sale.
 
-- [ ] **Step 1: Tests**
+- [x] **Step 1: Tests**
 
 ```ts
 test("echo pipes captured frames through opus into playback", async () => { expect(playback.frames).toHaveLength(captured.length); });
@@ -176,8 +176,8 @@ test("p99 processing per frame is under 5 ms", async () => {});
 test("meter draws the threshold marker and the speaking dot", async () => {});
 ```
 
-- [ ] **Step 2–4:** FAIL → implementar → PASS. Además, el agente corre `timeout 5 bun scripts/mic-test.tsx < /dev/null; echo exit=$?` y pega la salida (Expected: sin stack trace; `pw-record` es local y no toca la cuenta).
-- [ ] **Step 5:** commit `feat(e4a): mic echo test with level meter` + push.
+- [x] **Step 2–4:** FAIL → implementar → PASS. Además, el agente corre `timeout 5 bun scripts/mic-test.tsx < /dev/null; echo exit=$?` y pega la salida (Expected: sin stack trace; `pw-record` es local y no toca la cuenta).
+- [x] **Step 5:** commit `feat(e4a): mic echo test with level meter` + push.
 
 ---
 
@@ -194,7 +194,7 @@ test("meter draws the threshold marker and the speaking dot", async () => {});
   - `encryptRtpsize(header: Uint8Array, opus: Uint8Array, key: Uint8Array, counter: number): Uint8Array` → `header | ciphertext | tag(16) | counter(4, BE)`; nonce AES-GCM de 12 bytes = counter BE en los primeros 4 y ceros; AAD = header (+ CSRC + preámbulo de extensión si hay).
   - `decryptRtpsize(packet: Uint8Array, key: Uint8Array): Uint8Array | null` (si hay extensión, saca el cuerpo de la extensión del plaintext usando la longitud del preámbulo).
 
-- [ ] **Step 1: Tests**
+- [x] **Step 1: Tests**
 
 ```ts
 test("rtp header bytes", () => {
@@ -213,8 +213,8 @@ test("50 packets over a 127.0.0.1 UDP loopback arrive decrypted and in order", a
 });
 ```
 
-- [ ] **Step 2–4:** FAIL → implementar → PASS.
-- [ ] **Step 5:** commit `feat(e4a): rtp, ip discovery and rtpsize crypto with udp loopback` + push.
+- [x] **Step 2–4:** FAIL → implementar → PASS.
+- [x] **Step 5:** commit `feat(e4a): rtp, ip discovery and rtpsize crypto with udp loopback` + push.
 
 ---
 
@@ -226,9 +226,9 @@ test("50 packets over a 127.0.0.1 UDP loopback arrive decrypted and in order", a
 **Interfaces:**
 - Consumes: el resultado de Task 1 (`a`, `b` o `c`) y los vectores de `tests/fixtures/davey/`.
 
-- [ ] **Step 1:** convertir el camino que pasó en Task 1 en tests de `bun test` (los asserts de (a), (b) o (c) tal cual están en Task 1, Step 3), más: `new DAVESession(DAVE_PROTOCOL_VERSION + 1, …)` tira (igual que el test de davey "throws on invalid protocol version"), y `DAVE_PROTOCOL_VERSION >= 1` (con 0, Discord cierra con 4017, spec 6.6).
-- [ ] **Step 2:** Run `bun test tests/voice/dave-local.test.ts` · Expected: PASS.
-- [ ] **Step 3:** commit `test(e4a): local DAVE checks` + push.
+- [x] **Step 1:** convertir el camino que pasó en Task 1 en tests de `bun test` (los asserts de (a), (b) o (c) tal cual están en Task 1, Step 3), más: `new DAVESession(DAVE_PROTOCOL_VERSION + 1, …)` tira (igual que el test de davey "throws on invalid protocol version"), y `DAVE_PROTOCOL_VERSION >= 1` (con 0, Discord cierra con 4017, spec 6.6).
+- [x] **Step 2:** Run `bun test tests/voice/dave-local.test.ts` · Expected: PASS.
+- [x] **Step 3:** commit `test(e4a): local DAVE checks` + push.
 
 ---
 
