@@ -10,7 +10,8 @@
     "dev": "bun run src/main.tsx",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
-    "leak-check": "bun scripts/leak-check.ts"
+    "leak-check": "bun scripts/leak-check.ts",
+    "mic-test": "bun scripts/mic-test.tsx"
   },
   "dependencies": {
     "@discordjs/opus": "0.11.0",
