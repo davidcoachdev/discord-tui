@@ -9,6 +9,7 @@ import { ChannelList } from "./components/ChannelList";
 import { GuildList } from "./components/GuildList";
 import { MessageView } from "./components/MessageView";
 import { StatusBar } from "./components/StatusBar";
+import { COMMON_EMOJI } from "../emoji/common";
 import { validateOutgoing } from "./composer-state";
 
 function isOpenable(kind: string): boolean {
@@ -24,6 +25,8 @@ export function App(props: { store: Store; actions: Actions; onQuit: () => void 
   const [selectedId, setSelectedId] = createSignal<string | null>(null);
   const [drafts, setDrafts] = createSignal<Record<string, string>>({});
   const [lastD, setLastD] = createSignal(0);
+  const [pickerOpen, setPickerOpen] = createSignal(false);
+  const [pickerQuery, setPickerQuery] = createSignal("");
 
   const channelId = (): string | null => props.store.getState().ui.selectedChannelId;
   const currentText = (): string => {
@@ -160,7 +163,45 @@ export function App(props: { store: Store; actions: Actions; onQuit: () => void 
     setLastD(now);
   }
 
+  function pickerMatches() {
+    const query = pickerQuery().toLowerCase();
+    return COMMON_EMOJI.filter((emoji) => emoji.name.includes(query) || emoji.char === pickerQuery());
+  }
+
+  function togglePickedReaction(): void {
+    const id = channelId();
+    if (id === null || selectedId() === null) {
+      setHint("seleccioná un mensaje");
+      return;
+    }
+    const match = pickerMatches()[0];
+    if (match) void props.actions.toggleReaction(id, selectedId()!, { id: null, name: match.char });
+    setPickerOpen(false);
+    setPickerQuery("");
+  }
+
   useKeyboard((key) => {
+    if (pickerOpen()) {
+      if (key.name === "escape") {
+        setPickerOpen(false);
+        setPickerQuery("");
+        return;
+      }
+      if (key.name === "return") {
+        togglePickedReaction();
+        return;
+      }
+      if (key.name === "backspace") {
+        setPickerQuery((previous) => previous.slice(0, -1));
+        return;
+      }
+      if (!key.ctrl && !key.meta && key.sequence.length === 1) {
+        setPickerQuery((previous) => previous + key.sequence);
+        return;
+      }
+      return;
+    }
+
     if (confirmDelete() !== null) {
       if (key.name === "y") {
         const id = channelId();
@@ -243,6 +284,10 @@ export function App(props: { store: Store; actions: Actions; onQuit: () => void 
       case "R":
         retryFirstFailed();
         return;
+      case "+":
+        setPickerOpen(true);
+        setPickerQuery("");
+        return;
       default:
         return;
     }
@@ -273,6 +318,14 @@ export function App(props: { store: Store; actions: Actions; onQuit: () => void 
       <Show when={replyTo() !== null || editing() !== null}>
         <box height={1} width="100%" paddingLeft={1}>
           <text>{editing() !== null ? "editando · Esc cancela" : "respondiendo · Esc cancela"}</text>
+        </box>
+      </Show>
+      <Show when={pickerOpen()}>
+        <box height={1} width="100%" paddingLeft={1}>
+          <text>{`+ ${pickerQuery() || ""}  ${pickerMatches()
+            .slice(0, 6)
+            .map((emoji) => `${emoji.char} ${emoji.name}`)
+            .join("  ")}`}</text>
         </box>
       </Show>
       <Show when={hint() !== null}>

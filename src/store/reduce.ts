@@ -8,6 +8,7 @@ import {
   applyPage,
 } from "./reducers/messages";
 import { applyChannelUnreadUpdate, applyMessageAck } from "./reducers/read-state";
+import { applyReaction } from "./reducers/reactions";
 import {
   applyOutboxEnqueue,
   applyOutboxFailed,
@@ -43,6 +44,11 @@ export function reduce(state: AppState, action: Action): AppState {
           return applyMessageAck(state, action.d);
         case "CHANNEL_UNREAD_UPDATE":
           return applyChannelUnreadUpdate(state, action.d);
+        case "MESSAGE_REACTION_ADD":
+        case "MESSAGE_REACTION_REMOVE":
+        case "MESSAGE_REACTION_REMOVE_ALL":
+        case "MESSAGE_REACTION_REMOVE_EMOJI":
+          return applyReaction(state, action.t, action.d);
         default:
           return state;
       }

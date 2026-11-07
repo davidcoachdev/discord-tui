@@ -54,6 +54,7 @@ function setup() {
     retry: async () => {},
     edit: async () => {},
     remove: async () => {},
+    toggleReaction: async () => {},
   };
   return { store, actions, calls };
 }

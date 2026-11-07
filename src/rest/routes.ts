@@ -48,3 +48,23 @@ export async function patchMessage(
 export async function deleteMessage(rest: RestClient, channelId: string, messageId: string): Promise<void> {
   await rest.request("DELETE", `/channels/${channelId}/messages/${messageId}`);
 }
+
+export async function putReaction(
+  rest: RestClient,
+  channelId: string,
+  messageId: string,
+  emoji: { id: string | null; name: string },
+): Promise<void> {
+  const path = encodeURIComponent(emoji.id !== null ? `${emoji.name}:${emoji.id}` : emoji.name);
+  await rest.request("PUT", `/channels/${channelId}/messages/${messageId}/reactions/${path}/@me`);
+}
+
+export async function deleteOwnReaction(
+  rest: RestClient,
+  channelId: string,
+  messageId: string,
+  emoji: { id: string | null; name: string },
+): Promise<void> {
+  const path = encodeURIComponent(emoji.id !== null ? `${emoji.name}:${emoji.id}` : emoji.name);
+  await rest.request("DELETE", `/channels/${channelId}/messages/${messageId}/reactions/${path}/@me`);
+}

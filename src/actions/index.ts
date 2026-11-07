@@ -2,6 +2,7 @@ import type { Gateway } from "../gateway/connection";
 import type { RestClient } from "../rest/client";
 import { getMessages } from "../rest/routes";
 import { createEditActions } from "./edit";
+import { createReactActions } from "./react";
 import { createSendActions } from "./send";
 import { selectChannelList } from "../store/selectors";
 import type { Store } from "../store/store";
@@ -17,6 +18,7 @@ export interface Actions {
   retry(nonce: string): Promise<void>;
   edit(channelId: string, messageId: string, content: string): Promise<void>;
   remove(channelId: string, messageId: string): Promise<void>;
+  toggleReaction(channelId: string, messageId: string, emoji: { id: string | null; name: string }): Promise<void>;
 }
 
 export interface ActionsDeps {
@@ -52,6 +54,7 @@ export function createActions(deps: ActionsDeps): Actions {
 
   const sendActions = createSendActions({ store: deps.store, rest: deps.rest });
   const editActions = createEditActions({ rest: deps.rest });
+  const reactActions = createReactActions({ store: deps.store, rest: deps.rest });
 
   return {
     selectGuild(id: string | "@dms"): void {
@@ -73,5 +76,6 @@ export function createActions(deps: ActionsDeps): Actions {
     retry: sendActions.retry,
     edit: editActions.edit,
     remove: editActions.remove,
+    toggleReaction: reactActions.toggleReaction,
   };
 }

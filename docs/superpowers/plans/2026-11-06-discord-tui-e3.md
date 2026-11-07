@@ -224,7 +224,7 @@ $ tsc --noEmit   # sin salida, código 0
   - Reducer de `MESSAGE_REACTION_ADD`, `MESSAGE_REACTION_REMOVE`, `MESSAGE_REACTION_REMOVE_ALL`, `MESSAGE_REACTION_REMOVE_EMOJI` (con `me` cuando `user_id` es el propio).
   - Picker: lista filtrable (fuzzy) con los emojis custom del guild primero y después `COMMON_EMOJI`.
 
-- [ ] **Step 1: Tests**
+- [x] **Step 1: Tests**
 
 ```ts
 test("reactionPath", () => {
@@ -235,8 +235,25 @@ test("toggle sends PUT first time and DELETE when me is true", async () => {});
 test("reaction add/remove update count and me", () => {});
 ```
 
-- [ ] **Step 2–4:** FAIL → implementar → PASS.
-- [ ] **Step 5:** commit `feat(e3): reactions` + push.
+- [x] **Step 2–4:** FAIL → implementar → PASS.
+
+```text
+$ bun test tests/actions/react.test.ts tests/store/reactions.test.ts
+ 3 pass
+ 0 fail
+ 8 expect() calls
+Ran 3 tests across 2 files. [127.00ms]
+
+$ bun test && bun run typecheck
+ 159 pass
+ 0 fail
+ 327 expect() calls
+Ran 159 tests across 36 files. [4.69s]
+$ tsc --noEmit   # sin salida, código 0
+```
+
+`+` abre un picker mínimo con `COMMON_EMOJI` (60 emojis), escribe para filtrar, Enter alterna la reacción sobre el mensaje seleccionado. Los emojis custom del guild y el fuzzy fino quedan para después.
+- [x] **Step 5:** commit `feat(e3): reactions` + push.
 
 ---
 
