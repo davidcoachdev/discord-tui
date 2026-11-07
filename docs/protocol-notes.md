@@ -54,6 +54,7 @@ Datos que el agente resuelve y documenta mientras construye. Sin tokens ni ids r
 - **Desvío del plan:** el plan decía transmitir con `AudioPlayer` + `AudioResource` por ráfaga. Se usa `connection.playOpusPacket()` por cada frame capturado + `setSpeaking()`, porque el `AudioPlayer` corta Speaking si en un tick de 20 ms no hay frame (con mic en vivo pasa seguido). Los 5 silencios `F8 FF FE` los manda `voice/tx.ts` (davey no cifra los silencios).
 - **Gotchas de la librería:** arma `wss://${endpoint}?v=8` fijo; ante cualquier cierre que no sea 4014 hace rejoin sola, así que `voice/session.ts` escucha `networking.once("close")` y destruye la conexión en los códigos fatales (4014, 4016, 4017, 4004, 4011) o después de 3 rejoins. Los mensajes de debug pasan por `sanitizeVoiceDebug` (nada con `{`, `token`, `session_id` o `secret`).
 - Mensajes de cierre en español: `src/voice/close-codes.ts`.
+- Revisión (2026-11-07), arreglado con tests en `tests/voice/session-e2e.test.ts`: salir mientras la librería carga o mientras espera a Discord ya no deja una conexión viva; `rejoin()` para mute/deaf solo se usa con la conexión lista y el gateway listo (si no, los flags se mandan al quedar lista); 4014 espera 5 s por si es un "te movieron" antes de rendirse; si la voz se cae con el gateway principal caído, reintenta cuando vuelve (`gatewayReady`); `v`/`m`/`D`/`M` ignoran la autorepetición de teclas.
 
 ## Código de privacidad
 

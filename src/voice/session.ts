@@ -22,6 +22,8 @@ export interface VoiceSession {
   onSpeaking(fn: (userId: string, on: boolean) => void): () => void;
   onOpus(fn: (userId: string, opus: Uint8Array) => void): () => void;
   privacyCode(): string | null;
+  /** El gateway principal volvió a estar listo: si la voz quedó colgada esperando, reintenta. */
+  gatewayReady?(): void;
 }
 
 /** Lo que usamos de `@discordjs/voice`; inyectable para los tests. */
@@ -55,7 +57,17 @@ export function createDjsVoiceSession(deps: {
   meId: () => string | null;
   lib?: VoiceLib;
   joinTimeoutMs?: number;
+  /** Si el gateway principal puede mandar op 4 ahora (si no, la librería destruye la conexión). */
+  canSignal?: () => boolean;
+  moveGraceMs?: number;
+  retryMs?: number;
 }): VoiceSession {
+  const canSignal = deps.canSignal ?? ((): boolean => true);
+  let generation = 0;
+  let wantedFlags: VoiceFlags | null = null;
+  let retries = 0;
+  let retryTimer: ReturnType<typeof setTimeout> | null = null;
+  let abortWait: (() => void) | null = null;
   const statusListeners = new Set<(status: VoiceStatus, error?: string) => void>();
   const speakingListeners = new Set<(userId: string, on: boolean) => void>();
   const opusListeners = new Set<(userId: string, opus: Uint8Array) => void>();
@@ -109,8 +121,28 @@ export function createDjsVoiceSession(deps: {
     });
   }
 
+  function clearRetry(): void {
+    if (retryTimer !== null) clearTimeout(retryTimer);
+    retryTimer = null;
+  }
+
+  /** Reintenta entrar mientras la conexión siga caída; sin gateway listo, espera a que vuelva. */
+  function scheduleRetry(conn: VoiceConnection): void {
+    clearRetry();
+    retryTimer = setTimeout(() => {
+      retryTimer = null;
+      if (connection !== conn || conn.state.status !== "disconnected") return;
+      if (retries >= MAX_REJOINS) return fail(conn, "se cortó la voz y no pude volver a entrar");
+      if (!canSignal()) return scheduleRetry(conn);
+      retries += 1;
+      conn.rejoin();
+      if (conn.state.status === "disconnected") scheduleRetry(conn);
+    }, deps.retryMs ?? 1_000);
+  }
+
   function watchNetworking(conn: VoiceConnection): void {
     let watched: unknown = null;
+    let moveTimer: ReturnType<typeof setTimeout> | null = null;
     conn.on("stateChange", (oldState: any, newState: any) => {
       if (connection !== conn) return;
       const networking = newState?.networking;
@@ -119,20 +151,37 @@ export function createDjsVoiceSession(deps: {
         networking.once("close", (code: number) => {
           if (connection !== conn) return;
           log.warn("voice.closed", { close_code: code });
-          if (isFatalVoiceClose(code)) fail(conn, closeCodeMessage(code));
+          // 4014 puede ser "te movieron de canal": lo resuelve el estado disconnected con un margen.
+          if (code !== 4014 && isFatalVoiceClose(code)) fail(conn, closeCodeMessage(code));
           else if (conn.rejoinAttempts > MAX_REJOINS) fail(conn, closeCodeMessage(code));
           else setStatus("reconnecting");
         });
       }
-      if (newState.status === "ready") setStatus("connected");
-      else if (newState.status === "disconnected" && oldState.status !== "disconnected") {
+      if (newState.status !== "disconnected" && moveTimer !== null) {
+        clearTimeout(moveTimer);
+        moveTimer = null;
+      }
+      if (newState.status === "ready") {
+        retries = 0;
+        clearRetry();
+        setStatus("connected");
+        const flags = wantedFlags;
+        if (flags && (flags.selfMute !== conn.joinConfig.selfMute || flags.selfDeaf !== conn.joinConfig.selfDeaf) && canSignal()) {
+          conn.rejoin({ ...conn.joinConfig, ...flags });
+        }
+      } else if (newState.status === "disconnected" && oldState.status !== "disconnected") {
         const code = typeof newState.closeCode === "number" ? newState.closeCode : null;
+        if (code === 4014) {
+          setStatus("reconnecting");
+          moveTimer = setTimeout(() => {
+            moveTimer = null;
+            if (connection === conn && conn.state.status === "disconnected") fail(conn, closeCodeMessage(4014));
+          }, deps.moveGraceMs ?? 5_000);
+          return;
+        }
         if (code !== null && isFatalVoiceClose(code)) return fail(conn, closeCodeMessage(code));
-        if (conn.rejoinAttempts >= MAX_REJOINS) return fail(conn, "se cortó la voz y no pude volver a entrar");
         setStatus("reconnecting");
-        setTimeout(() => {
-          if (connection === conn && conn.state.status === "disconnected") conn.rejoin();
-        }, 1_000);
+        scheduleRetry(conn);
       } else if (oldState.status === "ready" && (newState.status === "signalling" || newState.status === "connecting")) {
         setStatus("reconnecting");
       }
@@ -140,6 +189,10 @@ export function createDjsVoiceSession(deps: {
   }
 
   async function leave(): Promise<void> {
+    generation += 1;
+    clearRetry();
+    abortWait?.();
+    wantedFlags = null;
     const conn = connection;
     connection = null;
     if (conn) teardown(conn, true);
@@ -149,8 +202,13 @@ export function createDjsVoiceSession(deps: {
   return {
     async join(guildId, channelId, flags): Promise<void> {
       if (connection) await leave();
-      lib ??= await loadLib();
+      const mine = ++generation;
       setStatus("joining");
+      lib ??= await loadLib();
+      // Si mientras cargaba la librería se salió (o se pidió otro canal), no se entra.
+      if (mine !== generation) return;
+      wantedFlags = { ...flags };
+      retries = 0;
       const conn = lib.joinVoiceChannel({
         guildId,
         channelId,
@@ -186,7 +244,12 @@ export function createDjsVoiceSession(deps: {
           }
           resolve();
         }, timeoutMs);
+        abortWait = (): void => {
+          off();
+          resolve();
+        };
         const off = (): void => {
+          abortWait = null;
           clearTimeout(timer);
           conn.off("stateChange", onChange);
         };
@@ -201,9 +264,21 @@ export function createDjsVoiceSession(deps: {
     },
 
     setFlags(flags): void {
+      wantedFlags = { ...flags };
       const conn = connection;
       if (!conn) return;
+      // rejoin() fuera de "ready" deja la conexión en signalling para siempre, y sin gateway la destruye:
+      // en esos casos se guardan los flags y se mandan cuando vuelve a estar lista.
+      if (conn.state.status !== "ready" || !canSignal()) return;
       conn.rejoin({ ...conn.joinConfig, selfMute: flags.selfMute, selfDeaf: flags.selfDeaf });
+    },
+
+    gatewayReady(): void {
+      const conn = connection;
+      if (!conn || conn.state.status !== "disconnected") return;
+      if (retries >= MAX_REJOINS) return fail(conn, "se cortó la voz y no pude volver a entrar");
+      retries += 1;
+      conn.rejoin();
     },
 
     leave,

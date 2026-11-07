@@ -12,7 +12,7 @@ const GUILD = "100000000000000001";
 const CHANNEL = "100000000000000003";
 const ME = "100000000000000010";
 
-function fakeMainGateway(server: FakeVoiceServer) {
+function fakeMainGateway(server: FakeVoiceServer, opts: { serverUpdateDelayMs?: number; silent?: boolean } = {}) {
   const listeners = new Set<(t: string, d: any) => void>();
   const sent: { op: number; d: any }[] = [];
   return {
@@ -30,8 +30,10 @@ function fakeMainGateway(server: FakeVoiceServer) {
       queueMicrotask(() => {
         for (const fn of [...listeners]) {
           fn("VOICE_STATE_UPDATE", { guild_id: GUILD, channel_id: d.channel_id, user_id: ME, session_id: "fake-session", self_mute: d.self_mute, self_deaf: d.self_deaf });
-          if (d.channel_id !== null) {
-            fn("VOICE_SERVER_UPDATE", { guild_id: GUILD, endpoint: server.endpoint, token: "fake-voice" });
+          if (d.channel_id !== null && !opts.silent) {
+            const send = () => fn("VOICE_SERVER_UPDATE", { guild_id: GUILD, endpoint: server.endpoint, token: "fake-voice" });
+            if (opts.serverUpdateDelayMs) setTimeout(send, opts.serverUpdateDelayMs);
+            else send();
           }
         }
       });
@@ -119,4 +121,83 @@ test("server closing with 4017 ends in error with the spanish message and no rej
   const joins = gateway.sent.filter((p) => p.d.channel_id !== null).length;
   expect(joins).toBeLessThanOrEqual(2);
   expect(gateway.sent.at(-1)!.d.channel_id).toBeNull();
+}, 15_000);
+
+test("leaving while the join is still starting never connects", async () => {
+  server = await startFakeVoiceServer();
+  const gateway = fakeMainGateway(server);
+  session = createDjsVoiceSession({ adapterCreator: createVoiceAdapterCreator({ gateway, meId: () => ME }), meId: () => ME });
+  const pending = session.join(GUILD, CHANNEL, { selfMute: false, selfDeaf: false });
+  await session.leave();
+  await pending;
+  await Bun.sleep(200);
+  expect(server.identify).toBeNull();
+}, 15_000);
+
+test("leaving while waiting for Discord resolves the join right away", async () => {
+  server = await startFakeVoiceServer();
+  const gateway = fakeMainGateway(server, { silent: true });
+  session = createDjsVoiceSession({ adapterCreator: createVoiceAdapterCreator({ gateway, meId: () => ME }), meId: () => ME });
+  const started = Date.now();
+  const pending = session.join(GUILD, CHANNEL, { selfMute: false, selfDeaf: false });
+  await Bun.sleep(100);
+  await session.leave();
+  await pending;
+  expect(Date.now() - started).toBeLessThan(2_000);
+  expect(gateway.sent.at(-1)!.d.channel_id).toBeNull();
+}, 15_000);
+
+test("mute pressed while connecting is applied once the connection is ready", async () => {
+  server = await startFakeVoiceServer();
+  const gateway = fakeMainGateway(server, { serverUpdateDelayMs: 150 });
+  session = createDjsVoiceSession({ adapterCreator: createVoiceAdapterCreator({ gateway, meId: () => ME }), meId: () => ME });
+  const pending = session.join(GUILD, CHANNEL, { selfMute: false, selfDeaf: false });
+  await Bun.sleep(30);
+  session.setFlags({ selfMute: true, selfDeaf: false });
+  const sentWhileJoining = gateway.sent.length;
+  await pending;
+  await until(() => gateway.sent.at(-1)!.d.self_mute === true);
+  expect(sentWhileJoining).toBe(1);
+}, 15_000);
+
+test("4014 waits for a move before giving up", async () => {
+  server = await startFakeVoiceServer();
+  const gateway = fakeMainGateway(server);
+  session = createDjsVoiceSession({
+    adapterCreator: createVoiceAdapterCreator({ gateway, meId: () => ME }),
+    meId: () => ME,
+    moveGraceMs: 200,
+  });
+  const events: [string, string | undefined][] = [];
+  session.onStatus((s, e) => events.push([s, e]));
+  await session.join(GUILD, CHANNEL, { selfMute: false, selfDeaf: false });
+  server.close(4014);
+  await until(() => events.some(([s]) => s === "reconnecting"));
+  expect(events.some(([s]) => s === "error")).toBe(false);
+  await until(() => events.some(([s]) => s === "error"));
+  expect(events.find(([s]) => s === "error")![1]).toBe("te desconectaron del canal");
+}, 15_000);
+
+test("a drop while the main gateway is down retries when it comes back", async () => {
+  server = await startFakeVoiceServer();
+  const gateway = fakeMainGateway(server);
+  let gatewayUp = true;
+  const flaky = { ...gateway, get status() { return gatewayUp ? ("ready" as const) : ("connecting" as const); }, send: gateway.send, on: gateway.on };
+  session = createDjsVoiceSession({
+    adapterCreator: createVoiceAdapterCreator({ gateway: flaky as never, meId: () => ME }),
+    meId: () => ME,
+    canSignal: () => gatewayUp,
+    retryMs: 50,
+  });
+  const events: string[] = [];
+  session.onStatus((s) => events.push(s));
+  await session.join(GUILD, CHANNEL, { selfMute: false, selfDeaf: false });
+  gatewayUp = false;
+  server.close(4000);
+  await until(() => events.includes("reconnecting"));
+  await Bun.sleep(200);
+  expect(events).not.toContain("error");
+  gatewayUp = true;
+  session.gatewayReady?.();
+  await until(() => events.lastIndexOf("connected") > events.indexOf("reconnecting"));
 }, 15_000);

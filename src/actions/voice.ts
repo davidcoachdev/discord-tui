@@ -48,6 +48,8 @@ export function createVoiceActions(deps: {
   let ptt: Ptt | null = null;
   let codeTimer: ReturnType<typeof setInterval> | null = null;
   let stats: { stop(): void } | null = null;
+  let mediaStarted = false;
+  let queue: Promise<void> = Promise.resolve();
   let media = 0;
 
   const voice = () => store.getState().voice;
@@ -64,8 +66,16 @@ export function createVoiceActions(deps: {
     return ptt;
   }
 
+  function clearTimers(): void {
+    if (codeTimer !== null) clearInterval(codeTimer);
+    codeTimer = null;
+    stats?.stop();
+    stats = null;
+  }
+
   async function startMedia(): Promise<void> {
     const generation = ++media;
+    clearTimers();
     const s = settings();
     const codec = deps.media.createCodec();
 
@@ -123,10 +133,8 @@ export function createVoiceActions(deps: {
 
   async function stopMedia(): Promise<void> {
     media += 1;
-    if (codeTimer !== null) clearInterval(codeTimer);
-    codeTimer = null;
-    stats?.stop();
-    stats = null;
+    mediaStarted = false;
+    clearTimers();
     tx?.stop();
     tx = null;
     rx?.stop();
@@ -146,7 +154,10 @@ export function createVoiceActions(deps: {
     log.info("voice.ui-status", { state: status });
     if (status === "connected") {
       store.dispatch({ type: "voice/status", status });
-      if (capture === null && playback === null) void startMedia();
+      if (!mediaStarted) {
+        mediaStarted = true;
+        void startMedia();
+      }
     } else if (status === "idle" || status === "error") {
       const wasIn = voice().channelId !== null;
       void stopMedia();
@@ -199,8 +210,14 @@ export function createVoiceActions(deps: {
     }
   }
 
-  return {
-    async toggleVoice(channelId: string): Promise<void> {
+  /** Entrar, salir y cambiar de canal van en fila: dos `v` seguidos no se pisan. */
+  function serial(job: () => Promise<void>): Promise<void> {
+    const next = queue.then(job, job);
+    queue = next.catch(() => {});
+    return next;
+  }
+
+  async function toggleVoiceNow(channelId: string): Promise<void> {
       const state = store.getState();
       const channel = state.channels[channelId];
       if (!channel || channel.type !== 2 || channel.guildId === null) {
@@ -223,9 +240,17 @@ export function createVoiceActions(deps: {
         await stopMedia();
         store.dispatch({ type: "voice/left", error: errorText(error) });
       }
+  }
+
+  return {
+    toggleVoice: (channelId: string) => {
+      // Un `v` mientras todavía está conectando corta ese intento en vez de esperar el timeout.
+      const status = voice().status;
+      if (status === "joining" || status === "reconnecting") void session.leave();
+      return serial(() => toggleVoiceNow(channelId));
     },
 
-    leaveVoice: () => leaveVoice(),
+    leaveVoice: () => serial(() => leaveVoice()),
 
     toggleMute(): void {
       const v = voice();

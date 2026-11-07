@@ -147,3 +147,14 @@ test("KITTY_KEYBOARD asks for all keys as escapes so Space reports its release",
   const { KITTY_KEYBOARD } = await import("../../src/ui/kitty");
   expect(buildKittyKeyboardFlags(KITTY_KEYBOARD) & 0b1010).toBe(0b1010);
 });
+
+test("holding v or m (auto-repeat) toggles only once", async () => {
+  const s = setup();
+  s.store.dispatch({ type: "ui/selectChannel", id: DEMO.voice });
+  s.store.dispatch({ type: "ui/focus", focus: "channels" });
+  const { mockInput, renderOnce } = await render(s);
+  await renderOnce();
+  mockInput.pressKeys(["\u001b[118u", "\u001b[118;1:2u", "\u001b[118;1:2u", "\u001b[109u", "\u001b[109;1:2u"]);
+  await renderOnce();
+  expect(s.calls).toEqual([`toggle:${DEMO.voice}`, "mute"]);
+});

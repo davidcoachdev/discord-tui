@@ -653,6 +653,10 @@ export function App(props: {
 
       const focused = props.store.getState().ui.focus;
 
+      // Mantener apretada una tecla repite el evento: solo la navegación se repite, los toggles no.
+      const navigation = ["j", "k", "up", "down", "h", "l", "left", "right", "backspace"];
+      if (key.repeated && !navigation.includes(key.name)) return;
+
       if (pendingG()) {
         setPendingG(false);
         switch (key.name) {

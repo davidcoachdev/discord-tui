@@ -72,6 +72,7 @@ export function createRuntime(deps: RuntimeDeps): Runtime {
     createDjsVoiceSession({
       adapterCreator: createVoiceAdapterCreator({ gateway, meId: () => store.getState().me?.id ?? deps.me.id }),
       meId: () => store.getState().me?.id ?? deps.me.id,
+      canSignal: () => gateway.status === "ready",
     });
   const voice = createVoiceActions({
     store,
@@ -85,7 +86,10 @@ export function createRuntime(deps: RuntimeDeps): Runtime {
   if (deps.initialSettings) store.dispatch({ type: "settings/loaded", settings: deps.initialSettings });
   const detachSettings = attachSettingsPersistence(store, { path: deps.settingsPath });
 
-  gateway.on("status", (status) => store.dispatch({ type: "connection", status }));
+  gateway.on("status", (status) => {
+    store.dispatch({ type: "connection", status });
+    if (status === "ready") voiceSession.gatewayReady?.();
+  });
   gateway.on("dispatch", (t, d) => {
     if (t === "READY" && d && typeof d === "object") {
       const firstGuild =

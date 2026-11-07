@@ -102,7 +102,9 @@ export function SettingsScreen(props: {
       return;
     }
     if (row() === "inputMode" && key.name === "return") {
-      patch({ inputMode: settings().inputMode === "voice_activity" ? "push_to_talk" : "voice_activity" });
+      const mode = settings().inputMode === "voice_activity" ? "push_to_talk" : "voice_activity";
+      if (props.actions.voice) props.actions.voice.setInputMode(mode);
+      else patch({ inputMode: mode });
       return;
     }
     if (row() === "sensitivity") {
