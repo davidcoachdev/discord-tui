@@ -157,4 +157,47 @@ describe("SettingsScreen", () => {
     expect(store.getState().settings.streamQuality).toBe("1080p30");
     expect(captureCharFrame()).toContain("calidad: 1080p30 (puede necesitar Nitro)");
   });
+
+  test("Sonidos rows: Enter toggles, h/l moves the volume by 10, a cue can be picked and silenced", async () => {
+    const { store, actions, deps } = setup();
+    const { mockInput, renderOnce, captureCharFrame } = await testRender(
+      () => <SettingsScreen store={store} actions={actions} deps={deps} inVoice={false} onClose={() => {}} />,
+      { width: 90, height: 34 },
+    );
+    await Bun.sleep(5);
+    await renderOnce();
+    expect(captureCharFrame()).toContain("sonidos de eventos: sí");
+    expect(captureCharFrame()).toContain("volumen de sonidos: 60%");
+    expect(captureCharFrame()).toContain("entrar a voz: suena");
+
+    for (let i = 0; i < 7; i += 1) mockInput.pressKey("j");
+    mockInput.pressEnter();
+    await renderOnce();
+    expect(store.getState().settings.sounds.enabled).toBe(false);
+    expect(captureCharFrame()).toContain("sonidos de eventos: no");
+    mockInput.pressEnter();
+
+    mockInput.pressKey("j");
+    mockInput.pressKey("l");
+    mockInput.pressKey("l");
+    mockInput.pressKey("l");
+    mockInput.pressKey("l");
+    mockInput.pressKey("l");
+    await renderOnce();
+    expect(store.getState().settings.sounds.volume).toBe(100);
+    mockInput.pressKey("h");
+    await renderOnce();
+    expect(captureCharFrame()).toContain("volumen de sonidos: 90%");
+
+    mockInput.pressKey("j");
+    mockInput.pressKey("l"); // leave
+    mockInput.pressKey("l"); // userJoin
+    await renderOnce();
+    expect(captureCharFrame()).toContain("alguien entra a tu canal: suena");
+    mockInput.pressEnter();
+    await renderOnce();
+    expect(store.getState().settings.sounds.events.userJoin).toBe(false);
+    expect(store.getState().settings.sounds.events.join).toBe(true);
+    expect(captureCharFrame()).toContain("alguien entra a tu canal: no suena");
+  });
 });
