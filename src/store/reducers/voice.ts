@@ -17,20 +17,67 @@ function withVoice(state: AppState, patch: Partial<VoiceSlice>): AppState {
   return { ...state, voice: { ...state.voice, ...patch } };
 }
 
-/** READY trae `voice_states` dentro de cada guild: quién está en qué canal al conectar. */
+/**
+ * Quién está en qué canal de voz al conectar. Para cuentas de usuario el READY trae los guilds "lazy" sin
+ * `voice_states`: llegan en READY_SUPPLEMENTAL (`guilds: [{ id, voice_states, … }]`, mismo orden que READY).
+ * Se mezcla por guild, así sirve para los dos eventos.
+ */
 export function applyReadyVoiceStates(state: AppState, d: any): AppState {
   const guilds: any[] = Array.isArray(d?.guilds) ? d.guilds : [];
-  const states: VoiceSlice["states"] = {};
+  const states: VoiceSlice["states"] = { ...state.voice.states };
+  let users = state.users;
+  let members = state.members;
   for (const guild of guilds) {
     if (typeof guild?.id !== "string" || !Array.isArray(guild.voice_states)) continue;
     const byUser: Record<string, VoiceMemberState> = {};
     for (const raw of guild.voice_states) {
       const member = toVoiceMember(raw);
-      if (member && typeof raw.user_id === "string") byUser[raw.user_id] = member;
+      if (!member || typeof raw.user_id !== "string") continue;
+      byUser[raw.user_id] = member;
+      const user = raw.member?.user;
+      if (user?.id && !users[user.id]) {
+        users = {
+          ...users,
+          [user.id]: { id: user.id, username: user.username ?? user.id, globalName: user.global_name ?? null, avatar: user.avatar ?? null, bot: user.bot === true },
+        };
+      }
+      if (raw.member && !members[guild.id]?.[raw.user_id]) {
+        members = {
+          ...members,
+          [guild.id]: {
+            ...(members[guild.id] ?? {}),
+            [raw.user_id]: { userId: raw.user_id, guildId: guild.id, roles: raw.member.roles ?? [], nick: raw.member.nick ?? null },
+          },
+        };
+      }
     }
     states[guild.id] = byUser;
   }
-  return withVoice(state, { states });
+  return { ...state, users, members, voice: { ...state.voice, states } };
+}
+
+/** READY_SUPPLEMENTAL: `merged_members[i]` son los miembros del guild `guilds[i]` (sirve para los nombres). */
+export function applySupplementalMembers(state: AppState, d: any): AppState {
+  const guilds: any[] = Array.isArray(d?.guilds) ? d.guilds : [];
+  const merged: any[] = Array.isArray(d?.merged_members) ? d.merged_members : [];
+  if (merged.length === 0) return state;
+  const members = { ...state.members };
+  guilds.forEach((guild, index) => {
+    const list = merged[index];
+    if (typeof guild?.id !== "string" || !Array.isArray(list)) return;
+    const byUser = { ...(members[guild.id] ?? {}) };
+    for (const raw of list) {
+      if (typeof raw?.user_id !== "string") continue;
+      byUser[raw.user_id] = {
+        userId: raw.user_id,
+        guildId: guild.id,
+        roles: Array.isArray(raw.roles) ? raw.roles : byUser[raw.user_id]?.roles ?? [],
+        nick: raw.nick ?? byUser[raw.user_id]?.nick ?? null,
+      };
+    }
+    members[guild.id] = byUser;
+  });
+  return { ...state, members };
 }
 
 export function applyVoiceStateUpdate(state: AppState, d: any): AppState {

@@ -108,3 +108,35 @@ test("removing a user frees its decoder and buffer", () => {
   h.opus("a", Uint8Array.of(2));
   expect(h.decoders()).toBe(2);
 });
+
+test("a decoder that cannot be created is not retried on every packet and the others keep playing", () => {
+  const opusListeners = new Set<(userId: string, opus: Uint8Array) => void>();
+  let attempts = 0;
+  const errors: unknown[] = [];
+  const pushed: string[] = [];
+  let clock = 0;
+  createReceiver({
+    session: { onOpus: (fn) => (opusListeners.add(fn), () => opusListeners.delete(fn)), onSpeaking: () => () => {} },
+    mixer: { buffer: (userId) => ({ push: () => void pushed.push(userId), pop: () => null, size: 0, reset: () => {} }), remove: () => {} },
+    makeDecoder: () => {
+      attempts += 1;
+      if (attempts === 1) throw new Error("no pude cargar Opus");
+      return { decode: (o: Uint8Array) => o };
+    },
+    isDeaf: () => false,
+    onSpeaking: () => {},
+    onDecoderError: (e) => void errors.push(e),
+    now: () => clock,
+    setTimer: (() => 0) as never,
+    clearTimer: (() => {}) as never,
+  });
+  const send = (userId: string) => opusListeners.forEach((fn) => fn(userId, Uint8Array.of(1, 2, 3, 4)));
+  for (let i = 0; i < 50; i += 1) send("a");
+  expect(attempts).toBe(1);
+  expect(errors).toHaveLength(1);
+  send("b");
+  expect(pushed).toContain("b");
+  clock = 6_000;
+  send("a");
+  expect(pushed).toContain("a");
+});

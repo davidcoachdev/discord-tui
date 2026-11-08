@@ -24,7 +24,7 @@ import {
   applyTypingSweep,
   clearTypingFor,
 } from "./reducers/members";
-import { applyReadyVoiceStates, applyVoiceStateUpdate, reduceVoiceAction } from "./reducers/voice";
+import { applyReadyVoiceStates, applySupplementalMembers, applyVoiceStateUpdate, reduceVoiceAction } from "./reducers/voice";
 
 export function reduce(state: AppState, action: Action): AppState {
   switch (action.type) {
@@ -33,7 +33,7 @@ export function reduce(state: AppState, action: Action): AppState {
         case "READY":
           return applyReadyVoiceStates(applyReady(state, action.d), action.d);
         case "READY_SUPPLEMENTAL":
-          return applyReadySupplemental(state, action.d);
+          return applySupplementalMembers(applyReadyVoiceStates(applyReadySupplemental(state, action.d), action.d), action.d);
         case "MESSAGE_CREATE": {
           let next = applyMessageCreate(state, action.d);
           if (typeof action.d?.author?.id === "string" && typeof action.d?.channel_id === "string") {

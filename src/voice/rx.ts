@@ -28,7 +28,10 @@ const SPEAKING_TIMEOUT_MS = 300;
 export function createReceiver(deps: {
   session: Pick<VoiceSession, "onOpus" | "onSpeaking">;
   mixer: Pick<Mixer, "buffer" | "remove">;
-  makeDecoder: () => { decode(opus: Uint8Array): Uint8Array };
+  makeDecoder: () => { decode(opus: Uint8Array): Uint8Array; destroy?(): void };
+  /** Si no se pudo crear un decoder (para loguear el motivo). */
+  onDecoderError?(error: unknown): void;
+  now?: () => number;
   isDeaf: () => boolean;
   onSpeaking(userId: string, on: boolean): void;
   setTimer?: typeof setTimeout;
@@ -36,7 +39,10 @@ export function createReceiver(deps: {
 }): Receiver {
   const setTimer = deps.setTimer ?? setTimeout;
   const clearTimer = deps.clearTimer ?? clearTimeout;
-  const decoders = new Map<string, { decode(opus: Uint8Array): Uint8Array }>();
+  const now = deps.now ?? Date.now;
+  const decoders = new Map<string, { decode(opus: Uint8Array): Uint8Array; destroy?(): void }>();
+  /** userId → hasta cuándo no reintentar crear su decoder (no reintentar en cada paquete). */
+  const failedUntil = new Map<string, number>();
   const silenceRun = new Map<string, number>();
   const timers = new Map<string, ReturnType<typeof setTimeout>>();
   const speaking = new Set<string>();
@@ -77,7 +83,16 @@ export function createReceiver(deps: {
 
     let decoder = decoders.get(userId);
     if (!decoder) {
-      decoder = deps.makeDecoder();
+      if ((failedUntil.get(userId) ?? 0) > now()) return;
+      try {
+        decoder = deps.makeDecoder();
+      } catch (error) {
+        decodeErrors += 1;
+        failedUntil.set(userId, now() + 5_000);
+        deps.onDecoderError?.(error);
+        return;
+      }
+      failedUntil.delete(userId);
       decoders.set(userId, decoder);
     }
     try {
@@ -95,7 +110,13 @@ export function createReceiver(deps: {
   });
 
   function removeUser(userId: string): void {
+    try {
+      decoders.get(userId)?.destroy?.();
+    } catch {
+      // ya liberado
+    }
     decoders.delete(userId);
+    failedUntil.delete(userId);
     silenceRun.delete(userId);
     const timer = timers.get(userId);
     if (timer !== undefined) clearTimer(timer);

@@ -12,7 +12,7 @@ import type { Vad } from "../voice/vad";
 export interface VoiceMedia {
   startCapture(opts?: { target?: string }): Promise<AudioCapture>;
   startPlayback(opts?: { target?: string }): Promise<AudioPlayback>;
-  createCodec(): { encode(pcm: Uint8Array): Uint8Array; decode(opus: Uint8Array): Uint8Array };
+  createCodec(): { encode(pcm: Uint8Array): Uint8Array; decode(opus: Uint8Array): Uint8Array; destroy?(): void };
   createVad(opts: { sensitivity: "auto" | number }): Vad;
 }
 
@@ -45,6 +45,7 @@ export function createVoiceActions(deps: {
   let rx: Receiver | null = null;
   let mixer: Mixer | null = null;
   let vad: Vad | null = null;
+  let txCodec: { destroy?(): void } | null = null;
   let ptt: Ptt | null = null;
   let codeTimer: ReturnType<typeof setInterval> | null = null;
   let stats: { stop(): void } | null = null;
@@ -78,6 +79,7 @@ export function createVoiceActions(deps: {
     clearTimers();
     const s = settings();
     const codec = deps.media.createCodec();
+    txCodec = codec;
 
     try {
       const out = await deps.media.startPlayback({ target: s.outputDevice ?? undefined });
@@ -93,6 +95,8 @@ export function createVoiceActions(deps: {
         session,
         mixer,
         makeDecoder: () => deps.media.createCodec(),
+        onDecoderError: (error) =>
+          log.error("voice.decoder-failed", { error_name: error instanceof Error ? error.name : "unknown", msg: error instanceof Error ? error.message.slice(0, 160) : "" }),
         isDeaf: () => voice().selfDeaf,
         onSpeaking: (userId, on) => store.dispatch({ type: "voice/speaking", userId, on }),
       });
@@ -146,6 +150,8 @@ export function createVoiceActions(deps: {
     mixer?.stop();
     mixer = null;
     vad = null;
+    txCodec?.destroy?.();
+    txCodec = null;
     ptt?.reset();
     const mic = capture;
     const out = playback;

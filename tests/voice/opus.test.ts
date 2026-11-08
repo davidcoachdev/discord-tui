@@ -57,3 +57,14 @@ describe("createOpusCodec", () => {
     expect(p99).toBeLessThan(5);
   });
 });
+
+test("many codecs alive at once keep working (opusscript's own wrapper aborts from the 5th instance)", () => {
+  const encoder = createOpusCodec({ prefer: "wasm" });
+  const decoders = Array.from({ length: 30 }, () => createOpusCodec({ prefer: "wasm" }));
+  const input = sine440();
+  for (let i = 0; i < 300; i += 1) decoders[i % 30]!.decode(encoder.encode(input));
+  const out = decoders[29]!.decode(encoder.encode(input));
+  expect(rms(out)).toBeGreaterThan(1000);
+  for (const d of decoders) d.destroy();
+  encoder.destroy();
+});

@@ -1,10 +1,17 @@
 import { FRAME_SAMPLES } from "./constants";
+import { createWasmOpus } from "./opus-wasm";
 
 export interface OpusCodec {
   encode(pcm: Uint8Array): Uint8Array;
   decode(opus: Uint8Array): Uint8Array;
+  /** Libera la memoria del códec (en WASM no la junta el GC). */
+  destroy(): void;
   backend: "native" | "wasm";
 }
+
+let lastLoadError = "";
+// El nativo no tiene prebuild para Bun 1.4.3: se prueba una sola vez y no en cada códec.
+let nativeAvailable: boolean | null = null;
 
 interface NativeOpus {
   encode(buffer: Buffer, frameSize: number): Buffer;
@@ -14,9 +21,11 @@ interface NativeOpus {
 interface WasmOpus {
   encode(buffer: Buffer, frameSize: number): Buffer;
   decode(buffer: Buffer): Buffer;
+  delete(): void;
 }
 
 function loadNative(): NativeOpus | null {
+  if (nativeAvailable === false) return null;
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const mod = require("@discordjs/opus");
@@ -24,20 +33,25 @@ function loadNative(): NativeOpus | null {
     const instance = new Ctor(48_000, 2) as NativeOpus;
     // Forzar la carga del binario nativo acá; si falta el prebuild tira al construir o al usar.
     instance.encode(Buffer.alloc(3840), FRAME_SAMPLES);
+    nativeAvailable = true;
     return new Ctor(48_000, 2) as NativeOpus;
   } catch {
+    nativeAvailable = false;
     return null;
   }
 }
 
+/** WASM con nuestro wrapper (src/voice/opus-wasm.ts): el de opusscript rompe con varias instancias. */
 function loadWasm(): WasmOpus | null {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const mod = require("opusscript");
-    const Ctor = mod.default ?? mod;
-    const Application = Ctor.Application ?? { AUDIO: 2049 };
-    return new Ctor(48_000, 2, Application.AUDIO) as WasmOpus;
-  } catch {
+    const codec = createWasmOpus(2);
+    return {
+      encode: (buffer, frameSize) => Buffer.from(codec.encode(buffer, frameSize)),
+      decode: (buffer) => Buffer.from(codec.decode(buffer)),
+      delete: () => codec.delete(),
+    };
+  } catch (error) {
+    lastLoadError = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
     return null;
   }
 }
@@ -58,7 +72,9 @@ export function createOpusCodec(opts?: { prefer?: "native" | "wasm" }): OpusCode
     }
   }
 
-  if (!engine || !backend) throw new Error("no pude cargar Opus (ni @discordjs/opus ni opusscript)");
+  if (!engine || !backend) {
+    throw new Error(`no pude cargar Opus (ni @discordjs/opus ni opusscript${lastLoadError ? `: ${lastLoadError.slice(0, 120)}` : ""})`);
+  }
 
   const opus = engine;
   const which = backend;
@@ -68,6 +84,9 @@ export function createOpusCodec(opts?: { prefer?: "native" | "wasm" }): OpusCode
     encode(pcm: Uint8Array): Uint8Array {
       const out = opus.encode(Buffer.from(pcm.buffer, pcm.byteOffset, pcm.byteLength), FRAME_SAMPLES);
       return new Uint8Array(out);
+    },
+    destroy(): void {
+      if (which === "wasm") (opus as WasmOpus).delete();
     },
     decode(opusPacket: Uint8Array): Uint8Array {
       const input = Buffer.from(opusPacket.buffer, opusPacket.byteOffset, opusPacket.byteLength);

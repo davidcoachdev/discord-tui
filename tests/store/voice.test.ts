@@ -40,3 +40,28 @@ test("speaking marks participants and self speaking only counts in the joined ch
   expect(store.getState().voice.speaking).toEqual({});
   expect(store.getState().voice.selfSpeaking).toBe(false);
 });
+
+test("READY_SUPPLEMENTAL voice_states fill the channels (user READY guilds are lazy, without voice_states)", () => {
+  const store = createStore(emptyState());
+  store.dispatch({ type: "gw", t: "READY", d: { user: { id: ME, username: "me" }, guilds: [{ id: GUILD, lazy: true, channels: [] }] } });
+  store.dispatch({
+    type: "gw",
+    t: "READY_SUPPLEMENTAL",
+    d: {
+      guilds: [
+        {
+          id: GUILD,
+          voice_states: [
+            { user_id: "7", channel_id: VOICE, self_mute: false, member: { user: { id: "7", username: "quique", global_name: "Quique" }, roles: [], nick: null } },
+            { user_id: "8", channel_id: VOICE, self_deaf: true },
+          ],
+        },
+      ],
+      merged_members: [[{ user_id: "8", nick: "Ocho", roles: [] }]],
+    },
+  });
+  const parts = selectVoiceParticipants(store.getState(), GUILD, VOICE);
+  expect(parts.map((p) => [p.userId, p.deafened])).toEqual([["7", false], ["8", true]]);
+  expect(store.getState().users["7"]?.globalName).toBe("Quique");
+  expect(store.getState().members[GUILD]?.["8"]?.nick).toBe("Ocho");
+});
