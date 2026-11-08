@@ -200,4 +200,22 @@ describe("SettingsScreen", () => {
     expect(store.getState().settings.sounds.events.join).toBe(true);
     expect(captureCharFrame()).toContain("alguien entra a tu canal: no suena");
   });
+
+  test("animar GIFs y emojis toggles animateImages (default on), next to imágenes inline", async () => {
+    const { store, actions, deps } = setup();
+    expect(store.getState().settings.animateImages).toBe(true);
+    const { mockInput, renderOnce, captureCharFrame } = await testRender(
+      () => <SettingsScreen store={store} actions={actions} deps={deps} inVoice={false} onClose={() => {}} />,
+      { width: 90, height: 40 },
+    );
+    await renderOnce();
+    expect(captureCharFrame()).toContain("animar GIFs y emojis: sí");
+    for (let i = 0; i < 20; i += 1) mockInput.pressKey("j");
+    await renderOnce();
+    mockInput.pressEnter();
+    await renderOnce();
+    expect(store.getState().settings.animateImages).toBe(false);
+    expect(store.getState().settings.inlineImages).toBe(true);
+    expect(captureCharFrame()).toContain("animar GIFs y emojis: no (primer cuadro)");
+  });
 });

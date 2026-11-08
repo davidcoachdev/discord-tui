@@ -34,6 +34,8 @@ export interface Settings {
   theme: ThemeName;
   idleAfterMinutes: number | null;
   inlineImages: boolean;
+  /** GIFs, stickers y emojis animados se mueven; con false se ve el primer cuadro. */
+  animateImages: boolean;
   status: OwnStatus;
   /** Monitor a transmitir (nombre de `hyprctl monitors`); null = preguntar si hay más de uno. */
   streamMonitor: string | null;
@@ -51,6 +53,7 @@ export const DEFAULT_SETTINGS: Settings = {
   theme: "dark",
   idleAfterMinutes: 10,
   inlineImages: true,
+  animateImages: true,
   status: "online",
   streamMonitor: null,
   streamQuality: "720p30",
@@ -138,6 +141,7 @@ export function normalizeSettings(raw: unknown): Settings {
     theme: record.theme === "light" || record.theme === "dark" ? record.theme : DEFAULT_SETTINGS.theme,
     idleAfterMinutes: parseIdle(record.idleAfterMinutes),
     inlineImages: typeof record.inlineImages === "boolean" ? record.inlineImages : DEFAULT_SETTINGS.inlineImages,
+    animateImages: typeof record.animateImages === "boolean" ? record.animateImages : DEFAULT_SETTINGS.animateImages,
     status: OWN_STATUSES.includes(record.status as OwnStatus) ? (record.status as OwnStatus) : DEFAULT_SETTINGS.status,
     streamMonitor: parseDevice(record.streamMonitor),
     streamQuality: STREAM_QUALITIES.includes(record.streamQuality as StreamQuality)

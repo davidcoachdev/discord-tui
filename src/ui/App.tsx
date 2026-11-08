@@ -1,9 +1,10 @@
 import type { KeyEvent, PasteEvent } from "@opentui/core";
-import { useKeyboard, usePaste, useTerminalDimensions, type JSX } from "@opentui/solid";
+import { useKeyboard, usePaste, useRenderer, useTerminalDimensions, type JSX } from "@opentui/solid";
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
 
 import type { Actions } from "../actions";
 import { COMMON_EMOJI } from "../emoji/common";
+import { animationScheduler } from "../images/animation";
 import { parseMarkdown, plainText } from "../markdown/parse";
 import {
   FORUM_TYPES,
@@ -103,6 +104,18 @@ export function App(props: {
     return state.ui.selectedGuildId !== null && state.ui.selectedGuildId !== "@dms";
   });
   const inlineImages = useSelector(props.store, (state) => state.settings.inlineImages);
+  const animateImages = useSelector(props.store, (state) => state.settings.animateImages);
+  // Terminal sin foco (Ghostty manda CSI I / CSI O): los GIFs se frenan y no queda timer vivo.
+  const renderer = useRenderer();
+  const pauseAnimations = (): void => animationScheduler.setPaused(true);
+  const resumeAnimations = (): void => animationScheduler.setPaused(false);
+  renderer.on("blur", pauseAnimations);
+  renderer.on("focus", resumeAnimations);
+  onCleanup(() => {
+    renderer.off("blur", pauseAnimations);
+    renderer.off("focus", resumeAnimations);
+    animationScheduler.setPaused(false);
+  });
   const textChannel = useSelector(props.store, (state) => {
     const id = state.ui.selectedChannelId;
     const type = id === null ? undefined : state.channels[id]?.type;
@@ -1098,6 +1111,7 @@ export function App(props: {
           selectedId={selectedId()}
           focused={focus() === "messages"}
           images={props.images === true && inlineImages()}
+          animate={animateImages()}
           onSelect={(id) => {
             setSelectedId(id);
             props.actions.focus("messages");
