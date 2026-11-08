@@ -10,7 +10,7 @@ import { FRAME_BYTES } from "../helpers/pcm";
 
 interface FakeProc {
   cmd: string[];
-  stdin: { writes: Uint8Array[]; write(chunk: Uint8Array): void } | null;
+  stdin: { writes: Uint8Array[]; log: string[]; write(chunk: Uint8Array): void; flush(): void; end(): void } | null;
   killed: boolean;
   kill(): void;
   exited: Promise<number>;
@@ -34,12 +34,23 @@ function fakeSpawn(opts: { exitImmediately?: number; stderrText?: string } = {})
       resolveExit = resolve;
     });
     const writes: Uint8Array[] = [];
+    const log: string[] = [];
     const proc: FakeProc = {
       cmd,
       stdin: {
         writes,
+        log,
         write(chunk: Uint8Array) {
           writes.push(chunk);
+          log.push("write");
+        },
+        flush() {
+          log.push("flush");
+        },
+        // Como pw-cat: al cerrarle la entrada termina solo.
+        end() {
+          log.push("end");
+          resolveExit(0);
         },
       },
       killed: false,
@@ -139,6 +150,26 @@ describe("startPlayback", () => {
     await Bun.sleep(1);
     expect(fake.calls[0]?.stdin?.writes).toHaveLength(1);
     await playback.stop();
+  });
+
+  test("every frame is flushed to pw-cat right away (Bun's FileSink buffers writes)", async () => {
+    const fake = fakeSpawn();
+    const playback = await startPlayback({ spawn: fake.spawn });
+    playback.write(new Uint8Array(FRAME_BYTES));
+    playback.write(new Uint8Array(FRAME_BYTES));
+    await Bun.sleep(1);
+    expect(fake.calls[0]?.stdin?.log).toEqual(["write", "flush", "write", "flush"]);
+    await playback.stop();
+  });
+
+  test("stop closes pw-cat's input (it ignores SIGTERM while stdin is open)", async () => {
+    const fake = fakeSpawn();
+    const playback = await startPlayback({ spawn: fake.spawn });
+    const started = Date.now();
+    await playback.stop();
+    expect(fake.calls[0]?.stdin?.log).toContain("end");
+    expect(fake.calls[0]?.killed).toBe(false);
+    expect(Date.now() - started).toBeLessThan(100);
   });
 
   test("a full stdin queue drops the oldest frame instead of growing", async () => {

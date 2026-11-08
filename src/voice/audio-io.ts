@@ -2,12 +2,13 @@ import { cleanEnv } from "../proc/spawn";
 import { createFramer } from "./pcm-framer";
 
 export interface ProcLike {
-  stdin: { write(chunk: Uint8Array): void } | null;
+  /** En Bun es un FileSink: `write` acumula en buffer y hace falta `flush` para que llegue al proceso. */
+  stdin: { write(chunk: Uint8Array): unknown; flush?(): unknown; end?(): unknown } | null;
   stdout: ReadableStream<Uint8Array> | null;
   stderr: ReadableStream<Uint8Array> | null;
   exited: Promise<number>;
   killed: boolean;
-  kill(): void;
+  kill(signal?: number): void;
 }
 
 export type SpawnLike = (cmd: string[], opts: { stdin: "pipe" | "ignore"; stdout: "pipe" | "ignore" }) => ProcLike;
@@ -93,7 +94,11 @@ export async function startCapture(opts?: { target?: string; spawn?: SpawnLike }
     },
     async stop(): Promise<void> {
       proc.kill();
-      await proc.exited;
+      const exited = await Promise.race([proc.exited.then(() => true), Bun.sleep(500).then(() => false)]);
+      if (!exited) {
+        proc.kill(9);
+        await Promise.race([proc.exited, Bun.sleep(500)]);
+      }
     },
   };
 }
@@ -138,7 +143,14 @@ export async function startPlayback(opts?: {
     queueMicrotask(() => {
       pumping = false;
       const frame = queue.shift();
-      if (frame) proc.stdin?.write(frame);
+      if (frame) {
+        try {
+          proc.stdin?.write(frame);
+          proc.stdin?.flush?.();
+        } catch {
+          // pw-cat ya no está
+        }
+      }
       if (queue.length > 0) pump();
     });
   }
@@ -156,8 +168,17 @@ export async function startPlayback(opts?: {
       return droppedCount;
     },
     async stop(): Promise<void> {
-      proc.kill();
-      await proc.exited;
+      // pw-cat ignora SIGTERM mientras tiene la entrada abierta: se cierra stdin y, si no sale, SIGKILL.
+      try {
+        proc.stdin?.end?.();
+      } catch {
+        // ya cerrado
+      }
+      const exited = await Promise.race([proc.exited.then(() => true), Bun.sleep(500).then(() => false)]);
+      if (!exited) {
+        proc.kill(9);
+        await Promise.race([proc.exited, Bun.sleep(500)]);
+      }
     },
   };
 }

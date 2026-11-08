@@ -96,7 +96,9 @@ export function createVoiceActions(deps: {
         isDeaf: () => voice().selfDeaf,
         onSpeaking: (userId, on) => store.dispatch({ type: "voice/speaking", userId, on }),
       });
+      log.info("voice.output", { state: "started", mode: s.outputDevice ? "device" : "default" });
     } catch (error) {
+      log.warn("voice.output", { state: "failed", error_name: error instanceof Error ? error.name : "unknown" });
       store.dispatch({ type: "notice/push", key: "voice-output", level: "warn", text: errorText(error) });
     }
 
@@ -116,7 +118,9 @@ export function createVoiceActions(deps: {
       });
       tx.setPtt(ptt?.transmitting ?? false);
       store.dispatch({ type: "voice/micError", error: null });
+      log.info("voice.mic", { state: "started", mode: s.inputMode });
     } catch (error) {
+      log.warn("voice.mic", { state: "failed", error_name: error instanceof Error ? error.name : "unknown" });
       store.dispatch({ type: "voice/micError", error: errorText(error) });
       store.dispatch({ type: "notice/push", key: "voice-mic", level: "warn", text: errorText(error) });
     }
