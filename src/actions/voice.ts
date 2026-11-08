@@ -19,6 +19,8 @@ export interface VoiceMedia {
   createVad(opts: { sensitivity: "auto" | number }): Vad;
   /** Salidas de audio (para mostrar por dónde sale la llamada y poder cambiarla). */
   listAudioDevices?(): Promise<{ outputs: AudioDevice[]; defaultOutput?: string | null }>;
+  /** Diagnóstico: un decoder independiente (opusscript original) para comparar niveles con paquetes reales. */
+  createReferenceDecoder?(): { decode(opus: Uint8Array): Uint8Array; destroy?(): void };
 }
 
 export interface VoiceActions {
@@ -187,6 +189,9 @@ export function createVoiceActions(deps: {
         session,
         mixer,
         makeDecoder: () => deps.media.createCodec(),
+        referenceDecoder: deps.media.createReferenceDecoder,
+        onDecoderCheck: (_userId, oursDb, referenceDb, n) =>
+          log.info("voice.decoder-check", { peak_db: Math.round(oursDb), ref_db: Math.round(referenceDb), count: n }),
         onDecoderError: (error) =>
           log.error("voice.decoder-failed", { error_name: error instanceof Error ? error.name : "unknown", msg: error instanceof Error ? error.message.slice(0, 160) : "" }),
         isDeaf: () => voice().selfDeaf,
@@ -225,6 +230,7 @@ export function createVoiceActions(deps: {
     stats = createVoiceStats({
       log,
       read: () => ({ ...(rx?.stats() ?? { packets: 0, decodeErrors: 0 }), state: voice().status }),
+      every: 30_000,
     });
     refreshTimer = setInterval(() => void refreshPlayback(generation), deps.refresh?.checkMs ?? 10_000);
     refreshTimer.unref?.();

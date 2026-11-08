@@ -140,3 +140,29 @@ test("a decoder that cannot be created is not retried on every packet and the ot
   send("a");
   expect(pushed).toContain("a");
 });
+
+test("diagnostic: compares the decoded level with a reference decoder for the first 50 packets (levels only)", () => {
+  const opusListeners = new Set<(userId: string, opus: Uint8Array) => void>();
+  const pcm = (amp: number) => {
+    const b = new Uint8Array(3840);
+    const v = new DataView(b.buffer);
+    for (let i = 0; i < 1920; i += 1) v.setInt16(i * 2, i % 2 ? amp : -amp, true);
+    return b;
+  };
+  const reports: [string, number, number, number][] = [];
+  const rx = createReceiver({
+    session: { onOpus: (fn) => (opusListeners.add(fn), () => opusListeners.delete(fn)), onSpeaking: () => () => {} },
+    mixer: { buffer: () => ({ push: () => {}, pop: () => null, size: 0, reset: () => {} }), remove: () => {} },
+    makeDecoder: () => ({ decode: () => pcm(100) }),
+    referenceDecoder: () => ({ decode: () => pcm(10000) }),
+    onDecoderCheck: (u, ours, ref, n) => void reports.push([u, Math.round(ours), Math.round(ref), n]),
+    isDeaf: () => false,
+    onSpeaking: () => {},
+    setTimer: (() => 0) as never,
+    clearTimer: (() => {}) as never,
+  });
+  for (let i = 0; i < 60; i += 1) opusListeners.forEach((fn) => fn("u", Uint8Array.of(1, 2, 3, i)));
+  expect(reports).toEqual([["u", -50, -10, 50]]);
+  expect(Math.round(rx.stats().peakDb)).toBe(-50);
+  expect(rx.stats().peakDb).toBe(-96);
+});

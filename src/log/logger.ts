@@ -25,6 +25,8 @@ export const ALLOWED_FIELDS = [
   "mode",
   "packets",
   "decode_errors",
+  "peak_db",
+  "ref_db",
 ] as const;
 
 export type AllowedField = (typeof ALLOWED_FIELDS)[number];

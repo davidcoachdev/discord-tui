@@ -1,9 +1,10 @@
 import { SILENCE_FRAME } from "./constants";
+import { rmsDbfs } from "./vad";
 import type { Mixer } from "./mixer";
 import type { VoiceSession } from "./session";
 
 export interface Receiver {
-  stats(): { packets: number; decodeErrors: number; usersActive: number };
+  stats(): { packets: number; decodeErrors: number; usersActive: number; peakDb: number };
   removeUser(userId: string): void;
   stop(): void;
 }
@@ -31,6 +32,12 @@ export function createReceiver(deps: {
   makeDecoder: () => { decode(opus: Uint8Array): Uint8Array; destroy?(): void };
   /** Si no se pudo crear un decoder (para loguear el motivo). */
   onDecoderError?(error: unknown): void;
+  /**
+   * Diagnóstico: los primeros paquetes de cada persona se decodifican también con un decoder de referencia y se
+   * reporta el nivel de los dos (nunca audio), para comparar con paquetes reales de Discord.
+   */
+  referenceDecoder?: () => { decode(opus: Uint8Array): Uint8Array; destroy?(): void };
+  onDecoderCheck?(userId: string, oursDb: number, referenceDb: number, packets: number): void;
   now?: () => number;
   isDeaf: () => boolean;
   onSpeaking(userId: string, on: boolean): void;
@@ -48,6 +55,9 @@ export function createReceiver(deps: {
   const speaking = new Set<string>();
   let packets = 0;
   let decodeErrors = 0;
+  let peakDb = -96;
+  const checks = new Map<string, { ref: { decode(opus: Uint8Array): Uint8Array; destroy?(): void }; ours: number; refPeak: number; n: number }>();
+  const CHECK_PACKETS = 50;
 
   function setSpeaking(userId: string, on: boolean): void {
     if (on === speaking.has(userId)) return;
@@ -96,11 +106,48 @@ export function createReceiver(deps: {
       decoders.set(userId, decoder);
     }
     try {
-      deps.mixer.buffer(userId).push(decoder.decode(opus));
+      const pcm = decoder.decode(opus);
+      deps.mixer.buffer(userId).push(pcm);
+      // Solo diagnóstico: medir nunca puede cortar el audio.
+      if (pcm.byteLength >= 4 && pcm.byteLength % 2 === 0) {
+        const level = rmsDbfs(pcm);
+        if (level > peakDb) peakDb = level;
+        checkAgainstReference(userId, opus, level);
+      }
     } catch {
       decodeErrors += 1;
     }
   });
+
+  function checkAgainstReference(userId: string, opus: Uint8Array, oursDb: number): void {
+    if (!deps.referenceDecoder || !deps.onDecoderCheck) return;
+    let check = checks.get(userId);
+    if (check === undefined) {
+      if (checks.size >= 2) return; // el decoder de referencia (opusscript) no aguanta muchas instancias
+      try {
+        check = { ref: deps.referenceDecoder(), ours: -96, refPeak: -96, n: 0 };
+      } catch {
+        return;
+      }
+      checks.set(userId, check);
+    }
+    if (check.n >= CHECK_PACKETS) return;
+    try {
+      check.refPeak = Math.max(check.refPeak, rmsDbfs(check.ref.decode(opus)));
+    } catch {
+      // paquete que el de referencia no entiende
+    }
+    check.ours = Math.max(check.ours, oursDb);
+    check.n += 1;
+    if (check.n === CHECK_PACKETS) {
+      deps.onDecoderCheck(userId, check.ours, check.refPeak, check.n);
+      try {
+        check.ref.destroy?.();
+      } catch {
+        // ya liberado
+      }
+    }
+  }
 
   const offSpeaking = deps.session.onSpeaking((userId, on) => {
     if (on) {
@@ -127,7 +174,9 @@ export function createReceiver(deps: {
 
   return {
     stats() {
-      return { packets, decodeErrors, usersActive: decoders.size };
+      const out = { packets, decodeErrors, usersActive: decoders.size, peakDb };
+      peakDb = -96;
+      return out;
     },
     removeUser,
     stop(): void {

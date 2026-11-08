@@ -45,6 +45,12 @@ const defaultMedia: VoiceMedia = {
   createCodec: () => createOpusCodec(),
   createVad: (opts) => createVad(opts),
   listAudioDevices: () => listAudioDevices(),
+  createReferenceDecoder: () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Ctor = require("opusscript");
+    const ref = new (Ctor.default ?? Ctor)(48_000, 2, 2049);
+    return { decode: (opus: Uint8Array) => new Uint8Array(ref.decode(Buffer.from(opus))), destroy: () => ref.delete() };
+  },
 };
 
 export interface Runtime {
