@@ -209,7 +209,7 @@ export interface AppState {
    */
   memberLists: Record<string, (MemberListRow | null)[]>;
   /** `member_count` y `online_count` del último GUILD_MEMBER_LIST_UPDATE, por guild. */
-  memberCounts: Record<string, { members: number; online: number }>;
+  memberCounts: Record<string, { members: number; online: number; groups?: Record<string, number> }>;
   /** Último canal para el que se mandó op 37, por guild. */
   subscribedChannels: Record<string, string>;
   /** Rangos de la lista de miembros que se pidieron en el último op 37, por guild. */

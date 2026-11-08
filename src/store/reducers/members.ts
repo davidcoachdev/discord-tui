@@ -39,6 +39,14 @@ function toRow(item: any, guildId: string, out: Collected): MemberListRow | null
   return { kind: "member", userId: user.id };
 }
 
+/** En el payload real los items `{ group: { id } }` vienen sin `count`: el conteo llega en `d.groups`. */
+function groupCounts(groups: unknown, previous?: Record<string, number>): Record<string, number> | undefined {
+  if (!Array.isArray(groups)) return previous;
+  const out: Record<string, number> = {};
+  for (const g of groups as any[]) if (typeof g?.id === "string" && typeof g?.count === "number") out[g.id] = g.count;
+  return out;
+}
+
 /**
  * GUILD_MEMBER_LIST_UPDATE: SYNC, INSERT, UPDATE, DELETE e INVALIDATE sobre la lista del guild.
  * Los índices de Discord son absolutos (cuentan los encabezados de grupo), así que la lista guarda
@@ -95,8 +103,10 @@ export function applyMemberListUpdate(state: AppState, d: any): AppState {
   while (list.length > 0 && list[list.length - 1] === null) list.pop();
   const counts =
     typeof d.member_count === "number" && typeof d.online_count === "number"
-      ? { ...state.memberCounts, [guildId]: { members: d.member_count, online: d.online_count } }
-      : state.memberCounts;
+      ? { ...state.memberCounts, [guildId]: { members: d.member_count, online: d.online_count, groups: groupCounts(d.groups, state.memberCounts[guildId]?.groups) } }
+      : Array.isArray(d.groups) && state.memberCounts[guildId]
+        ? { ...state.memberCounts, [guildId]: { ...state.memberCounts[guildId]!, groups: groupCounts(d.groups, state.memberCounts[guildId]?.groups) } }
+        : state.memberCounts;
   return {
     ...state,
     users: { ...state.users, ...out.users },

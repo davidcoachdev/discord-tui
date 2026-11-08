@@ -68,3 +68,24 @@ test("typing expires after 10 s, excludes me and is cleared by the author's mess
   store.dispatch({ type: "gw", t: "MESSAGE_CREATE", d: { id: "5", channel_id: CHANNEL, author: { id: "100000000000000011" }, content: "x" } });
   expect(selectTyping(store.getState(), CHANNEL, at + 1000)).toEqual([]);
 });
+
+test("group headers take their count from d.groups (real items come as { group: { id } } without count)", () => {
+  const store = createStore(emptyState());
+  store.dispatch({
+    type: "gw",
+    t: "GUILD_MEMBER_LIST_UPDATE",
+    d: {
+      guild_id: GUILD,
+      id: "everyone",
+      member_count: 305,
+      online_count: 40,
+      groups: [{ id: "online", count: 38 }, { id: "offline", count: 265 }],
+      ops: [{ op: "SYNC", range: [0, 99], items: [{ group: { id: "online" } }, { member: { user: { id: "9", username: "a" }, roles: [] } }, { group: { id: "offline" } }] }],
+    },
+  });
+  const groups = selectMemberRows(store.getState(), GUILD).filter((r) => r.kind === "group");
+  expect(groups).toEqual([
+    { kind: "group", label: "En línea", count: 38 },
+    { kind: "group", label: "Desconectados", count: 265 },
+  ]);
+});

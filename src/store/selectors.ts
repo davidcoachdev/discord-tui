@@ -279,7 +279,8 @@ export function selectMemberRows(state: AppState, guildId: string): MemberRow[] 
     for (const row of list) {
       if (row === null) continue;
       if (row.kind === "group") {
-        rows.push({ kind: "group", label: GROUP_LABELS[row.id] ?? roles.find((role) => role.id === row.id)?.name ?? row.id, count: row.count });
+        const count = state.memberCounts[guildId]?.groups?.[row.id] ?? row.count;
+        rows.push({ kind: "group", label: GROUP_LABELS[row.id] ?? roles.find((role) => role.id === row.id)?.name ?? row.id, count });
       } else if (!seen.has(row.userId)) {
         seen.add(row.userId);
         rows.push({ kind: "member", userId: row.userId, status: statusOf(row.userId) });
