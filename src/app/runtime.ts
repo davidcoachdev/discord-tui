@@ -14,6 +14,7 @@ import { selectMessages } from "../store/selectors";
 import { createStore, type Store } from "../store/store";
 import { createVoiceActions, type VoiceMedia } from "../actions/voice";
 import { createGoLive, type GoLive } from "../golive/golive";
+import { createStreamWatcher, type StreamWatcher } from "../watch/watch";
 import { createVoiceAdapterCreator } from "../voice/adapter";
 import { startCapture, startPlayback } from "../voice/audio-io";
 import { createOpusCodec } from "../voice/opus";
@@ -39,6 +40,8 @@ export interface RuntimeDeps {
   kittyKeyboard?: () => boolean;
   /** Go Live; por defecto el real (src/golive), atado a este gateway. */
   goLive?: (deps: { store: Store; gateway: ReturnType<typeof createGateway> }) => GoLive;
+  /** Ver transmisiones de otros; por defecto el real (src/watch), atado a este gateway. */
+  streamWatcher?: (deps: { store: Store; gateway: ReturnType<typeof createGateway> }) => StreamWatcher;
   /** Sonidos de eventos; por defecto los reales (pw-cat o el mixer de la llamada). */
   sounds?: SoundPlayer;
   /** Notificación de escritorio; por defecto `notify-send`. */
@@ -99,6 +102,7 @@ export function createRuntime(deps: RuntimeDeps): Runtime {
       canSignal: () => gateway.status === "ready",
     });
   const stream = (deps.goLive ?? ((d) => createGoLive(d)))({ store, gateway });
+  const watch = (deps.streamWatcher ?? ((d) => createStreamWatcher(d)))({ store, gateway });
   const media = deps.voiceMedia ?? defaultMedia;
   const voice = createVoiceActions({
     store,
@@ -106,6 +110,7 @@ export function createRuntime(deps: RuntimeDeps): Runtime {
     media,
     kittyKeyboard: deps.kittyKeyboard,
     stream,
+    watch,
   });
   const sounds =
     deps.sounds ??
@@ -225,6 +230,7 @@ export function createRuntime(deps: RuntimeDeps): Runtime {
         await Promise.race([voice.leaveVoice(), new Promise((resolve) => setTimeout(resolve, 1_500))]);
       }
       // Por si quedó algo de la captura: no deja procesos huérfanos al salir.
+      watch.dispose();
       stream.dispose();
       await Promise.race([stream.stop(), new Promise((resolve) => setTimeout(resolve, 2_000))]);
       detachSettings();

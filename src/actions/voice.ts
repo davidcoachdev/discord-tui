@@ -1,6 +1,8 @@
 import { log } from "../log/logger";
 import type { GoLive } from "../golive/golive";
 import type { Monitor } from "../golive/capture";
+import type { FrameSubscription, StreamWatcher } from "../watch/watch";
+import type { DecodedFrame } from "../watch/decode";
 import type { Store } from "../store/store";
 import type { AudioCapture, AudioPlayback } from "../voice/audio-io";
 import { createMixer, type Mixer } from "../voice/mixer";
@@ -37,6 +39,12 @@ export interface VoiceActions {
   startStream?(monitor?: string | null): Promise<void>;
   stopStream?(): Promise<void>;
   toggleStream?(): Promise<void>;
+  /** Ver la transmisión de otro de tu canal de voz (una a la vez); toggle = dejar de verla si ya la mirás. */
+  watchStream?(userId: string): Promise<void>;
+  toggleWatch?(userId: string): Promise<void>;
+  stopWatching?(): Promise<void>;
+  /** Cuadros de la transmisión que mirás, achicados a la caja (la vista se suscribe mientras está visible). */
+  watchFrames?(width: number, height: number, onFrame: (frame: DecodedFrame) => void): FrameSubscription;
   /** Monitores que se pueden transmitir (Hyprland; si no, uno: el predeterminado). */
   listMonitors?(): Promise<Monitor[]>;
   /** Salidas disponibles y cuál se usa ahora. */
@@ -58,6 +66,8 @@ export function createVoiceActions(deps: {
   kittyKeyboard?: () => boolean;
   /** Go Live atado a esta voz (src/golive). */
   stream?: GoLive;
+  /** Ver transmisiones de otros (src/watch). */
+  watch?: StreamWatcher;
   /**
    * Renovación de la salida para el desfase de relojes: el reloj de la PC (que marca el ritmo del mixer) y el
    * de la placa de audio se separan ~50–100 ppm, así que en una llamada larga el colchón de pw-cat se agota
@@ -303,6 +313,7 @@ export function createVoiceActions(deps: {
   });
 
   async function leaveVoice(error?: string): Promise<void> {
+    await deps.watch?.stop();
     await deps.stream?.stop();
     await stopMedia();
     await session.leave();
@@ -343,6 +354,7 @@ export function createVoiceActions(deps: {
         return;
       }
       if (state.voice.channelId !== null) {
+        await deps.watch?.stop();
         await deps.stream?.stop();
         await stopMedia();
         await session.leave();
@@ -424,6 +436,14 @@ export function createVoiceActions(deps: {
           stopStream: () => deps.stream!.stop(),
           toggleStream: () => deps.stream!.toggle(),
           listMonitors: () => deps.stream!.listMonitors(),
+        }
+      : {}),
+    ...(deps.watch
+      ? {
+          watchStream: (userId: string) => deps.watch!.watch(userId),
+          toggleWatch: (userId: string) => deps.watch!.toggle(userId),
+          stopWatching: () => deps.watch!.stop(),
+          watchFrames: (w: number, h: number, fn: (frame: DecodedFrame) => void) => deps.watch!.subscribe(w, h, fn),
         }
       : {}),
   };

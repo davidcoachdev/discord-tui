@@ -187,6 +187,16 @@ export interface StreamState {
   viewers?: number;
 }
 
+export type WatchStatus = "idle" | "connecting" | "watching" | "error";
+
+/** Transmisión de otro que estás mirando (una a la vez; solo estando en su canal de voz). */
+export interface WatchState {
+  status: WatchStatus;
+  /** Quién transmite. */
+  userId: string | null;
+  error: string | null;
+}
+
 export interface VoiceSlice {
   guildId: string | null;
   channelId: string | null;
@@ -205,6 +215,7 @@ export interface VoiceSlice {
   pttWarning: string | null;
   micError: string | null;
   stream: StreamState;
+  watch: WatchState;
 }
 
 export interface AppState {
@@ -283,4 +294,5 @@ export type Action =
   | { type: "voice/pttWarning"; warning: string | null }
   | { type: "voice/micError"; error: string | null }
   | { type: "voice/outputLabel"; label: string | null }
-  | { type: "voice/stream"; patch: Partial<StreamState> };
+  | { type: "voice/stream"; patch: Partial<StreamState> }
+  | { type: "voice/watch"; patch: Partial<WatchState> };

@@ -313,3 +313,14 @@ export function selectDmMemberRows(state: AppState, channelId: string): MemberRo
     ...ids.map((userId) => ({ kind: "member" as const, userId, status: statusOf(userId) })),
   ];
 }
+
+/** Quiénes transmiten (📺) en TU canal de voz, sin vos: los que se pueden mirar. */
+export function selectWatchableStreamers(state: AppState): string[] {
+  const v = state.voice;
+  if (v.guildId === null || v.channelId === null || v.status !== "connected") return [];
+  const meId = state.me?.id ?? null;
+  return Object.entries(v.states[v.guildId] ?? {})
+    .filter(([userId, s]) => userId !== meId && s.channelId === v.channelId && s.selfStream)
+    .map(([userId]) => userId)
+    .sort(compareSnowflakes);
+}

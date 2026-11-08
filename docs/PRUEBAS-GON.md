@@ -89,3 +89,23 @@ terminar en ban (ver `docs/protocol-notes.md`, "Transmitir pantalla").
 - [ ] `🔴 EN VIVO · detener` → tu amigo deja de verla. Probá también salir de la voz transmitiendo (`✕ salir`): corta solo.
 - [ ] Con la TUI todavía abierta y sin transmitir: `pgrep -a "wf-recorder|ffmpeg|grim"` no muestra nada. Y después de `q`, tampoco.
 - [ ] `bun run leak-check` → `OK`.
+
+## 7. Ver la transmisión de otro [2ª]
+
+Necesita a un amigo que transmita pantalla (Go Live) desde el cliente oficial en un canal de voz donde estés vos. Usa tu
+cuenta, como Go Live (ver `docs/protocol-notes.md`, "Ver transmisiones"). Sin audio de la transmisión por ahora.
+
+- [ ] `bun run demo` primero: entrá a `🔊 Sala 1` → debajo de Ragnar (`📺`) aparece `▶ ver`; click → `⏳ conectando…` → barras de
+      colores en lugar de los mensajes, arriba `📺 Ragnar · en vivo · N fps` y `✕ dejar de ver`. `Esc` o `w` la cierra; `w` de
+      nuevo la abre. En el chat del canal de voz también está `▶ ver Ragnar`.
+- [ ] `bun run dev`, entrá al canal de voz de tu amigo y que él empiece a transmitir. Click en `▶ ver` debajo de su nombre (o `w`).
+      En ≤ 5 s tiene que verse su pantalla. Si queda en `⏳ conectando…` o sale un error, copiá esa línea y el final del log
+      (`watch.*`, sin datos privados).
+- [ ] Lo importante: ¿se ve la imagen? (si queda negro o "esperando el primer cuadro…" con DAVE activo, el log dice si fue el
+      descifrado: es lo único que no se pudo probar sin la cuenta). ¿Cuántos fps dice arriba (debería rondar 10–12)? ¿Parpadea
+      en Ghostty? ¿Cuánta CPU usa la app (`top`, debería estar < 15 % de un núcleo)?
+- [ ] Tu amigo ve en su cliente que estás mirando (`👁 1` / tu avatar en el stream).
+- [ ] Que tu amigo corte la transmisión → la vista se cierra sola con `<nombre> dejó de transmitir`. Probá también salir de la voz
+      mirando: se cierra sola.
+- [ ] Achicá y agrandá la ventana de la terminal mientras mirás: el video se re-ajusta a la caja.
+- [ ] `bun run leak-check` → `OK`.

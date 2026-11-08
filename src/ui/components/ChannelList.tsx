@@ -51,6 +51,10 @@ interface ListView {
   voiceChannelId: string | null;
   /** DM 1 a 1 → el otro (para el avatar), solo con `showAvatars`. */
   dmUsers: Record<string, { userId: string; avatar: string }>;
+  /** A quién estás mirando (Go Live de otro), si mirás a alguien. */
+  watching: string | null;
+  /** El canal de voz donde estás conectado del todo (para mirar transmisiones hay que estar adentro). */
+  connectedChannelId: string | null;
 }
 
 function listView(s: AppState): ListView {
@@ -82,7 +86,9 @@ function listView(s: AppState): ListView {
     selectedGuild === "@dms"
       ? " Mensajes directos "
       : ` ${truncate((guildId ? s.guilds[guildId]?.name : null) ?? "Canales", CHANNEL_WIDTH - 6)} `;
-  return { title, rows, participants, voiceChannelId: s.voice.channelId, collapsed: s.ui.collapsedCategories, dmUsers };
+  const connected = s.voice.status === "connected" ? s.voice.channelId : null;
+  const watching = s.voice.watch.status === "idle" ? null : s.voice.watch.userId;
+  return { title, rows, participants, voiceChannelId: s.voice.channelId, collapsed: s.ui.collapsedCategories, watching, connectedChannelId: connected, dmUsers };
 }
 
 export function ChannelList(props: {
@@ -96,6 +102,8 @@ export function ChannelList(props: {
   onVolume?(userId: string, delta: number): void;
   /** Imágenes inline prendidas: los avatares se bajan; si no, queda la inicial. */
   images?: boolean;
+  /** `▶ ver` / `■ dejar de ver` de alguien que transmite en tu canal. */
+  onWatch?(userId: string): void;
 }): JSX.Element {
   const [hovered, setHovered] = createSignal<string | null>(null);
   let lastClick: { id: string; at: number } | null = null;
@@ -290,6 +298,17 @@ export function ChannelList(props: {
                             );
                           })()}
                         </box>
+                        <Show when={p.streaming && !p.me && view().connectedChannelId === row.id && props.onWatch}>
+                          <box flexDirection="row" width="100%" paddingLeft={row.depth * 2 + 5}>
+                            <Button
+                              label={view().watching === p.userId ? "■ dejar de ver" : "▶ ver"}
+                              theme={props.theme}
+                              active={view().watching !== p.userId}
+                              danger={view().watching === p.userId}
+                              onPress={() => props.onWatch?.(p.userId)}
+                            />
+                          </box>
+                        </Show>
                         <Show when={chosen() && !p.me}>
                           <box flexDirection="row" width="100%" paddingLeft={row.depth * 2 + 5}>
                             <text fg={props.theme.dim}>vol </text>

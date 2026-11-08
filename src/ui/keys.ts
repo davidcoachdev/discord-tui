@@ -42,6 +42,7 @@ export const SPEC_KEYS: KeyEntry[] = [
   { key: "M", desc: "modo VAD o Push-to-Talk", group: "Voz" },
   { key: "Espacio", desc: "push-to-talk (mantener)", group: "Voz" },
   { key: "S", desc: "transmitir pantalla (Go Live) / detener", group: "Voz" },
+  { key: "w", desc: "ver la transmisión (📺) de alguien de tu canal / dejar de ver (Esc)", group: "Voz" },
   { key: "j + / -", desc: "volumen de un participante (±10 %)", group: "Voz" },
   { key: "gs", desc: "settings (audio, tema, imágenes)", group: "App" },
   { key: "gp", desc: "estado propio (en línea, ausente, no molestar, invisible)", group: "App" },

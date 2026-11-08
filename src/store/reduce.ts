@@ -185,6 +185,7 @@ export function reduce(state: AppState, action: Action): AppState {
     case "voice/micError":
     case "voice/outputLabel":
     case "voice/stream":
+    case "voice/watch":
       return reduceVoiceAction(state, action);
     default:
       return state;
