@@ -17,6 +17,11 @@ export function canViewChannel(state: AppState, guildId: string, channelId: stri
   // DMs y grupos: no hay permisos de guild.
   if (channel.guildId === null) return true;
 
+  // Un hilo se ve si se ve su canal (los privados solo llegan si ya estás adentro).
+  if (channel.thread !== undefined) {
+    return channel.parentId !== null && channel.parentId !== channelId && canViewChannel(state, guildId, channel.parentId);
+  }
+
   const guild = state.guilds[guildId];
   if (!guild) return false;
   if (state.me !== null && guild.ownerId === state.me.id) return true;

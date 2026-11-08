@@ -31,6 +31,7 @@ import {
   applyRecipient,
   ensureDmForMessage,
 } from "./reducers/channels";
+import { applyThreadDelete, applyThreadListSync, applyThreadsLoaded, applyThreadUpsert, isThreadPayload } from "./reducers/threads";
 import { applyReadyVoiceStates, applySupplementalMembers, applyVoiceStateUpdate, reduceVoiceAction } from "./reducers/voice";
 
 export function reduce(state: AppState, action: Action): AppState {
@@ -78,7 +79,14 @@ export function reduce(state: AppState, action: Action): AppState {
           return applyVoiceStateUpdate(state, action.d);
         case "CHANNEL_CREATE":
         case "CHANNEL_UPDATE":
-          return applyChannelUpsert(state, action.d);
+          return isThreadPayload(action.d) ? applyThreadUpsert(state, action.d) : applyChannelUpsert(state, action.d);
+        case "THREAD_CREATE":
+        case "THREAD_UPDATE":
+          return applyThreadUpsert(state, action.d);
+        case "THREAD_DELETE":
+          return applyThreadDelete(state, action.d);
+        case "THREAD_LIST_SYNC":
+          return applyThreadListSync(state, action.d);
         case "CHANNEL_DELETE":
           return applyChannelDelete(state, action.d);
         case "CHANNEL_RECIPIENT_ADD":
@@ -89,6 +97,8 @@ export function reduce(state: AppState, action: Action): AppState {
         default:
           return state;
       }
+    case "threads/loaded":
+      return applyThreadsLoaded(state, action.guildId, action.threads);
     case "connection":
       return state.connection === action.status ? state : { ...state, connection: action.status };
     case "messages/page":

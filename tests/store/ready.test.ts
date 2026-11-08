@@ -37,7 +37,7 @@ test("DMs come from private_channels", () => {
   expect(rows.every((row) => row.kind === "dm" || row.kind === "group_dm")).toBe(true);
 });
 
-test("channel list skips threads, forums and stage, and nests under categories by position", () => {
+test("channel list lists forums, skips stage and threads not under a text channel, and nests under categories by position", () => {
   const category = { id: "100000000000000060", type: 4, name: "categoria", position: 0, parent_id: null, permission_overwrites: [] };
   const child = { id: "100000000000000061", type: 0, name: "hijo", position: 2, parent_id: category.id, permission_overwrites: [] };
   const thread = { id: "100000000000000062", type: 11, name: "hilo", position: 3, parent_id: category.id, permission_overwrites: [] };
@@ -50,7 +50,7 @@ test("channel list skips threads, forums and stage, and nests under categories b
   expect(rows.find((row) => row.id === category.id)).toMatchObject({ kind: "category", depth: 0 });
   expect(rows.find((row) => row.id === child.id)).toMatchObject({ kind: "text", depth: 1 });
   expect(rows.some((row) => row.id === thread.id)).toBe(false);
-  expect(rows.some((row) => row.id === forum.id)).toBe(false);
+  expect(rows.find((row) => row.id === forum.id)).toMatchObject({ kind: "forum", depth: 1 });
   expect(rows.some((row) => row.id === stage.id)).toBe(false);
 });
 

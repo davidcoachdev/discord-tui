@@ -7,11 +7,12 @@ import type { ApiMessage, AppState, ChannelState, Message } from "./types";
 export interface ChannelRow {
   id: string;
   name: string;
-  kind: "text" | "voice" | "category" | "dm" | "group_dm";
+  kind: "text" | "voice" | "category" | "dm" | "group_dm" | "thread" | "forum" | "media";
   unread: boolean;
   mentions: number;
   muted: boolean;
-  depth: 0 | 1;
+  /** 2: hilo de un canal que está dentro de una categoría. */
+  depth: 0 | 1 | 2;
   /** DM 1 a 1: presencia del otro. */
   status?: string;
 }
@@ -25,10 +26,21 @@ export interface GuildRow {
 
 const TEXT_TYPES = new Set([0, 5]);
 const VOICE_TYPES = new Set([2]);
+export const THREAD_CHANNEL_TYPES = new Set([10, 11, 12]);
+/** Foros (15) y canales de medios (16): no tienen mensajes propios, solo posts (hilos). */
+export const FORUM_TYPES = new Set([15, 16]);
+
+/** Canales donde se leen y escriben mensajes (texto, DMs, hilos). */
+export function isMessageChannelType(type: number | undefined): boolean {
+  return type !== undefined && type !== 2 && type !== 4 && !FORUM_TYPES.has(type);
+}
 
 function kindOf(channel: ChannelState): ChannelRow["kind"] | null {
   if (TEXT_TYPES.has(channel.type)) return "text";
   if (VOICE_TYPES.has(channel.type)) return "voice";
+  if (THREAD_CHANNEL_TYPES.has(channel.type)) return "thread";
+  if (channel.type === 15) return "forum";
+  if (channel.type === 16) return "media";
   if (channel.type === 4) return "category";
   if (channel.type === 1) return "dm";
   if (channel.type === 3) return "group_dm";
@@ -39,16 +51,20 @@ export function isChannelUnread(state: AppState, channelId: string): boolean {
   const channel = state.channels[channelId];
   if (!channel || channel.lastMessageId === null) return false;
   const read = state.readState[channelId];
+  // Hilos: como Discord, solo cuentan los que seguís (los que tienen read state).
+  if (channel.thread !== undefined && !read) return false;
   if (!read?.lastAckedId) return true;
   return compareSnowflakes(channel.lastMessageId, read.lastAckedId) > 0;
 }
 
 export function isChannelMuted(state: AppState, guildId: string | null, channelId: string): boolean {
   if (state.guildSettings.mutedChannels.includes(channelId)) return true;
+  const channel = state.channels[channelId];
+  if (channel?.thread !== undefined && channel.parentId !== null && state.guildSettings.mutedChannels.includes(channel.parentId)) return true;
   return guildId !== null && state.guildSettings.mutedGuilds.includes(guildId);
 }
 
-function toRow(state: AppState, channel: ChannelState, depth: 0 | 1): ChannelRow {
+function toRow(state: AppState, channel: ChannelState, depth: ChannelRow["depth"]): ChannelRow {
   const kind = kindOf(channel);
   const isPrivate = channel.guildId === null && channel.recipientIds !== undefined;
   const other = channel.type === 1 ? channel.recipientIds?.[0] : undefined;
@@ -68,6 +84,46 @@ function byPosition(a: ChannelState, b: ChannelState): number {
   return a.position - b.position || compareSnowflakes(a.id, b.id);
 }
 
+/** Actividad más reciente primero (último mensaje, o la creación si no tiene). */
+function byActivity(a: ChannelState, b: ChannelState): number {
+  return compareSnowflakes(b.lastMessageId ?? b.id, a.lastMessageId ?? a.id);
+}
+
+export function isThread(channel: ChannelState | undefined): boolean {
+  return channel !== undefined && channel.thread !== undefined && THREAD_CHANNEL_TYPES.has(channel.type);
+}
+
+/** Hilos activos (no archivados) de un canal, el de actividad más reciente primero. */
+export function selectActiveThreads(state: AppState, parentId: string): ChannelState[] {
+  return Object.values(state.channels)
+    .filter((channel) => isThread(channel) && channel.parentId === parentId && !channel.thread!.archived)
+    .sort(byActivity);
+}
+
+export interface ForumPostRow {
+  id: string;
+  name: string;
+  archived: boolean;
+  locked: boolean;
+  messageCount: number | null;
+  unread: boolean;
+}
+
+/** Posts de un foro: los activos y después los archivados que se pidieron, cada grupo por actividad. */
+export function selectForumPosts(state: AppState, forumId: string): ForumPostRow[] {
+  const posts = Object.values(state.channels).filter((channel) => isThread(channel) && channel.parentId === forumId);
+  const active = posts.filter((post) => !post.thread!.archived).sort(byActivity);
+  const archived = posts.filter((post) => post.thread!.archived).sort(byActivity);
+  return [...active, ...archived].map((post) => ({
+    id: post.id,
+    name: post.name,
+    archived: post.thread!.archived,
+    locked: post.thread!.locked,
+    messageCount: post.thread!.messageCount,
+    unread: isChannelUnread(state, post.id),
+  }));
+}
+
 export function selectChannelList(state: AppState, guildId: string | "@dms"): ChannelRow[] {
   if (guildId === "@dms") {
     // Como Discord: el que tuvo actividad más reciente arriba.
@@ -80,8 +136,17 @@ export function selectChannelList(state: AppState, guildId: string | "@dms"): Ch
   }
 
   const visible = Object.values(state.channels).filter(
-    (channel) => channel.guildId === guildId && canViewChannel(state, guildId, channel.id) && kindOf(channel) !== null,
+    (channel) =>
+      channel.guildId === guildId &&
+      !isThread(channel) &&
+      canViewChannel(state, guildId, channel.id) &&
+      kindOf(channel) !== null,
   );
+  // Los hilos activos van debajo de su canal de texto (los de un foro se ven al abrir el foro).
+  const withThreads = (channel: ChannelState, depth: 0 | 1): void => {
+    if (!TEXT_TYPES.has(channel.type)) return;
+    for (const thread of selectActiveThreads(state, channel.id)) rows.push(toRow(state, thread, depth === 0 ? 1 : 2));
+  };
 
   const categories = visible.filter((channel) => channel.type === 4).sort(byPosition);
   const rows: ChannelRow[] = [];
@@ -94,11 +159,13 @@ export function selectChannelList(state: AppState, guildId: string | "@dms"): Ch
     for (const child of children) {
       rows.push(toRow(state, child, 1));
       placed.add(child.id);
+      withThreads(child, 1);
     }
   }
 
   for (const channel of visible.filter((candidate) => candidate.type !== 4 && !placed.has(candidate.id)).sort(byPosition)) {
     rows.push(toRow(state, channel, 0));
+    withThreads(channel, 0);
   }
 
   return rows;
@@ -110,7 +177,9 @@ export function selectVisibleChannelList(state: AppState, guildId: string | "@dm
   if (collapsed.size === 0) return selectChannelList(state, guildId);
   return selectChannelList(state, guildId).filter((row) => {
     if (row.kind === "category" || row.depth === 0) return true;
-    const parent = state.channels[row.id]?.parentId;
+    let parent = state.channels[row.id]?.parentId;
+    // Un hilo se colapsa con la categoría de su canal.
+    if (row.kind === "thread" && parent != null) parent = state.channels[parent]?.parentId;
     return parent == null || !collapsed.has(parent);
   });
 }

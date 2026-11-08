@@ -1,3 +1,4 @@
+import { isThreadPayload, toThread } from "./threads";
 import type { AppState, ChannelState, MemberState, OverwriteState, RoleState, UserState } from "../types";
 
 
@@ -133,7 +134,14 @@ export function applyReady(state: AppState, d: any): AppState {
     }
 
     for (const rawChannel of asList(rawGuild.channels, "id")) {
-      channels[rawChannel.id] = toChannel(rawChannel, rawGuild.id);
+      if (typeof rawChannel.id !== "string") continue;
+      const thread = isThreadPayload(rawChannel) ? toThread(rawChannel, rawGuild.id) : null;
+      channels[rawChannel.id] = thread ?? toChannel(rawChannel, rawGuild.id);
+    }
+    // Hilos activos que el usuario ve (en cuentas de usuario: los que sigue; el resto llega en THREAD_LIST_SYNC).
+    for (const rawThread of asList(rawGuild.threads, "id")) {
+      const thread = toThread(rawThread, rawGuild.id);
+      if (thread) channels[thread.id] = thread;
     }
   }
 
