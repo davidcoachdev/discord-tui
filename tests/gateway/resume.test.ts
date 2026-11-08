@@ -189,3 +189,33 @@ test("status goes ready, reconnecting, resuming and ready again", async () => {
     fake.stop();
   }
 });
+
+test("op 9 opens exactly one new socket (two sockets would share zlib state and corrupt it)", async () => {
+  let fake: FakeGateway;
+  let ready = null as ReturnType<typeof readyFor> | null;
+  fake = startFakeGateway({ onIdentify: () => fake.dispatch("READY", ready!.d) });
+  ready = readyFor(fake);
+  // Timers reales, como en la app: el cierre del socket viejo llega antes de que venza la espera del op 9.
+  const gw = gatewayFor(fake, { setTimer: setTimeout, random: () => 0 });
+  const statuses: string[] = [];
+  gw.on("status", (s) => statuses.push(s));
+  gw.connect();
+  try {
+    await waitFor(() => gw.status === "ready");
+    fake.sendRaw({ op: 9, d: false });
+    await waitFor(() => fake.received.filter((message) => message.op === 2).length === 2, 6000);
+    await Bun.sleep(2500);
+    expect(fake.received.filter((message) => message.op === 2)).toHaveLength(2);
+    expect(statuses.filter((s) => s === "connecting")).toHaveLength(2);
+    // Un mensaje después de la reconexión se sigue descomprimiendo bien.
+    fake.dispatch("MESSAGE_CREATE", { id: "1", channel_id: "2", content: "ok" });
+    const got: string[] = [];
+    gw.on("dispatch", (t) => got.push(t));
+    fake.dispatch("TYPING_START", { channel_id: "2", user_id: "3" });
+    await waitFor(() => got.includes("TYPING_START"));
+    expect(gw.status).toBe("ready");
+  } finally {
+    gw.close();
+    fake.stop();
+  }
+}, 15_000);

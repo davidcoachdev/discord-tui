@@ -46,7 +46,6 @@ export function createGateway(deps: GatewayDeps): Gateway {
   const random = deps.random ?? Math.random;
   const setTimer = deps.setTimer ?? setTimeout;
   const url = deps.url ?? DEFAULT_URL;
-  const inflater = createZlibStreamInflater();
 
   const listeners = new Map<string, Set<(...args: any[]) => void>>();
   let socket: WebSocket | null = null;
@@ -106,11 +105,7 @@ export function createGateway(deps: GatewayDeps): Gateway {
   function heartbeatTick(): void {
     if (!acked) {
       log.error("gateway.heartbeat-miss");
-      try {
-        socket?.close(4000);
-      } catch {
-        // ya estaba cerrado
-      }
+      dropSocket(sessionId !== null && seq !== null ? "resume" : "identify");
       return;
     }
     acked = false;
@@ -199,27 +194,17 @@ export function createGateway(deps: GatewayDeps): Gateway {
         send(1, seq);
         return;
       case 7:
-        try {
-          socket?.close(4000);
-        } catch {
-          // ya estaba cerrado
-        }
+        log.info("gateway.reconnect-requested");
+        dropSocket("resume");
         return;
       case 9: {
         const resumable = message.d === true;
+        log.warn("gateway.invalid-session", { state: resumable ? "resumable" : "new" });
         if (!resumable) {
           sessionId = null;
           seq = null;
         }
-        try {
-          socket?.close(4000);
-        } catch {
-          // ya estaba cerrado
-        }
-        scheduleReconnect(
-          resumable ? "resume" : "identify",
-          resumable ? undefined : 1_000 + Math.floor(random() * 4_000),
-        );
+        dropSocket(resumable ? "resume" : "identify", resumable ? undefined : 1_000 + Math.floor(random() * 4_000));
         return;
       }
       case 0:
@@ -230,11 +215,29 @@ export function createGateway(deps: GatewayDeps): Gateway {
     }
   }
 
+  /**
+   * Suelta el socket actual (sus eventos ya no cuentan) y programa una sola reconexión.
+   * Antes se cerraba y además reconectaba onclose: quedaban dos sockets vivos a la vez.
+   */
+  function dropSocket(kind: "resume" | "identify", delay?: number): void {
+    stopHeartbeat();
+    const current = socket;
+    socket = null;
+    resuming = false;
+    try {
+      current?.close(4000);
+    } catch {
+      // ya estaba cerrado
+    }
+    scheduleReconnect(kind, delay);
+  }
+
   function handleClose(code: number): void {
     stopHeartbeat();
     socket = null;
-    reconnectTimer = null;
     resuming = false;
+    log.warn("gateway.closed", { close_code: code });
+    if (reconnectTimer !== null) return;
 
     if (closedByUser) {
       setStatus("disconnected");
@@ -256,18 +259,26 @@ export function createGateway(deps: GatewayDeps): Gateway {
   }
 
   function openSocket(target: string): void {
-    inflater.reset();
+    // Un contexto zlib por socket: si dos sockets compartieran uno, se corrompe ("unknown compression method").
+    const own = createZlibStreamInflater();
     setStatus(resuming ? "resuming" : "connecting");
     const ws = new WebSocketImpl(target);
     socket = ws;
 
     ws.onmessage = (event: MessageEvent) => {
+      if (socket !== ws) return; // un socket viejo que todavía manda algo
       let text: string | null;
       if (typeof event.data === "string") {
         text = event.data;
       } else {
         const bytes = toBytes(event.data);
-        text = bytes === null ? null : inflater.push(bytes);
+        try {
+          text = bytes === null ? null : own.push(bytes);
+        } catch (error) {
+          log.error("gateway.inflate-failed", { error_name: error instanceof Error ? error.name : "unknown" });
+          dropSocket(sessionId !== null && seq !== null ? "resume" : "identify");
+          return;
+        }
       }
       if (text !== null) handleMessage(text);
     };

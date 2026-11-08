@@ -8,14 +8,13 @@ export function buildGuildSubscription(
     op: 37,
     d: {
       subscriptions: {
+        // `members` (si va) es una lista de ids de usuario, no rangos: un rango ahí hace que
+        // Discord cierre el gateway. La lista de miembros sale de los rangos de `channels`.
         [guildId]: {
           typing: true,
-          threads: false,
+          threads: true,
           activities: true,
-          members: [range],
-          member_updates: false,
           channels: { [channelId]: [range] },
-          thread_member_lists: {},
         },
       },
     },

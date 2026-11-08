@@ -4,15 +4,8 @@
     "subscriptions": {
       "100000000000000001": {
         "typing": true,
-        "threads": false,
+        "threads": true,
         "activities": true,
-        "members": [
-          [
-            0,
-            99
-          ]
-        ],
-        "member_updates": false,
         "channels": {
           "100000000000000002": [
             [
@@ -20,8 +13,7 @@
               99
             ]
           ]
-        },
-        "thread_member_lists": {}
+        }
       }
     }
   }
