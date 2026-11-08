@@ -86,3 +86,14 @@ Datos que el agente resuelve y documenta mientras construye. Sin tokens ni ids r
 - `CHANNEL_CREATE` agrega DMs nuevos; además, el primer mensaje de alguien que no estaba en la lista crea el DM (`ensureDmForMessage`). `CHANNEL_UPDATE`/`DELETE`, `CHANNEL_RECIPIENT_ADD`/`REMOVE` y `GUILD_MEMBER_UPDATE` ahora se aplican.
 - Presencia de los DMs: `READY_SUPPLEMENTAL.merged_presences.friends`.
 - Bug arreglado de paso: un autor de mensaje sin `global_name` pisaba el nombre ya conocido (los DMs mostraban el username).
+
+## Encuestas y stickers
+
+Fuentes (consultadas 2026-11-07): docs.discord.food → Messages (Poll Object, "Create Poll Vote"), Gateway Events ("Message Poll Vote Add/Remove") y Stickers. Probado solo con fixtures y la demo; falta la prueba de Gon contra la cuenta real.
+
+- **`message.poll`**: `{ question: { text }, answers: [{ answer_id, poll_media: { text, emoji? } }], expiry, allow_multiselect, layout_type, results? }`. `results = { is_finalized, answer_counts: [{ id, count, me_voted }] }`; una respuesta que no figura en `answer_counts` tiene 0 votos. Si falta `results`, los resultados son desconocidos: un `MESSAGE_UPDATE` con la encuesta sin `results` conserva los que ya teníamos (`updateMessage`).
+- **Votos en vivo**: `MESSAGE_POLL_VOTE_ADD` / `MESSAGE_POLL_VOTE_REMOVE` con `{ user_id, channel_id, message_id, guild_id?, answer_id }` (`answer_id` es entero, los demás snowflakes); en multiselección llega uno por respuesta. `me_voted` cambia solo si `user_id` soy yo (`src/store/reducers/polls.ts`).
+- **Votar**: `PUT /channels/{channel_id}/polls/{message_id}/answers/@me` con `{ answer_ids: [...] }` (array de enteros; vacío saca el voto), responde 204 y Discord dispara los eventos de voto, también por los propios: por eso no hay cambio optimista. Multiselección alterna la respuesta tocada sobre mis votos actuales; selección única la reemplaza y tocar la misma saca el voto. Encuestas vencidas (`expiry` pasado) o con `is_finalized` no mandan nada.
+- **[sin verificar]** si el cliente web manda los `answer_ids` como strings (`["1"]`) en vez de enteros; discord.food dice `array[integer]` y seguimos eso. Tampoco se probó el voto contra la cuenta real.
+- Terminar una encuesta (`POST /channels/{c}/polls/{m}/expire`, solo el autor) no está implementado.
+- **Stickers**: `message.sticker_items = [{ id, name, format_type }]`, `format_type` 1 PNG, 2 APNG, 3 Lottie, 4 GIF. Se muestran como imagen desde `https://media.discordapp.net/stickers/{id}.png?size=160` (o `.gif`; discord.food aclara que los GIF no están en el CDN y van por `media.discordapp.net`). El host ya estaba en la lista permitida; no se tocó. Lottie y "imágenes apagadas" muestran `🏷 nombre`. **[sin verificar]** el parámetro `size=160` (lo pidió el plan; discord.food no lo menciona) y que `<image>` anime APNG/GIF (se espera el primer frame).
