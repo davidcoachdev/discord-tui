@@ -237,3 +237,39 @@ test("setPlayback moves the stream to a new output with its own cushion; idleMs 
   expect(first).toHaveLength(before);
   expect(second.length).toBeGreaterThan(3);
 });
+
+describe("mixer.play (event sounds)", () => {
+  test("a one-shot is summed into the next slots, one frame per slot, then stops", () => {
+    const h = harness();
+    h.mixer.start();
+    fill(h, "a", 100, 3);
+    h.mixer.play([pcmOf(10), pcmOf(20)]);
+    h.advance(20);
+    h.advance(20);
+    h.advance(20);
+    expect(h.writes.map((w) => sampleAt(w, 0))).toEqual([110, 120, 100]);
+  });
+
+  test("with nobody talking the one-shot alone is written; two overlap and add up", () => {
+    const h = harness();
+    h.mixer.start();
+    h.mixer.play([pcmOf(10), pcmOf(10)]);
+    h.mixer.play([pcmOf(5)]);
+    h.advance(20);
+    h.advance(20);
+    h.advance(20);
+    expect(h.writes.map((w) => sampleAt(w, 0))).toEqual([15, 10]);
+  });
+
+  test("deafened (muted mixer): people are dropped but the one-shot still plays, after a short cushion", () => {
+    const h = harness();
+    h.mixer.start();
+    h.mixer.setMuted(true);
+    fill(h, "a", 100, 2);
+    h.mixer.play([pcmOf(7)]);
+    expect(h.writes.map((w) => sampleAt(w, 0))).toEqual([0, 0]);
+    h.advance(20);
+    h.advance(20);
+    expect(h.writes.map((w) => sampleAt(w, 0))).toEqual([0, 0, 7]);
+  });
+});

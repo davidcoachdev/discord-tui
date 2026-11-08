@@ -20,6 +20,8 @@ import { createOpusCodec } from "../voice/opus";
 import { createDjsVoiceSession, type VoiceSession } from "../voice/session";
 import { createVad } from "../voice/vad";
 import { listAudioDevices } from "../voice/devices";
+import { attachVoiceSounds, peerCue } from "../sounds/events";
+import { createSoundPlayer, type SoundPlayer } from "../sounds/player";
 
 export interface RuntimeDeps {
   session: Session;
@@ -37,6 +39,10 @@ export interface RuntimeDeps {
   kittyKeyboard?: () => boolean;
   /** Go Live; por defecto el real (src/golive), atado a este gateway. */
   goLive?: (deps: { store: Store; gateway: ReturnType<typeof createGateway> }) => GoLive;
+  /** Sonidos de eventos; por defecto los reales (pw-cat o el mixer de la llamada). */
+  sounds?: SoundPlayer;
+  /** Notificación de escritorio; por defecto `notify-send`. */
+  notify?: (title: string, body: string) => void;
 }
 
 const defaultMedia: VoiceMedia = {
@@ -93,13 +99,23 @@ export function createRuntime(deps: RuntimeDeps): Runtime {
       canSignal: () => gateway.status === "ready",
     });
   const stream = (deps.goLive ?? ((d) => createGoLive(d)))({ store, gateway });
+  const media = deps.voiceMedia ?? defaultMedia;
   const voice = createVoiceActions({
     store,
     session: voiceSession,
-    media: deps.voiceMedia ?? defaultMedia,
+    media,
     kittyKeyboard: deps.kittyKeyboard,
     stream,
   });
+  const sounds =
+    deps.sounds ??
+    createSoundPlayer({
+      getSettings: () => store.getState().settings,
+      isDeaf: () => store.getState().voice.selfDeaf,
+      mixerSink: () => voice.soundSink?.() ?? null,
+      startPlayback: (opts) => media.startPlayback(opts),
+    });
+  const detachSounds = attachVoiceSounds(store, (cue) => sounds.play(cue));
   const statusSync = createStatusSync({ store, rest, presence: idle });
   const actions = createActions({ store, rest, gateway, voice, fetch: deps.fetch, presence: idle, statusSync });
   store.dispatch({ type: "connection", status: gateway.status });
@@ -127,11 +143,16 @@ export function createRuntime(deps: RuntimeDeps): Runtime {
         }),
       });
     }
+    const before = t === "VOICE_STATE_UPDATE" ? store.getState() : null;
     try {
       store.dispatch({ type: "gw", t, d });
     } catch (error) {
       log.error("store.dispatch-failed", { error_name: error instanceof Error ? error.name : "unknown", t });
       return;
+    }
+    if (before) {
+      const cue = peerCue(before, store.getState());
+      if (cue) sounds.play(cue);
     }
     if (t === "READY") statusSync.ready(d);
     if (t === "USER_SETTINGS_PROTO_UPDATE") statusSync.update(d);
@@ -139,7 +160,8 @@ export function createRuntime(deps: RuntimeDeps): Runtime {
       const state = store.getState();
       const message = selectMessages(state, d.channel_id).find((candidate) => candidate.id === d.id);
       if (message && shouldNotify(state, message, state.ui.selectedChannelId)) {
-        notify(notificationTitle(state, message), message.content.slice(0, 200));
+        (deps.notify ?? notify)(notificationTitle(state, message), message.content.slice(0, 200));
+        sounds.play("message");
       }
     }
   });
@@ -197,6 +219,7 @@ export function createRuntime(deps: RuntimeDeps): Runtime {
     async stop(): Promise<void> {
       clearInterval(noticeSweep);
       offAck();
+      detachSounds();
       idle.stop();
       if (store.getState().voice.channelId !== null) {
         await Promise.race([voice.leaveVoice(), new Promise((resolve) => setTimeout(resolve, 1_500))]);

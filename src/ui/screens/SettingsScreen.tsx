@@ -13,6 +13,23 @@ import { useTheme } from "../theme";
 import { Button, type Click } from "../components/Button";
 import { statusLabel } from "../components/StatusMenu";
 import { OWN_STATUSES, STREAM_QUALITIES } from "../../settings/settings";
+import { CUES, type Cue } from "../../sounds/synth";
+
+/** Nombre de cada sonido en la fila de Settings. */
+export const CUE_LABELS: Record<Cue, string> = {
+  join: "entrar a voz",
+  leave: "salir de voz",
+  userJoin: "alguien entra a tu canal",
+  userLeave: "alguien sale de tu canal",
+  mute: "mutear",
+  unmute: "desmutear",
+  deafen: "ensordecer",
+  undeafen: "dejar de ensordecer",
+  message: "mención o DM",
+  streamStart: "empezar a transmitir",
+  streamStop: "dejar de transmitir",
+  disconnect: "se cortó la voz",
+};
 
 export interface SettingsDeps {
   listAudioDevices(): Promise<{ inputs: AudioDevice[]; outputs: AudioDevice[] }>;
@@ -20,8 +37,35 @@ export interface SettingsDeps {
   startPlayback: (opts?: { target?: string }) => Promise<any>;
 }
 
-type Section = "input" | "output" | "inputMode" | "sensitivity" | "testMic" | "streamMonitor" | "streamQuality" | "status" | "theme" | "images";
-const SECTIONS: Section[] = ["input", "output", "inputMode", "sensitivity", "testMic", "streamMonitor", "streamQuality", "status", "theme", "images"];
+type Section =
+  | "input"
+  | "output"
+  | "inputMode"
+  | "sensitivity"
+  | "testMic"
+  | "streamMonitor"
+  | "streamQuality"
+  | "sounds"
+  | "soundVolume"
+  | "soundEvent"
+  | "status"
+  | "theme"
+  | "images";
+const SECTIONS: Section[] = [
+  "input",
+  "output",
+  "inputMode",
+  "sensitivity",
+  "testMic",
+  "streamMonitor",
+  "streamQuality",
+  "sounds",
+  "soundVolume",
+  "soundEvent",
+  "status",
+  "theme",
+  "images",
+];
 
 export function SettingsScreen(props: {
   store: Store;
@@ -38,6 +82,7 @@ export function SettingsScreen(props: {
   const [level, setLevel] = createSignal(-96);
   const [threshold, setThreshold] = createSignal(-45);
   const [open, setOpen] = createSignal(false);
+  const [cue, setCue] = createSignal<Cue>(CUES[0]);
 
   let echo: Echo | null = null;
 
@@ -109,6 +154,16 @@ export function SettingsScreen(props: {
       else void startTest();
       return;
     }
+    if (section === "sounds" && dir === 0) return patch({ sounds: { ...settings().sounds, enabled: !settings().sounds.enabled } });
+    if (section === "soundVolume" && dir !== 0) {
+      const volume = Math.min(100, Math.max(0, settings().sounds.volume + dir * 10));
+      return patch({ sounds: { ...settings().sounds, volume } });
+    }
+    if (section === "soundEvent") {
+      if (dir !== 0) return void setCue(CUES[(CUES.indexOf(cue()) + dir + CUES.length) % CUES.length]!);
+      const events = { ...settings().sounds.events, [cue()]: !settings().sounds.events[cue()] };
+      return patch({ sounds: { ...settings().sounds, events } });
+    }
     if (section === "streamMonitor") return cycleMonitor(dir === 0 ? 1 : dir);
     if (section === "streamQuality") {
       const index = STREAM_QUALITIES.indexOf(settings().streamQuality);
@@ -152,7 +207,12 @@ export function SettingsScreen(props: {
 
   const theme = useTheme(props.store);
   const arrows = (section: Section): boolean =>
-    section === "input" || section === "output" || section === "sensitivity" || section === "streamMonitor";
+    section === "input" ||
+    section === "output" ||
+    section === "sensitivity" ||
+    section === "soundVolume" ||
+    section === "soundEvent" ||
+    section === "streamMonitor";
   const line = (section: Section, text: string): JSX.Element => (
     <box
       flexDirection="row"
@@ -222,6 +282,13 @@ export function SettingsScreen(props: {
         {line(
           "streamQuality",
           `calidad: ${settings().streamQuality}${settings().streamQuality === "1080p30" ? " (puede necesitar Nitro)" : ""}`,
+        )}
+        <text fg={theme().header}>Sonidos</text>
+        {line("sounds", `sonidos de eventos: ${settings().sounds.enabled ? "sí" : "no"}`)}
+        {line("soundVolume", `volumen de sonidos: ${settings().sounds.volume}%  (h/l)`)}
+        {line(
+          "soundEvent",
+          `${CUE_LABELS[cue()]}: ${settings().sounds.events[cue()] ? "suena" : "no suena"}  (h/l elige, Enter cambia)`,
         )}
         <text fg={theme().header}>Cuenta</text>
         {line("status", `estado: ${statusLabel(settings().status)}  (Enter o h/l)`)}

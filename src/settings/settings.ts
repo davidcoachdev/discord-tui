@@ -2,6 +2,7 @@ import { chmod, mkdir, open, readFile, rename, unlink } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import { settingsPath } from "../config/paths";
+import { CUES, type Cue } from "../sounds/synth";
 
 const VERSION = 1;
 
@@ -14,6 +15,14 @@ export const OWN_STATUSES: OwnStatus[] = ["online", "idle", "dnd", "invisible"];
 /** Calidad de Go Live. Sin Nitro el cliente oficial limita a 720p30; 1080p30 puede necesitar Nitro. */
 export type StreamQuality = "720p30" | "1080p30";
 export const STREAM_QUALITIES: StreamQuality[] = ["720p30", "1080p30"];
+
+/** Sonidos de eventos (entrar/salir de voz, mute, menciones…). */
+export interface SoundSettings {
+  enabled: boolean;
+  /** 0–100. */
+  volume: number;
+  events: Record<Cue, boolean>;
+}
 
 export interface Settings {
   version: typeof VERSION;
@@ -29,6 +38,7 @@ export interface Settings {
   /** Monitor a transmitir (nombre de `hyprctl monitors`); null = preguntar si hay más de uno. */
   streamMonitor: string | null;
   streamQuality: StreamQuality;
+  sounds: SoundSettings;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -44,7 +54,12 @@ export const DEFAULT_SETTINGS: Settings = {
   status: "online",
   streamMonitor: null,
   streamQuality: "720p30",
+  sounds: { enabled: true, volume: 60, events: allCues(true) },
 };
+
+function allCues(on: boolean): Record<Cue, boolean> {
+  return Object.fromEntries(CUES.map((cue) => [cue, on])) as Record<Cue, boolean>;
+}
 
 const MIN_SENSITIVITY = -60;
 const MAX_SENSITIVITY = -20;
@@ -92,6 +107,19 @@ function parseIdle(value: unknown): number | null {
   return DEFAULT_SETTINGS.idleAfterMinutes;
 }
 
+function parseSounds(value: unknown): SoundSettings {
+  const record = asRecord(value);
+  const events = allCues(true);
+  const rawEvents = asRecord(record?.events);
+  for (const cue of CUES) if (typeof rawEvents?.[cue] === "boolean") events[cue] = rawEvents[cue] as boolean;
+  const volume = record?.volume;
+  return {
+    enabled: typeof record?.enabled === "boolean" ? record.enabled : true,
+    volume: typeof volume === "number" && Number.isFinite(volume) ? Math.round(clamp(volume, 0, 100)) : 60,
+    events,
+  };
+}
+
 /** Normaliza un objeto arbitrario a `Settings`, campo por campo (un campo inválido no tumba al resto). */
 export function normalizeSettings(raw: unknown): Settings {
   const record = asRecord(raw);
@@ -115,6 +143,7 @@ export function normalizeSettings(raw: unknown): Settings {
     streamQuality: STREAM_QUALITIES.includes(record.streamQuality as StreamQuality)
       ? (record.streamQuality as StreamQuality)
       : DEFAULT_SETTINGS.streamQuality,
+    sounds: parseSounds(record.sounds),
   };
 }
 

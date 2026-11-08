@@ -43,6 +43,8 @@ export interface VoiceActions {
   listOutputs?(): Promise<{ outputs: AudioDevice[]; current: string | null; isDefault: boolean }>;
   /** Cambia la salida de la llamada (null = la predeterminada del sistema); en llamada se pasa al instante. */
   setOutputDevice?(name: string | null): Promise<void>;
+  /** El mixer de la llamada en curso, para sumarle los sonidos de eventos (null fuera de llamada). */
+  soundSink?(): { play(frames: Uint8Array[]): void } | null;
 }
 
 function errorText(error: unknown): string {
@@ -406,6 +408,10 @@ export function createVoiceActions(deps: {
         store.dispatch({ type: "notice/push", key: "voice-output", level: "warn", text: errorText(error) });
       }
       await announceOutput(false);
+    },
+
+    soundSink() {
+      return mixer;
     },
 
     micLevel() {

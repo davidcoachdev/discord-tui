@@ -67,6 +67,7 @@ Con auriculares y el teléfono mirando el canal de voz **sin entrar** (el teléf
 ## 5. Settings y día de uso (E5)
 
 - [ ] `⚙ settings` (o `gs`) → elegir micrófono y salida con `◀ ▶`, mover la sensibilidad mirando el medidor, "probar mic" (eco), tema claro/oscuro, imágenes sí/no.
+- [ ] Sonidos: `bun run dev`, entrá y salí de un canal de voz, mutear/ensordecer (`m`/`D`), que entre y salga un amigo, y que te mencione en otro canal: ¿suenan, a buen volumen y por la salida elegida? En `gs` → "Sonidos" apagalos, bajá el volumen y silenciá uno: ¿se respeta? Ensordecido solo deberían sonar mute/deafen/salir.
 - [ ] Un día de laburo usando solo discord-tui; anotá todo lo que te hizo abrir la app oficial o te molestó y pasáselo al agente.
 
 ## 6. Transmitir pantalla (Go Live) [2ª]
