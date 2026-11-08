@@ -86,3 +86,10 @@ Datos que el agente resuelve y documenta mientras construye. Sin tokens ni ids r
 - `CHANNEL_CREATE` agrega DMs nuevos; además, el primer mensaje de alguien que no estaba en la lista crea el DM (`ensureDmForMessage`). `CHANNEL_UPDATE`/`DELETE`, `CHANNEL_RECIPIENT_ADD`/`REMOVE` y `GUILD_MEMBER_UPDATE` ahora se aplican.
 - Presencia de los DMs: `READY_SUPPLEMENTAL.merged_presences.friends`.
 - Bug arreglado de paso: un autor de mensaje sin `global_name` pisaba el nombre ya conocido (los DMs mostraban el username).
+
+## Interferencia al escuchar (2026-11-08, Gon)
+
+- **Sin colchón en pw-cat.** El mixer escribía exactamente un frame por slot de 20 ms y nada cuando no había audio: cualquier demora del timer (el audio comparte el event loop con la UI de OpenTUI) o un paquete tardío dejaba a PipeWire sin datos → chasquidos. Ahora el mixer de la llamada es continuo (silencio cuando nadie habla) con un colchón inicial de 100 ms (`prerollFrames: 5`) que se repone tras una pausa larga del event loop o al sacar el deafen. Simulación de 60 s con jitter de red y pausas de 40–120 ms del event loop: 23 huecos → 2. Costo: ~100 ms más de latencia de escucha.
+- El jitter buffer, si se vaciaba a mitad de frase, esperaba 3 frames otra vez (cortes de 60 ms); ahora vuelve con 2.
+- **Ciphertext de DAVE al decoder.** `@discordjs/voice` (`DAVESession.decrypt`) devuelve el paquete sin descifrar cuando la sesión DAVE no está lista (al entrar o en una transición de época). Decodificarlo como Opus suena a ruido; se descartan los frames que terminan con el marcador 0xFAFA.
+- El decoder WASM propio da salida idéntica byte a byte a opusscript (50/50 paquetes): no era la fuente del ruido.

@@ -11,6 +11,16 @@ export interface VoiceFlags {
   selfDeaf: boolean;
 }
 
+/**
+ * Un frame que sigue cifrado con DAVE termina con el marcador mágico 0xFAFA (spec 6.6). `@discordjs/voice`
+ * devuelve el paquete tal cual cuando la sesión DAVE todavía no está lista (al entrar o en un cambio de
+ * época): decodificar ese ciphertext como Opus suena como ráfagas de ruido, así que se descarta.
+ */
+export function isStillDaveEncrypted(opus: Uint8Array): boolean {
+  const n = opus.byteLength;
+  return n >= 2 && opus[n - 1] === 0xfa && opus[n - 2] === 0xfa;
+}
+
 export interface VoiceSession {
   join(guildId: string, channelId: string, flags: VoiceFlags): Promise<void>;
   setFlags(flags: VoiceFlags): void;
@@ -109,6 +119,7 @@ export function createDjsVoiceSession(deps: {
       stream.on("data", (chunk: Buffer) => {
         if (connection !== conn) return;
         const opus = new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength);
+        if (isStillDaveEncrypted(opus)) return;
         for (const fn of [...opusListeners]) fn(userId, opus);
       });
       stream.on("error", (error: unknown) => {

@@ -36,6 +36,13 @@ export function createMixer(deps: {
   setTimer?: (fn: () => void, ms: number) => unknown;
   clearTimer?: (h: unknown) => void;
   gainFor?: (userId: string) => number;
+  /**
+   * Flujo continuo: escribe un frame en cada slot (silencio si nadie habla) y arranca con `prerollFrames`
+   * de silencio, así pw-cat siempre tiene un colchón. Sin colchón, cualquier demora del timer (el audio
+   * comparte el event loop con la UI) o un paquete que llega tarde deja a PipeWire sin datos: chasquidos.
+   */
+  continuous?: boolean;
+  prerollFrames?: number;
 }): Mixer {
   const now = deps.now ?? ((): number => performance.now());
   const setTimer = deps.setTimer ?? ((fn: () => void, ms: number): unknown => setInterval(fn, ms));
@@ -46,6 +53,15 @@ export function createMixer(deps: {
   let timer: unknown = null;
   let clock = 0;
 
+  const continuous = deps.continuous === true;
+  const preroll = deps.prerollFrames ?? 4;
+  const SILENCE = new Uint8Array(FRAME_BYTES);
+
+  function cushion(): void {
+    if (!continuous || muted) return;
+    for (let i = 0; i < preroll; i += 1) deps.playback.write(SILENCE);
+  }
+
   function mixSlot(): void {
     const frames: Uint8Array[] = [];
     for (const [userId, jb] of buffers) {
@@ -54,7 +70,11 @@ export function createMixer(deps: {
       const gain = deps.gainFor?.(userId);
       frames.push(gain !== undefined && gain !== 100 ? applyGain(frame, gain) : frame);
     }
-    if (muted || frames.length === 0) return;
+    if (muted) return;
+    if (frames.length === 0) {
+      if (continuous) deps.playback.write(SILENCE);
+      return;
+    }
     deps.playback.write(mixFrames(frames));
   }
 
@@ -65,6 +85,8 @@ export function createMixer(deps: {
     if (due > MAX_CATCH_UP_FRAMES) {
       for (let i = 0; i < MAX_CATCH_UP_FRAMES; i += 1) mixSlot();
       clock = t;
+      // Después de una pausa larga del event loop el colchón de pw-cat se gastó: se repone.
+      cushion();
       return;
     }
     for (let i = 0; i < due; i += 1) mixSlot();
@@ -75,7 +97,7 @@ export function createMixer(deps: {
     buffer(userId: string): JitterBuffer {
       let jb = buffers.get(userId);
       if (!jb) {
-        jb = createJitterBuffer();
+        jb = createJitterBuffer(continuous ? { rebufferFrames: 2 } : undefined);
         buffers.set(userId, jb);
       }
       return jb;
@@ -86,6 +108,7 @@ export function createMixer(deps: {
     start(): void {
       if (timer !== null) return;
       clock = now();
+      cushion();
       timer = setTimer(tick, FRAME_MS);
     },
     stop(): void {
@@ -94,7 +117,10 @@ export function createMixer(deps: {
       timer = null;
     },
     setMuted(m: boolean): void {
+      const wasMuted = muted;
       muted = m;
+      // Al dejar de estar ensordecido, pw-cat estuvo sin datos: se repone el colchón.
+      if (wasMuted && !m) cushion();
     },
     activeUsers(): string[] {
       return [...buffers.keys()];

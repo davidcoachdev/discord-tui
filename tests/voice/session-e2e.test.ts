@@ -201,3 +201,21 @@ test("a drop while the main gateway is down retries when it comes back", async (
   session.gatewayReady?.();
   await until(() => events.lastIndexOf("connected") > events.indexOf("reconnecting"));
 }, 15_000);
+
+test("frames still encrypted with DAVE (0xFAFA marker) are dropped instead of decoded as noise", async () => {
+  const { isStillDaveEncrypted } = await import("../../src/voice/session");
+  expect(isStillDaveEncrypted(Uint8Array.of(0x78, 1, 2, 3, 8, 0xfa, 0xfa))).toBe(true);
+  expect(isStillDaveEncrypted(Uint8Array.of(0xfc, 1, 2, 3))).toBe(false);
+
+  server = await startFakeVoiceServer();
+  const gateway = fakeMainGateway(server);
+  session = createDjsVoiceSession({ adapterCreator: createVoiceAdapterCreator({ gateway, meId: () => ME }), meId: () => ME });
+  const heard: Uint8Array[] = [];
+  session.onOpus((_u, opus) => heard.push(opus));
+  await session.join(GUILD, CHANNEL, { selfMute: false, selfDeaf: false });
+  for (let i = 0; i < 3; i += 1) server.sendAudioFrom("100000000000000011", 999, Uint8Array.of(0xfc, 9, i, 0xfa, 0xfa));
+  for (let i = 0; i < 3; i += 1) server.sendAudioFrom("100000000000000011", 999, Uint8Array.of(0xfc, 9, i));
+  await until(() => heard.length >= 2);
+  await Bun.sleep(50);
+  expect(heard.every((p) => !isStillDaveEncrypted(p))).toBe(true);
+}, 15_000);

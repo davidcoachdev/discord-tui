@@ -152,3 +152,58 @@ describe("createMixer", () => {
     expect(h.writes.length).toBe(0);
   });
 });
+
+describe("continuous mode (keeps pw-cat fed)", () => {
+  function harness(prerollFrames = 4) {
+    let t = 0;
+    let tick: (() => void) | null = null;
+    const written: Uint8Array[] = [];
+    const mixer = createMixer({
+      playback: { write: (pcm) => void written.push(pcm) },
+      now: () => t,
+      setTimer: (fn) => ((tick = fn), 1),
+      clearTimer: () => {},
+      continuous: true,
+      prerollFrames,
+    });
+    return { mixer, written, advance: (ms: number) => ((t += ms), tick?.()) };
+  }
+
+  test("starts with a cushion of silence and writes one frame per slot even when nobody talks", () => {
+    const h = harness(4);
+    h.mixer.start();
+    expect(h.written).toHaveLength(4);
+    for (let i = 0; i < 10; i += 1) h.advance(20);
+    expect(h.written).toHaveLength(14);
+    expect(h.written.every((f) => f.length === 3840)).toBe(true);
+  });
+
+  test("an event-loop stall over 100 ms re-adds the cushion", () => {
+    const h = harness(4);
+    h.mixer.start();
+    h.advance(300);
+    expect(h.written).toHaveLength(4 + 5 + 4);
+  });
+
+  test("undeafen re-adds the cushion; deafened writes nothing", () => {
+    const h = harness(3);
+    h.mixer.start();
+    h.mixer.setMuted(true);
+    h.advance(20);
+    expect(h.written).toHaveLength(3);
+    h.mixer.setMuted(false);
+    expect(h.written).toHaveLength(6);
+  });
+
+  test("after draining mid-sentence the jitter buffer resumes with 2 frames, not 3", () => {
+    const h = harness(0);
+    h.mixer.start();
+    const jb = h.mixer.buffer("a");
+    for (let i = 0; i < 3; i += 1) jb.push(new Uint8Array(3840).fill(9));
+    for (let i = 0; i < 3; i += 1) expect(jb.pop()).not.toBeNull();
+    jb.push(new Uint8Array(3840).fill(9));
+    expect(jb.pop()).toBeNull();
+    jb.push(new Uint8Array(3840).fill(9));
+    expect(jb.pop()).not.toBeNull();
+  });
+});

@@ -87,6 +87,8 @@ export function createVoiceActions(deps: {
       playback = out;
       mixer = createMixer({
         playback: out,
+        continuous: true,
+        prerollFrames: 5,
         gainFor: (userId) => settings().userVolumes[userId] ?? 100,
       });
       mixer.setMuted(voice().selfDeaf);
