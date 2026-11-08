@@ -19,6 +19,7 @@ import { startCapture, startPlayback } from "../voice/audio-io";
 import { createOpusCodec } from "../voice/opus";
 import { createDjsVoiceSession, type VoiceSession } from "../voice/session";
 import { createVad } from "../voice/vad";
+import { listAudioDevices } from "../voice/devices";
 
 export interface RuntimeDeps {
   session: Session;
@@ -43,6 +44,7 @@ const defaultMedia: VoiceMedia = {
   startPlayback,
   createCodec: () => createOpusCodec(),
   createVad: (opts) => createVad(opts),
+  listAudioDevices: () => listAudioDevices(),
 };
 
 export interface Runtime {

@@ -196,6 +196,8 @@ export interface VoiceSlice {
   /** guildId → userId → estado de voz (quién está en cada canal). */
   states: Record<string, Record<string, VoiceMemberState>>;
   privacyCode: string | null;
+  /** Por dónde sale el audio de la llamada (descripción del dispositivo de PipeWire). */
+  outputLabel?: string | null;
   pttWarning: string | null;
   micError: string | null;
   stream: StreamState;
@@ -276,4 +278,5 @@ export type Action =
   | { type: "voice/privacyCode"; code: string | null }
   | { type: "voice/pttWarning"; warning: string | null }
   | { type: "voice/micError"; error: string | null }
+  | { type: "voice/outputLabel"; label: string | null }
   | { type: "voice/stream"; patch: Partial<StreamState> };

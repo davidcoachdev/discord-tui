@@ -37,6 +37,8 @@ import { moveInList } from "./list-window";
 import { StatusBar, VoiceBar } from "./components/StatusBar";
 import { StatusMenu } from "./components/StatusMenu";
 import { MonitorPicker } from "./components/MonitorPicker";
+import { OutputPicker } from "./components/OutputPicker";
+import type { AudioDevice } from "../voice/devices";
 import type { Monitor } from "../golive/capture";
 import { validateOutgoing } from "./composer-state";
 import { displayName, truncate } from "./format";
@@ -127,6 +129,7 @@ export function App(props: {
   const [pendingG, setPendingG] = createSignal(false);
   const [helpOpen, setHelpOpen] = createSignal(false);
   const [statusMenuOpen, setStatusMenuOpen] = createSignal(false);
+  const [outputChoices, setOutputChoices] = createSignal<{ outputs: AudioDevice[]; current: string | null; isDefault: boolean } | null>(null);
   /** Monitores para elegir qué transmitir (null = cerrado). */
   const [monitorChoices, setMonitorChoices] = createSignal<Monitor[] | null>(null);
   const [switcherOpen, setSwitcherOpen] = createSignal(false);
@@ -730,7 +733,7 @@ export function App(props: {
         return;
       }
       props.onActivity?.();
-      if (settingsOpen() || statusMenuOpen() || monitorChoices() !== null) return;
+      if (settingsOpen() || statusMenuOpen() || monitorChoices() !== null || outputChoices() !== null) return;
 
       if (helpOpen()) {
         if (key.name === "escape" || key.name === "q" || (key.name === "?" && !key.ctrl && !key.meta)) return void setHelpOpen(false);
@@ -1191,7 +1194,17 @@ export function App(props: {
           if (id !== null) setAttachments((previous) => ({ ...previous, [id]: (previous[id] ?? []).filter((_, i) => i !== index) }));
         }}
       />
-      <VoiceBar store={props.store} theme={theme()} actions={props.actions} onStream={() => void streamPress()} />
+      <VoiceBar
+        store={props.store}
+        theme={theme()}
+        actions={props.actions}
+        onStream={() => void streamPress()}
+        onOutput={
+          props.actions.voice?.listOutputs
+            ? () => void props.actions.voice!.listOutputs!().then((choices) => setOutputChoices(choices))
+            : undefined
+        }
+      />
       <StatusBar
         store={props.store}
         theme={theme()}
@@ -1232,6 +1245,21 @@ export function App(props: {
           }}
           onClose={() => setStatusMenuOpen(false)}
         />
+      </Show>
+      <Show when={outputChoices()}>
+        {(choices: () => { outputs: AudioDevice[]; current: string | null; isDefault: boolean }) => (
+          <OutputPicker
+            outputs={choices().outputs}
+            current={choices().current}
+            isDefault={choices().isDefault}
+            theme={theme()}
+            onPick={(name) => {
+              setOutputChoices(null);
+              void props.actions.voice?.setOutputDevice?.(name);
+            }}
+            onClose={() => setOutputChoices(null)}
+          />
+        )}
       </Show>
       <Show when={monitorChoices()}>
         {(monitors: () => Monitor[]) => (

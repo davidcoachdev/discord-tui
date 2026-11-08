@@ -47,6 +47,7 @@ lo único que corrés es `bun run dev` (o `bun run demo` para mirar sin conectar
 Con auriculares y el teléfono mirando el canal de voz **sin entrar** (el teléfono no puede estar en voz con la misma cuenta).
 
 - [ ] `bun run dev`, click en un canal 🔊 de tu servidor de prueba (o el botón grande `🔊 Entrar a voz`, o `v`). En menos de 15 s la barra de abajo dice `🔊 canal · servidor · 🔒 E2EE <código> · VAD · ○ vos`, sin `conectando…` ni error. En el teléfono aparecés en el canal. Si sale `✗ voz: Discord exige cifrado E2EE (DAVE)…` (código 4017) o se queda conectando, frená y pasale al agente esa línea y el final del log: hay plan B.
+- [ ] Al entrar aparece `🔈 el audio de la llamada sale por: …`. Si no escuchás a nadie, click en `🔈 …` en la barra de voz y elegí tus auriculares (se cambia al instante y queda guardado). La app usa la salida predeterminada del sistema hasta que elijas una.
 - [ ] Hablá → `● vos` se prende (y tu nombre en verde debajo del canal); en el teléfono el anillo verde. Callado, se apaga.
 - [ ] `M` → `PTT`. Mantené `Espacio` y hablá → prende; soltá → se apaga al toque. Si aparece un aviso amarillo de "interruptor", contáselo al agente.
 - [ ] `🎙 mic` (o `m`) → mic tachado en el teléfono. `🎧 audio` (o `D`) → auriculares tachados; otra vez → vuelve el mute que tenías.

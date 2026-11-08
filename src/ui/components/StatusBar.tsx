@@ -3,7 +3,7 @@ import { Show, type JSX } from "solid-js";
 
 import type { Store } from "../../store/store";
 import { formatPrivacyCode } from "../../voice/privacy-code";
-import { displayName } from "../format";
+import { displayName, truncate } from "../format";
 import { useSelector } from "../store-bridge";
 import type { Actions } from "../../actions";
 import { Button, type Click } from "./Button";
@@ -84,7 +84,14 @@ export function streamButtonLabel(status: string): string {
   return "📺 transmitir";
 }
 
-export function VoiceBar(props: { store: Store; theme: Theme; actions?: Actions; onStream?(): void }): JSX.Element {
+export function VoiceBar(props: {
+  store: Store;
+  theme: Theme;
+  actions?: Actions;
+  onStream?(): void;
+  /** Click en 🔈: elegir por dónde sale el audio de la llamada. */
+  onOutput?(): void;
+}): JSX.Element {
   const state = useSelector(props.store, (s) => s);
   const voice = () => state().voice;
   const channelName = (): string => {
@@ -156,6 +163,13 @@ export function VoiceBar(props: { store: Store; theme: Theme; actions?: Actions;
                   danger={voice().selfMute}
                   onPress={() => voiceActions().toggleMute()}
                 />
+                <Show when={props.onOutput}>
+                  <Button
+                    label={`🔈 ${truncate(voice().outputLabel ?? "salida", 18)}`}
+                    theme={props.theme}
+                    onPress={() => props.onOutput?.()}
+                  />
+                </Show>
                 <Button
                   label={voice().selfDeaf ? "🎧 sordo" : "🎧 audio"}
                   theme={props.theme}

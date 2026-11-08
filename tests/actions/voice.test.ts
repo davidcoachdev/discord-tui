@@ -261,3 +261,63 @@ describe("Go Live", () => {
     expect(calls).toEqual([`join:${VOICE_A}:false:false`, "stream:stop", "leave", `join:${VOICE_B}:false:false`, "stream:stop", "leave"]);
   });
 });
+
+test("joining tells where the call audio goes, and setOutputDevice moves it live to another output", async () => {
+  const store = createStore(emptyState());
+  store.dispatch({
+    type: "gw",
+    t: "READY",
+    d: { user: { id: ME, username: "gon" }, guilds: [{ id: GUILD, name: "g", roles: [], channels: [{ id: VOICE_A, type: 2, name: "Voz" }] }] },
+  });
+  const listeners = new Set<(s: VoiceStatus) => void>();
+  const session: VoiceSession = {
+    async join() {
+      listeners.forEach((fn) => fn("connected"));
+    },
+    setFlags() {},
+    async leave() {
+      listeners.forEach((fn) => fn("idle"));
+    },
+    onStatus: (fn) => (listeners.add(fn), () => listeners.delete(fn)),
+    sendOpus() {},
+    setSpeaking() {},
+    onSpeaking: () => () => {},
+    onOpus: () => () => {},
+    privacyCode: () => null,
+  };
+  const targets: (string | undefined)[] = [];
+  let stopped = 0;
+  const voice = createVoiceActions({
+    store,
+    session,
+    media: {
+      startCapture: async () => ({ onFrame: () => () => {}, stop: async () => {} }),
+      startPlayback: async (opts) => {
+        targets.push(opts?.target);
+        return { write() {}, stop: async () => void (stopped += 1), dropped: () => 0 };
+      },
+      createCodec: () => ({ encode: (p) => p, decode: (o) => o }),
+      createVad: () => ({ push: () => null, isOpen: false, thresholdDb: -45, levelDb: -96 }),
+      listAudioDevices: async () => ({
+        outputs: [
+          { name: "bluez_output.AE01", description: "AE01" },
+          { name: "alsa_output.prox2", description: "PRO X 2" },
+        ],
+        defaultOutput: "bluez_output.AE01",
+      }),
+    },
+  });
+  await voice.toggleVoice(VOICE_A);
+  await Bun.sleep(10);
+  expect(Object.values(store.getState().notices).map((n) => n.text).join(" ")).toContain("sale por: AE01 (predeterminada del sistema)");
+  expect(store.getState().voice.outputLabel).toBe("AE01");
+  expect(targets).toEqual([undefined]);
+
+  await voice.setOutputDevice!("alsa_output.prox2");
+  expect(store.getState().settings.outputDevice).toBe("alsa_output.prox2");
+  expect(targets).toEqual([undefined, "alsa_output.prox2"]);
+  expect(stopped).toBe(1);
+  expect(store.getState().voice.outputLabel).toBe("PRO X 2");
+  expect((await voice.listOutputs!()).current).toBe("alsa_output.prox2");
+  await voice.leaveVoice();
+});

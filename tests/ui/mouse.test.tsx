@@ -368,3 +368,18 @@ test("a voice channel's chat can be read without joining (Ctrl-k) and the strip 
   await click(h, "🔊 Entrar a voz");
   expect(s.calls).toContain(`toggleVoice:${DEMO.voice2}`);
 });
+
+test("🔈 in the voice bar shows where the audio goes and lets you pick another output", async () => {
+  const s = setup();
+  const h = await render(s);
+  await s.actions.voice!.toggleVoice(DEMO.voice);
+  await Bun.sleep(450);
+  await h.renderOnce();
+  expect(h.captureCharFrame()).toContain("🔈 AE01");
+  await click(h, "🔈 AE01");
+  expect(h.captureCharFrame()).toContain("¿Por dónde escuchar la llamada?");
+  await click(h, "PRO X 2 LIGHTSPEED");
+  expect(s.store.getState().settings.outputDevice).toBe("alsa_output.usb-Logitech_PRO_X_2");
+  expect(h.captureCharFrame()).not.toContain("¿Por dónde escuchar");
+  expect(h.captureCharFrame()).toContain("🔈 PRO X 2 LIGHTSPEE");
+});

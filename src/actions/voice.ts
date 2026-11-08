@@ -10,12 +10,15 @@ import type { VoiceSession } from "../voice/session";
 import { createVoiceStats } from "../voice/stats";
 import { createTransmitter, type Transmitter } from "../voice/tx";
 import type { Vad } from "../voice/vad";
+import { outputLabel, type AudioDevice } from "../voice/devices";
 
 export interface VoiceMedia {
   startCapture(opts?: { target?: string }): Promise<AudioCapture>;
   startPlayback(opts?: { target?: string }): Promise<AudioPlayback>;
   createCodec(): { encode(pcm: Uint8Array): Uint8Array; decode(opus: Uint8Array): Uint8Array; destroy?(): void };
   createVad(opts: { sensitivity: "auto" | number }): Vad;
+  /** Salidas de audio (para mostrar por dónde sale la llamada y poder cambiarla). */
+  listAudioDevices?(): Promise<{ outputs: AudioDevice[]; defaultOutput?: string | null }>;
 }
 
 export interface VoiceActions {
@@ -34,6 +37,10 @@ export interface VoiceActions {
   toggleStream?(): Promise<void>;
   /** Monitores que se pueden transmitir (Hyprland; si no, uno: el predeterminado). */
   listMonitors?(): Promise<Monitor[]>;
+  /** Salidas disponibles y cuál se usa ahora. */
+  listOutputs?(): Promise<{ outputs: AudioDevice[]; current: string | null; isDefault: boolean }>;
+  /** Cambia la salida de la llamada (null = la predeterminada del sistema); en llamada se pasa al instante. */
+  setOutputDevice?(name: string | null): Promise<void>;
 }
 
 function errorText(error: unknown): string {
@@ -85,6 +92,41 @@ export function createVoiceActions(deps: {
     });
     if (ptt.warning) store.dispatch({ type: "voice/pttWarning", warning: ptt.warning });
     return ptt;
+  }
+
+  /** Pone en la barra por dónde sale el audio y, al entrar, lo avisa (si sale por otro lado, no escuchás a nadie). */
+  async function announceOutput(notice: boolean): Promise<void> {
+    if (!deps.media.listAudioDevices) return;
+    try {
+      const devices = await deps.media.listAudioDevices();
+      const out = outputLabel(devices, settings().outputDevice);
+      store.dispatch({ type: "voice/outputLabel", label: out.label });
+      if (notice) {
+        store.dispatch({
+          type: "notice/push",
+          key: "voice-output-device",
+          level: "info",
+          text: `🔈 el audio de la llamada sale por: ${out.label}${out.isDefault ? " (predeterminada del sistema)" : ""} · click en 🔈 para cambiarla`,
+        });
+      }
+    } catch {
+      // sin pw-dump: no se muestra
+    }
+  }
+
+  async function swapPlayback(): Promise<void> {
+    const generation = media;
+    if (!mixer || !playback) return;
+    const fresh = await deps.media.startPlayback({ target: settings().outputDevice ?? undefined });
+    if (generation !== media || !mixer) {
+      await fresh.stop();
+      return;
+    }
+    const old = playback;
+    playback = fresh;
+    mixer.setPlayback(fresh);
+    playbackSince = clock();
+    await old?.stop();
   }
 
   async function refreshPlayback(generation: number): Promise<void> {
@@ -151,6 +193,7 @@ export function createVoiceActions(deps: {
         onSpeaking: (userId, on) => store.dispatch({ type: "voice/speaking", userId, on }),
       });
       log.info("voice.output", { state: "started", mode: s.outputDevice ? "device" : "default" });
+      void announceOutput(true);
     } catch (error) {
       log.warn("voice.output", { state: "failed", error_name: error instanceof Error ? error.name : "unknown" });
       store.dispatch({ type: "notice/push", key: "voice-output", level: "warn", text: errorText(error) });
@@ -341,6 +384,22 @@ export function createVoiceActions(deps: {
     pttKey(e: PttKey): void {
       if (settings().inputMode !== "push_to_talk") return;
       getPtt().onKey(e);
+    },
+
+    async listOutputs() {
+      const devices = (await deps.media.listAudioDevices?.()) ?? { outputs: [], defaultOutput: null };
+      const out = outputLabel(devices, settings().outputDevice);
+      return { outputs: devices.outputs, current: out.name, isDefault: out.isDefault };
+    },
+
+    async setOutputDevice(name: string | null): Promise<void> {
+      store.dispatch({ type: "settings/set", patch: { outputDevice: name } });
+      try {
+        await swapPlayback();
+      } catch (error) {
+        store.dispatch({ type: "notice/push", key: "voice-output", level: "warn", text: errorText(error) });
+      }
+      await announceOutput(false);
     },
 
     micLevel() {

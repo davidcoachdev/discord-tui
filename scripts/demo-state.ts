@@ -236,6 +236,7 @@ export function demoActions(store: Store): Actions {
       await Bun.sleep(400);
       store.dispatch({ type: "voice/status", status: "connected" });
       store.dispatch({ type: "voice/privacyCode", code: "4812093317502246618810475" });
+      store.dispatch({ type: "voice/outputLabel", label: "AE01" });
       let on = false;
       speakTimer = setInterval(() => {
         on = !on;
@@ -265,6 +266,20 @@ export function demoActions(store: Store): Actions {
     },
     pttKey() {},
     micLevel: () => null,
+    async listOutputs() {
+      const outputs = [
+        { name: "alsa_output.usb-Logitech_PRO_X_2", description: "PRO X 2 LIGHTSPEED Analog Stereo" },
+        { name: "bluez_output.AE01", description: "AE01" },
+        { name: "alsa_output.pci-hdmi", description: "GA102 HDMI [Odyssey G40B]" },
+      ];
+      const current = store.getState().settings.outputDevice;
+      return { outputs, current: current ?? "bluez_output.AE01", isDefault: current === null };
+    },
+    async setOutputDevice(name) {
+      store.dispatch({ type: "settings/set", patch: { outputDevice: name } });
+      const labels: Record<string, string> = { "alsa_output.usb-Logitech_PRO_X_2": "PRO X 2 LIGHTSPEED Analog Stereo", "alsa_output.pci-hdmi": "GA102 HDMI" };
+      store.dispatch({ type: "voice/outputLabel", label: name ? labels[name] ?? name : "AE01" });
+    },
     ...demoStreamActions(store, ME),
   };
   let n = 2000;

@@ -158,6 +158,8 @@ export function reduceVoiceAction(state: AppState, action: any): AppState {
       return state.voice.privacyCode === action.code ? state : withVoice(state, { privacyCode: action.code });
     case "voice/pttWarning":
       return withVoice(state, { pttWarning: action.warning });
+    case "voice/outputLabel":
+      return withVoice(state, { outputLabel: action.label });
     case "voice/micError":
       return withVoice(state, { micError: action.error });
     case "voice/stream":

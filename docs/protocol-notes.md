@@ -306,3 +306,8 @@ Spike del 2026-11-08, sin la cuenta (todo contra fakes locales). Scripts en `scr
 **Riesgo de cuenta:** la librería lo dice (README: "Using any kind of automation programs on your account can result in your account getting permanently banned"). El identify del stream no es idéntico al del cliente oficial (campos de `streams`, sin op 20 PLATFORM) **[sin verificar]** si Discord lo mira. Sin Nitro, el cliente oficial limita Go Live a 720p30 **[sin verificar]** (no consultado hoy): transmitir a 720p30 como máximo **[nuestra]**. Hace falta el permiso "Video" en el canal.
 
 **🧍 Paso de Gon:** ya no hay script aparte (`golive-spike.ts` se borró): se prueba desde la app, `docs/PRUEBAS-GON.md` sección 6.
+
+## Salida de audio de la llamada (2026-11-08, Gon no escuchaba)
+
+- Diagnóstico: la voz llegaba bien (miles de paquetes, 0 errores) y el pw-cat de la app estaba conectado y "running", pero sin `outputDevice` elegido sale por la salida predeterminada del sistema, que en ese momento era un dispositivo Bluetooth (`AE01`, vía EasyEffects) y no los auriculares puestos. El cliente oficial usa su propia salida configurada.
+- Ahora: al entrar a una llamada se avisa por dónde sale el audio; la barra de voz tiene `🔈 <dispositivo>` y al hacer click se elige la salida (o "predeterminada del sistema"). El cambio es en caliente: se abre un pw-cat nuevo con `--target` y se cierra el viejo, sin salir de la llamada. La predeterminada se lee de la metadata "default" de PipeWire (`default.audio.sink`).

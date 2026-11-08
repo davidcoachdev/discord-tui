@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { listAudioDevices, resolveTarget } from "../../src/voice/devices";
+import { listAudioDevices, resolveTarget, outputLabel } from "../../src/voice/devices";
 
 const fixture = readFileSync(join(import.meta.dir, "..", "fixtures", "pw-dump.json"), "utf8");
 
@@ -47,4 +47,18 @@ describe("resolveTarget", () => {
       warning: "no encontré c, uso el predeterminado",
     });
   });
+});
+
+test("the system default output comes from PipeWire's default metadata, and outputLabel names it", async () => {
+  const dump = [
+    { type: "PipeWire:Interface:Node", info: { props: { "node.name": "bluez_output.AE01", "node.description": "AE01", "media.class": "Audio/Sink" } } },
+    { type: "PipeWire:Interface:Node", info: { props: { "node.name": "alsa_output.prox2", "node.description": "PRO X 2", "media.class": "Audio/Sink" } } },
+    { type: "PipeWire:Interface:Metadata", props: { "metadata.name": "default" }, metadata: [{ key: "default.audio.sink", value: { name: "bluez_output.AE01" } }] },
+  ];
+  const devices = await listAudioDevices({
+    spawn: () => ({ stdout: new Response(JSON.stringify(dump)).body, exited: Promise.resolve(0) }),
+  });
+  expect(devices.defaultOutput).toBe("bluez_output.AE01");
+  expect(outputLabel(devices, null)).toEqual({ name: "bluez_output.AE01", label: "AE01", isDefault: true });
+  expect(outputLabel(devices, "alsa_output.prox2")).toEqual({ name: "alsa_output.prox2", label: "PRO X 2", isDefault: false });
 });
