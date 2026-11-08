@@ -86,3 +86,25 @@ Datos que el agente resuelve y documenta mientras construye. Sin tokens ni ids r
 - `CHANNEL_CREATE` agrega DMs nuevos; además, el primer mensaje de alguien que no estaba en la lista crea el DM (`ensureDmForMessage`). `CHANNEL_UPDATE`/`DELETE`, `CHANNEL_RECIPIENT_ADD`/`REMOVE` y `GUILD_MEMBER_UPDATE` ahora se aplican.
 - Presencia de los DMs: `READY_SUPPLEMENTAL.merged_presences.friends`.
 - Bug arreglado de paso: un autor de mensaje sin `global_name` pisaba el nombre ya conocido (los DMs mostraban el username).
+
+## Composer
+
+Cursor real en el composer (2026-11-07). Cada canal guarda su borrador, sus menciones elegidas y la posición del cursor. La lógica pura está en `src/ui/text-edit.ts` (grafemas con `Intl.Segmenter`: un emoji o una letra con tilde combinada es un paso). En modo insert:
+
+| Tecla | Hace |
+|---|---|
+| ← / → | un grafema |
+| Ctrl-← / Ctrl-→, Alt-b / Alt-f | una palabra (letras, números y `_`) |
+| Home / End, Ctrl-a / Ctrl-e | principio / fin de la línea |
+| ↑ / ↓ | línea anterior / siguiente del borrador, misma columna (en la primera/última línea va al principio/final). Con el popup de @ abierto, ↑/↓ y Tab/Enter siguen siendo del popup |
+| Backspace / Delete | el grafema antes / después del cursor (con Ctrl o Alt: la palabra) |
+| Ctrl-w | la tira sin espacios antes del cursor (como la shell) |
+| Ctrl-u | hasta el principio de la línea (antes borraba todo el borrador) |
+| Ctrl-k | hasta el fin de la línea; al final de una línea junta la siguiente. **Solo en insert**: en modo normal Ctrl-k sigue abriendo el quick switcher |
+| click en el texto | pone el cursor ahí (usa `lineInfo` del `<text>` de OpenTUI; ojo: `lineStartCols` cuenta columnas desde el principio de todo el texto, no de la línea lógica) |
+
+- Escribir, pegar (Ctrl-v y bracketed paste), elegir una mención del popup y el click en un miembro insertan en el cursor. Las menciones de después se corren (`replaceMentions`); una mención cuyo rango se edita se descarta y queda como texto plano.
+- El popup de @ mira el texto antes del cursor.
+- `e` (editar) deja el cursor al final. Esc y Enter siguen igual.
+- Dibujo: el grafema bajo el cursor va invertido (fondo `modeInsert`); al final de una línea o del texto, un `█`.
+- ↑/↓ se mueven por líneas lógicas (separadas por Shift-Enter), no por las filas que parte el ancho de la terminal.

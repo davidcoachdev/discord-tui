@@ -1,7 +1,7 @@
 export interface KeyEntry {
   key: string;
   desc: string;
-  group: "Navegación" | "Mensajes" | "Voz" | "App";
+  group: "Navegación" | "Mensajes" | "Composer" | "Voz" | "App";
 }
 
 // Tabla de la spec 7.5 + las nuestras (R, gm, gs, x) — docs/superpowers/plans/2026-11-06-discord-tui-e5.md.
@@ -15,7 +15,7 @@ export const SPEC_KEYS: KeyEntry[] = [
   { key: "G", desc: "ir al final", group: "Navegación" },
   { key: "gu", desc: "siguiente canal no leído", group: "Navegación" },
   { key: "gm", desc: "mostrar u ocultar miembros", group: "Navegación" },
-  { key: "Ctrl-k", desc: "quick switcher de canales y DMs", group: "Navegación" },
+  { key: "Ctrl-k", desc: "quick switcher (en modo normal)", group: "Navegación" },
   { key: "Esc", desc: "modo normal / soltar selección", group: "Navegación" },
   { key: "i", desc: "escribir en el composer", group: "Mensajes" },
   { key: "Enter", desc: "mandar (Shift-Enter: nueva línea)", group: "Mensajes" },
@@ -28,6 +28,12 @@ export const SPEC_KEYS: KeyEntry[] = [
   { key: "Ctrl-v", desc: "pegar imagen del portapapeles", group: "Mensajes" },
   { key: "a", desc: "adjuntar archivo por path", group: "Mensajes" },
   { key: "x", desc: "quitar el último adjunto", group: "Mensajes" },
+  // En modo insert (escribiendo). Ctrl-k acá borra hasta el fin de línea; en modo normal abre el switcher.
+  { key: "← →", desc: "cursor (Ctrl/Alt: por palabra)", group: "Composer" },
+  { key: "Home End", desc: "inicio/fin de línea (Ctrl-a/e)", group: "Composer" },
+  { key: "↑ ↓", desc: "línea anterior / siguiente", group: "Composer" },
+  { key: "Ctrl-w", desc: "borrar la palabra anterior", group: "Composer" },
+  { key: "Ctrl-u/k", desc: "borrar a inicio / fin de línea", group: "Composer" },
   { key: "v", desc: "entrar / salir del canal de voz", group: "Voz" },
   { key: "m", desc: "mutear micrófono", group: "Voz" },
   { key: "D", desc: "ensordecer (deafen)", group: "Voz" },
