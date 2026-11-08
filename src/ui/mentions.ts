@@ -97,3 +97,8 @@ export function serializeComposer(text: string, mentions: PickedMention[]): stri
   }
   return out + text.slice(at);
 }
+
+/** Rangos tras reemplazar [from, to) por `inserted` caracteres: corre los de después y descarta los tocados. */
+export function replaceMentions(mentions: PickedMention[], from: number, to: number, inserted: number): PickedMention[] {
+  return shiftMentions(shiftMentions(mentions, from, from - to), from, inserted);
+}

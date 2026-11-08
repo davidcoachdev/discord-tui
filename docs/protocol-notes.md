@@ -110,3 +110,25 @@ Fuentes (consultadas 2026-11-07): docs.discord.food → Messages (Poll Object, "
 - El divisor rojo `──── mensajes nuevos ────` va antes del primer mensaje cargado más nuevo que `afterId` que **no sea propio**.
 - Si hay sin leer más viejos que lo cargado (`hasMoreBefore` y el más viejo cargado > `afterId`) se muestra la barra `↑ N+ mensajes nuevos desde … · click o gn para saltar`. La hora sale del snowflake de `afterId`. Recién con el click o `gn` se piden páginas `before` (las mismas de `loadOlder`), como máximo 9 (los 500 mensajes que guarda el canal), y se selecciona el primero sin leer. La API también acepta `around`/`after`, pero dejarían huecos en el slice; no se usan.
 - Al abrir, si el divisor está cargado la vista lo pone arriba (si todo lo nuevo entra, queda al final). `Esc`/`G` siempre bajan al final; el chip "↓ ir al final" aparece si llegaron mensajes estando arriba o con un mensaje seleccionado.
+
+## Composer
+
+Cursor real en el composer (2026-11-07). Cada canal guarda su borrador, sus menciones elegidas y la posición del cursor. La lógica pura está en `src/ui/text-edit.ts` (grafemas con `Intl.Segmenter`: un emoji o una letra con tilde combinada es un paso). En modo insert:
+
+| Tecla | Hace |
+|---|---|
+| ← / → | un grafema |
+| Ctrl-← / Ctrl-→, Alt-b / Alt-f | una palabra (letras, números y `_`) |
+| Home / End, Ctrl-a / Ctrl-e | principio / fin de la línea |
+| ↑ / ↓ | línea anterior / siguiente del borrador, misma columna (en la primera/última línea va al principio/final). Con el popup de @ abierto, ↑/↓ y Tab/Enter siguen siendo del popup |
+| Backspace / Delete | el grafema antes / después del cursor (con Ctrl o Alt: la palabra) |
+| Ctrl-w | la tira sin espacios antes del cursor (como la shell) |
+| Ctrl-u | hasta el principio de la línea (antes borraba todo el borrador) |
+| Ctrl-k | hasta el fin de la línea; al final de una línea junta la siguiente. **Solo en insert**: en modo normal Ctrl-k sigue abriendo el quick switcher |
+| click en el texto | pone el cursor ahí (usa `lineInfo` del `<text>` de OpenTUI; ojo: `lineStartCols` cuenta columnas desde el principio de todo el texto, no de la línea lógica) |
+
+- Escribir, pegar (Ctrl-v y bracketed paste), elegir una mención del popup y el click en un miembro insertan en el cursor. Las menciones de después se corren (`replaceMentions`); una mención cuyo rango se edita se descarta y queda como texto plano.
+- El popup de @ mira el texto antes del cursor.
+- `e` (editar) deja el cursor al final. Esc y Enter siguen igual.
+- Dibujo: el grafema bajo el cursor va invertido (fondo `modeInsert`); al final de una línea o del texto, un `█`.
+- ↑/↓ se mueven por líneas lógicas (separadas por Shift-Enter), no por las filas que parte el ancho de la terminal.

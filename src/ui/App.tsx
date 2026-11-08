@@ -37,12 +37,25 @@ import {
   applyPick,
   mentionCandidates,
   mentionQueryAt,
+  replaceMentions,
   serializeComposer,
-  shiftMentions,
   type PickedMention,
 } from "./mentions";
 import { SettingsScreen, type SettingsDeps } from "./screens/SettingsScreen";
 import { useSelector } from "./store-bridge";
+import {
+  clampCursor,
+  lineDown,
+  lineEnd,
+  lineStart,
+  lineUp,
+  nextGrapheme,
+  prevGrapheme,
+  ruboutStart,
+  splice,
+  wordLeft,
+  wordRight,
+} from "./text-edit";
 import { useTheme } from "./theme";
 
 function isOpenable(kind: string): boolean {
@@ -94,6 +107,7 @@ export function App(props: {
   const [selectedId, setSelectedId] = createSignal<string | null>(null);
   const [drafts, setDrafts] = createSignal<Record<string, string>>({});
   const [mentions, setMentions] = createSignal<Record<string, PickedMention[]>>({});
+  const [cursors, setCursors] = createSignal<Record<string, number>>({});
   const [attachments, setAttachments] = createSignal<Record<string, PendingAttachment[]>>({});
   const [attachPrompt, setAttachPrompt] = createSignal<string | null>(null);
   const [mentionIndex, setMentionIndex] = createSignal(0);
@@ -129,6 +143,12 @@ export function App(props: {
     const id = channelId();
     return id === null ? "" : drafts()[id] ?? "";
   };
+  /** Cursor del borrador del canal (offset en el texto); sin cursor guardado, al final. */
+  const currentCursor = (): number => {
+    const id = channelId();
+    const text = currentText();
+    return id === null ? 0 : clampCursor(text, cursors()[id] ?? text.length);
+  };
   const currentMentions = (): PickedMention[] => {
     const id = channelId();
     return id === null ? [] : mentions()[id] ?? [];
@@ -143,30 +163,43 @@ export function App(props: {
     return id !== null && type !== 2 && type !== 4;
   };
 
-  function setText(text: string, picked: PickedMention[] = currentMentions()): void {
+  function setText(text: string, picked: PickedMention[] = currentMentions(), cursor: number = text.length): void {
     const id = channelId();
     if (id === null) return;
     setDrafts((previous) => ({ ...previous, [id]: text }));
     setMentions((previous) => ({ ...previous, [id]: picked }));
+    setCursors((previous) => ({ ...previous, [id]: cursor }));
+  }
+
+  function moveCursor(cursor: number): void {
+    const id = channelId();
+    if (id === null) return;
+    setCursors((previous) => ({ ...previous, [id]: clampCursor(currentText(), cursor) }));
+    setMentionIndex(0);
+  }
+
+  /** Reemplaza [from, to) del borrador por `chunk`, corre las menciones y deja el cursor después. */
+  function replaceRange(from: number, to: number, chunk: string): void {
+    const a = Math.min(from, to);
+    const b = Math.max(from, to);
+    if (a === b && chunk.length === 0) return;
+    const next = splice(currentText(), a, b, chunk);
+    setText(next.text, replaceMentions(currentMentions(), a, b, chunk.length), next.cursor);
+    setMentionIndex(0);
   }
 
   function insertText(chunk: string): void {
     const id = channelId();
     if (id === null || chunk.length === 0) return;
-    const before = currentText();
-    setText(before + chunk, shiftMentions(currentMentions(), before.length, chunk.length));
+    const at = currentCursor();
+    replaceRange(at, at, chunk);
     setMentionClosed(false);
-    setMentionIndex(0);
-    props.actions.keystroke?.(id, before + chunk);
+    props.actions.keystroke?.(id, currentText());
   }
 
-  function backspace(): void {
-    const before = currentText();
-    if (before.length === 0) return;
-    const cut = [...before].slice(0, -1).join("");
-    const removed = before.length - cut.length;
-    setText(cut, shiftMentions(currentMentions(), cut.length, -removed));
-    setMentionIndex(0);
+  /** Borra desde el cursor hasta `to` (antes o después del cursor). */
+  function deleteTo(to: number): void {
+    replaceRange(currentCursor(), to, "");
   }
 
   function addAttachment(file: PendingAttachment): void {
@@ -178,8 +211,7 @@ export function App(props: {
   const mentionState = () => {
     const id = channelId();
     if (!insert() || id === null || mentionClosed()) return null;
-    const text = currentText();
-    const query = mentionQueryAt(text, text.length);
+    const query = mentionQueryAt(currentText(), currentCursor());
     if (query === null) return null;
     const candidates = mentionCandidates(props.store.getState(), id, query.query);
     if (candidates.length === 0) return null;
@@ -191,9 +223,8 @@ export function App(props: {
     if (!popup) return false;
     const candidate = popup.candidates[Math.min(index, popup.candidates.length - 1)];
     if (!candidate) return false;
-    const text = currentText();
-    const next = applyPick(text, popup.start, text.length, candidate.label, candidate.userId, currentMentions());
-    setText(next.text, next.mentions);
+    const next = applyPick(currentText(), popup.start, currentCursor(), candidate.label, candidate.userId, currentMentions());
+    setText(next.text, next.mentions, next.cursor);
     setMentionIndex(0);
     return true;
   }
@@ -393,6 +424,7 @@ export function App(props: {
     if (id !== null) {
       setDrafts((previous) => ({ ...previous, [id]: "" }));
       setMentions((previous) => ({ ...previous, [id]: [] }));
+      setCursors((previous) => ({ ...previous, [id]: 0 }));
       setAttachments((previous) => ({ ...previous, [id]: [] }));
     }
     closeComposer();
@@ -597,11 +629,14 @@ export function App(props: {
     const id = channelId();
     if (id === null || !isTextChannel()) return;
     const label = displayName(state, userId, state.channels[id]?.guildId ?? null);
-    const before = currentText();
-    const glue = before.length === 0 || before.endsWith(" ") ? "" : " ";
-    const start = before.length + glue.length;
-    const text = `${before}${glue}@${label} `;
-    setText(text, [...currentMentions(), { start, end: start + label.length + 1, userId }]);
+    const at = currentCursor();
+    const before = currentText().slice(0, at);
+    const glue = before.length === 0 || /\s$/.test(before) ? "" : " ";
+    const start = at + glue.length;
+    const next = splice(currentText(), at, at, `${glue}@${label} `);
+    const shifted = replaceMentions(currentMentions(), at, at, next.cursor - at);
+    const picked = [...shifted, { start, end: start + label.length + 1, userId }].sort((a, b) => a.start - b.start);
+    setText(next.text, picked, next.cursor);
     setInsert(true);
   }
 
@@ -678,7 +713,8 @@ export function App(props: {
         return;
       }
 
-      if (key.ctrl && key.name === "k") {
+      // En el composer Ctrl-k borra hasta el fin de línea (como en la shell); en modo normal abre el switcher.
+      if (key.ctrl && key.name === "k" && !insert()) {
         setSwitcherOpen(true);
         setSwitcherQuery("");
         setSwitcherIndex(0);
@@ -741,12 +777,26 @@ export function App(props: {
           else void submitComposer();
           return;
         }
-        if (key.name === "backspace") return backspace();
+        const text = currentText();
+        const at = currentCursor();
+        const word = key.ctrl || key.meta;
+        if (key.name === "left") return moveCursor(word ? wordLeft(text, at) : prevGrapheme(text, at));
+        if (key.name === "right") return moveCursor(word ? wordRight(text, at) : nextGrapheme(text, at));
+        if (key.meta && key.name === "b") return moveCursor(wordLeft(text, at));
+        if (key.meta && key.name === "f") return moveCursor(wordRight(text, at));
+        if (key.name === "home" || (key.ctrl && key.name === "a")) return moveCursor(lineStart(text, at));
+        if (key.name === "end" || (key.ctrl && key.name === "e")) return moveCursor(lineEnd(text, at));
+        if (key.name === "up") return moveCursor(lineUp(text, at));
+        if (key.name === "down") return moveCursor(lineDown(text, at));
+        if (key.name === "backspace") return deleteTo(word ? wordLeft(text, at) : prevGrapheme(text, at));
+        if (key.name === "delete") return deleteTo(word ? wordRight(text, at) : nextGrapheme(text, at));
         if (key.ctrl && key.name === "v") return void pasteFromClipboard();
-        if (key.ctrl && key.name === "u") return setText("", []);
-        if (key.ctrl && key.name === "w") {
-          const trimmed = currentText().replace(/\S+\s*$/, "");
-          return setText(trimmed, currentMentions().filter((m) => m.end <= trimmed.length));
+        if (key.ctrl && key.name === "w") return deleteTo(ruboutStart(text, at));
+        if (key.ctrl && key.name === "u") return deleteTo(lineStart(text, at));
+        if (key.ctrl && key.name === "k") {
+          const end = lineEnd(text, at);
+          // Al final de una línea, Ctrl-k junta la siguiente (borra el salto), como en Emacs.
+          return deleteTo(end === at && at < text.length ? at + 1 : end);
         }
         const ch = printable(key);
         if (ch !== null) insertText(ch);
@@ -1032,6 +1082,7 @@ export function App(props: {
       <Notices store={props.store} theme={theme()} />
       <Composer
         text={currentText()}
+        cursor={currentCursor()}
         insert={insert()}
         replyTo={replyTo()}
         editing={editing()}
@@ -1041,6 +1092,9 @@ export function App(props: {
         attachments={currentAttachments()}
         prompt={attachPrompt()}
         onClick={startComposer}
+        onCursor={(offset) => {
+          if (isTextChannel()) moveCursor(offset);
+        }}
         onAttach={textChannel() ? () => setAttachPrompt("") : undefined}
         onPaste={textChannel() ? () => void pasteFromClipboard() : undefined}
         onRemoveAttachment={(index) => {
