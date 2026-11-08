@@ -171,6 +171,18 @@ export interface VoiceMemberState {
   selfStream: boolean;
 }
 
+export type StreamStatus = "idle" | "starting" | "live" | "error";
+
+/** Go Live propio (una transmisión a la vez). */
+export interface StreamState {
+  status: StreamStatus;
+  /** Monitor que se transmite (null = el predeterminado). */
+  monitor: string | null;
+  error: string | null;
+  /** Cuántos miran (de STREAM_CREATE/STREAM_UPDATE `viewer_ids`), si Discord lo mandó. */
+  viewers?: number;
+}
+
 export interface VoiceSlice {
   guildId: string | null;
   channelId: string | null;
@@ -186,6 +198,7 @@ export interface VoiceSlice {
   privacyCode: string | null;
   pttWarning: string | null;
   micError: string | null;
+  stream: StreamState;
 }
 
 export interface AppState {
@@ -262,4 +275,5 @@ export type Action =
   | { type: "voice/speaking"; userId: string; on: boolean }
   | { type: "voice/privacyCode"; code: string | null }
   | { type: "voice/pttWarning"; warning: string | null }
-  | { type: "voice/micError"; error: string | null };
+  | { type: "voice/micError"; error: string | null }
+  | { type: "voice/stream"; patch: Partial<StreamState> };

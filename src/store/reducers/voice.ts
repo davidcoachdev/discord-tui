@@ -138,6 +138,7 @@ export function reduceVoiceAction(state: AppState, action: any): AppState {
         selfSpeaking: false,
         privacyCode: null,
         micError: null,
+        stream: { status: "idle", monitor: null, error: null },
       });
     case "voice/moved":
       return withVoice(state, { channelId: action.channelId, speaking: {} });
@@ -159,6 +160,8 @@ export function reduceVoiceAction(state: AppState, action: any): AppState {
       return withVoice(state, { pttWarning: action.warning });
     case "voice/micError":
       return withVoice(state, { micError: action.error });
+    case "voice/stream":
+      return withVoice(state, { stream: { ...state.voice.stream, ...action.patch } });
     default:
       return state;
   }

@@ -183,6 +183,7 @@ export function reduce(state: AppState, action: Action): AppState {
     case "voice/privacyCode":
     case "voice/pttWarning":
     case "voice/micError":
+    case "voice/stream":
       return reduceVoiceAction(state, action);
     default:
       return state;

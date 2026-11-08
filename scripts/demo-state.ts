@@ -7,6 +7,7 @@ import { seedUnread } from "./demo/unread";
 import { seedThreads } from "./demo/threads";
 import { seedPresence } from "./demo/presence";
 import { seedEmoji } from "./demo/emoji";
+import { demoStreamActions } from "./demo/golive";
 
 /**
  * Estado de demostración, sin red ni cuenta: sirve para mirar la UI (`bun run demo`)
@@ -263,6 +264,7 @@ export function demoActions(store: Store): Actions {
     },
     pttKey() {},
     micLevel: () => null,
+    ...demoStreamActions(store, ME),
   };
   let n = 2000;
   return {

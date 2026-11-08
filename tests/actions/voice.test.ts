@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { createVoiceActions, type VoiceMedia } from "../../src/actions/voice";
+import type { GoLive } from "../../src/golive/golive";
 import { createStore, emptyState } from "../../src/store/store";
 import type { VoiceSession, VoiceStatus } from "../../src/voice/session";
 
@@ -10,7 +11,7 @@ const VOICE_B = "100000000000000004";
 const TEXT = "100000000000000002";
 const ME = "100000000000000010";
 
-function setup(opts: { micFails?: boolean } = {}) {
+function setup(opts: { micFails?: boolean; stream?: boolean } = {}) {
   const store = createStore(emptyState());
   store.dispatch({
     type: "gw",
@@ -69,7 +70,16 @@ function setup(opts: { micFails?: boolean } = {}) {
     createCodec: () => ({ encode: (p) => p, decode: (o) => o }),
     createVad: () => ({ push: () => null, isOpen: false, thresholdDb: -45, levelDb: -96 }),
   };
-  const voice = createVoiceActions({ store, session, media });
+  const stream: GoLive | undefined = opts.stream
+    ? {
+        start: async (monitor) => void calls.push(`stream:start:${monitor ?? ""}`),
+        stop: async () => void calls.push("stream:stop"),
+        toggle: async () => void calls.push("stream:toggle"),
+        listMonitors: async () => [{ name: "DP-1", width: 1, height: 1, focused: true }],
+        dispose() {},
+      }
+    : undefined;
+  const voice = createVoiceActions({ store, session, media, stream });
   return { store, voice, calls, emit, stopped };
 }
 
@@ -226,5 +236,28 @@ describe("output refresh for clock drift in long calls", () => {
     await Bun.sleep(150);
     expect(counts().opened).toBe(1);
     await voice.leaveVoice();
+  });
+});
+
+describe("Go Live", () => {
+  test("without a stream controller there are no stream actions (the UI hides the button)", () => {
+    expect(setup().voice.startStream).toBeUndefined();
+  });
+
+  test("start/stop/toggle/listMonitors delegate to the controller", async () => {
+    const { voice, calls } = setup({ stream: true });
+    await voice.startStream!("DP-1");
+    await voice.toggleStream!();
+    await voice.stopStream!();
+    expect(calls).toEqual(["stream:start:DP-1", "stream:toggle", "stream:stop"]);
+    expect((await voice.listMonitors!()).map((m) => m.name)).toEqual(["DP-1"]);
+  });
+
+  test("leaving voice or switching channel stops the stream before leaving the call", async () => {
+    const { voice, calls } = setup({ stream: true });
+    await voice.toggleVoice(VOICE_A);
+    await voice.toggleVoice(VOICE_B);
+    await voice.leaveVoice();
+    expect(calls).toEqual([`join:${VOICE_A}:false:false`, "stream:stop", "leave", `join:${VOICE_B}:false:false`, "stream:stop", "leave"]);
   });
 });

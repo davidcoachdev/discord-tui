@@ -240,6 +240,8 @@ export interface VoiceParticipant {
   muted: boolean;
   deafened: boolean;
   me: boolean;
+  /** Está transmitiendo pantalla (Go Live): `self_stream` de su VOICE_STATE_UPDATE, o el stream propio en vivo. */
+  streaming: boolean;
 }
 
 /** Participantes de un canal de voz, con quién habla (uno mismo incluido). */
@@ -256,6 +258,7 @@ export function selectVoiceParticipants(state: AppState, guildId: string, channe
         speaking: me ? state.voice.selfSpeaking && state.voice.channelId === channelId : state.voice.speaking[userId] === true,
         muted: voice.selfMute || voice.mute,
         deafened: voice.selfDeaf || voice.deaf,
+        streaming: voice.selfStream || (me && state.voice.channelId === channelId && state.voice.stream.status === "live"),
       };
     })
     .sort((a, b) => compareSnowflakes(a.userId, b.userId));
