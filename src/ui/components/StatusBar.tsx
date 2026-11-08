@@ -6,7 +6,8 @@ import { formatPrivacyCode } from "../../voice/privacy-code";
 import { displayName } from "../format";
 import { useSelector } from "../store-bridge";
 import type { Actions } from "../../actions";
-import { Button } from "./Button";
+import { Button, type Click } from "./Button";
+import { statusColor, statusLabel } from "./StatusMenu";
 import type { Theme } from "../theme";
 
 export function connectionLabel(connection: string): string {
@@ -25,10 +26,12 @@ export function StatusBar(props: {
   onHelp?(): void;
   onSettings?(): void;
   onSwitcher?(): void;
+  onStatus?(): void;
 }): JSX.Element {
   const connection = useSelector(props.store, (state) => state.connection);
   const me = useSelector(props.store, (state) => state.me);
   const inputMode = useSelector(props.store, (state) => state.settings.inputMode);
+  const ownStatus = useSelector(props.store, (state) => state.settings.status);
   const connColor = (): string =>
     connection() === "ready" ? props.theme.ok : connection() === "disconnected" ? props.theme.error : props.theme.warn;
 
@@ -38,12 +41,26 @@ export function StatusBar(props: {
         fg={props.theme.modeFg}
         bg={props.mode === "INSERT" ? props.theme.modeInsert : props.theme.modeNormal}
         attributes={TextAttributes.BOLD}
+        flexShrink={0}
       >
         {` ${props.mode} `}
       </text>
-      <text fg={connColor()}>{` ● ${connectionLabel(connection())}`}</text>
-      <text fg={props.theme.dim}>{` · logueado como ${me()?.username ?? "…"}`}</text>
-      <text fg={props.theme.faint}>{` · mic ${inputMode() === "push_to_talk" ? "PTT" : "VAD"}`}</text>
+      <text fg={connColor()} flexShrink={0}>{` ● ${connectionLabel(connection())}`}</text>
+      <text fg={props.theme.dim} flexShrink={0}> ·</text>
+      <text
+        fg={statusColor(props.theme, ownStatus())}
+        bg={props.theme.selection}
+        wrapMode="none"
+        flexShrink={0}
+        onMouseDown={(e: Click) => {
+          e.stopPropagation();
+          props.onStatus?.();
+        }}
+      >
+        {` ${statusLabel(ownStatus())} ▾ `}
+      </text>
+      <text fg={props.theme.dim} wrapMode="none">{` · logueado como ${me()?.username ?? "…"}`}</text>
+      <text fg={props.theme.faint} wrapMode="none">{` · mic ${inputMode() === "push_to_talk" ? "PTT" : "VAD"}`}</text>
       <box flexGrow={1} />
       <Show
         when={props.onHelp}
