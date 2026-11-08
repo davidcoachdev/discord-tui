@@ -1,9 +1,10 @@
-import { TextAttributes } from "@opentui/core";
+import { TextAttributes, type TextRenderable } from "@opentui/core";
 import { For, Show, type JSX } from "solid-js";
 
 import { formatBytes } from "../../uploads/file";
 import type { PendingAttachment } from "../../store/types";
 import type { MentionCandidate } from "../mentions";
+import { nextGrapheme, offsetAt } from "../text-edit";
 import type { Theme } from "../theme";
 import { Button, type Click } from "./Button";
 
@@ -45,8 +46,11 @@ export function MentionPopup(props: {
   );
 }
 
+const PROMPT = "❯ ";
+
 export function Composer(props: {
   text: string;
+  cursor?: number;
   insert: boolean;
   replyTo: string | null;
   editing: string | null;
@@ -56,6 +60,8 @@ export function Composer(props: {
   attachments?: PendingAttachment[];
   prompt?: string | null;
   onClick?(): void;
+  /** Click dentro del texto: offset del texto donde poner el cursor. */
+  onCursor?(offset: number): void;
   onAttach?(): void;
   onPaste?(): void;
   onRemoveAttachment?(index: number): void;
@@ -63,6 +69,25 @@ export function Composer(props: {
   const over = (): boolean => props.text.length > 2000;
   const counter = (): string => (over() ? ` ${props.text.length}/2000 · muy largo ` : ` ${props.text.length}/2000 `);
   const border = (): string => (props.insert ? props.theme.modeInsert : props.theme.border);
+  const cursor = (): number => Math.max(0, Math.min(props.text.length, props.cursor ?? props.text.length));
+  /** El grafema bajo el cursor ("" al final del texto o "\n" al final de una línea). */
+  const under = (): string => props.text.slice(cursor(), nextGrapheme(props.text, cursor()));
+  const onLineEnd = (): boolean => under() === "" || under() === "\n";
+
+  let textEl: TextRenderable | undefined;
+  function clickAt(e: { x: number; y: number }): void {
+    const el = textEl;
+    if (!el || !props.onCursor) return;
+    const info = el.lineInfo;
+    const row = Math.max(0, Math.min(info.lineSources.length - 1, e.y - el.y + el.scrollY));
+    const logical = info.lineSources[row] ?? 0;
+    // lineStartCols cuenta desde el principio del texto: la columna dentro de la línea lógica
+    // es lo que va desde la primera fila visual de esa línea.
+    const first = info.lineSources.indexOf(logical);
+    const wrapped = (info.lineStartCols[row] ?? 0) - (info.lineStartCols[first] ?? 0);
+    const col = wrapped + (e.x - el.x) - (logical === 0 ? PROMPT.length : 0);
+    props.onCursor(offsetAt(props.text, logical, col));
+  }
 
   return (
     <box
@@ -105,13 +130,24 @@ export function Composer(props: {
           when={props.text.length > 0 || props.insert}
           fallback={<text fg={props.theme.faint}>{`· ${props.placeholder ?? "i para escribir"}`}</text>}
         >
-          <text wrapMode="char" fg={over() ? props.theme.error : props.theme.fg}>
+          <text
+            ref={(el: TextRenderable) => (textEl = el)}
+            wrapMode="char"
+            fg={over() ? props.theme.error : props.theme.fg}
+            onMouseDown={(e: { x: number; y: number }) => clickAt(e)}
+          >
             <span style={{ fg: props.insert ? props.theme.modeInsert : props.theme.dim, attributes: TextAttributes.BOLD }}>
-              {props.insert ? "❯ " : "· "}
+              {props.insert ? PROMPT : "· "}
             </span>
-            {props.text}
-            <Show when={props.insert}>
-              <span style={{ fg: props.theme.modeInsert }}>█</span>
+            <Show when={props.insert} fallback={props.text}>
+              {props.text.slice(0, cursor())}
+              <Show
+                when={onLineEnd()}
+                fallback={<span style={{ fg: props.theme.bg, bg: props.theme.modeInsert }}>{under()}</span>}
+              >
+                <span style={{ fg: props.theme.modeInsert }}>█</span>
+              </Show>
+              {props.text.slice(onLineEnd() ? cursor() : cursor() + under().length)}
             </Show>
           </text>
         </Show>

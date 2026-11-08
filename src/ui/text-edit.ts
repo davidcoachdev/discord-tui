@@ -115,3 +115,23 @@ export function lineDown(text: string, cursor: number): number {
 export function splice(text: string, from: number, to: number, chunk: string): Edited {
   return { text: text.slice(0, from) + chunk + text.slice(to), cursor: from + chunk.length };
 }
+
+/** Offset (inicio de grafema) de la celda `col` dentro de `line`; pasado el final, el final de la línea. */
+export function offsetAtColumn(line: string, col: number): number {
+  let x = 0;
+  for (const { index, segment } of segmenter.segment(line)) {
+    const width = Math.max(1, Bun.stringWidth(segment));
+    if (col < x + width) return index;
+    x += width;
+  }
+  return line.length;
+}
+
+/** Offset del texto para un click en la línea lógica `lineIndex`, columna `col` (en celdas). */
+export function offsetAt(text: string, lineIndex: number, col: number): number {
+  const lines = text.split("\n");
+  const index = Math.max(0, Math.min(lines.length - 1, lineIndex));
+  let start = 0;
+  for (let i = 0; i < index; i += 1) start += lines[i]!.length + 1;
+  return start + (col <= 0 ? 0 : offsetAtColumn(lines[index]!, col));
+}
