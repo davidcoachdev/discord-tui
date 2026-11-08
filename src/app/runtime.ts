@@ -1,5 +1,6 @@
 import { createActions, type Actions } from "../actions";
 import { createIdlePresence } from "../actions/presence";
+import { createStatusSync } from "../actions/status-sync";
 import type { Session } from "../auth/session";
 import type { ClientProps } from "../client-props/props";
 import { createGateway } from "../gateway/connection";
@@ -86,7 +87,8 @@ export function createRuntime(deps: RuntimeDeps): Runtime {
     media: deps.voiceMedia ?? defaultMedia,
     kittyKeyboard: deps.kittyKeyboard,
   });
-  const actions = createActions({ store, rest, gateway, voice, fetch: deps.fetch, presence: idle });
+  const statusSync = createStatusSync({ store, rest, presence: idle });
+  const actions = createActions({ store, rest, gateway, voice, fetch: deps.fetch, presence: idle, statusSync });
   store.dispatch({ type: "connection", status: gateway.status });
 
   if (deps.initialSettings) store.dispatch({ type: "settings/loaded", settings: deps.initialSettings });
@@ -118,6 +120,8 @@ export function createRuntime(deps: RuntimeDeps): Runtime {
       log.error("store.dispatch-failed", { error_name: error instanceof Error ? error.name : "unknown", t });
       return;
     }
+    if (t === "READY") statusSync.ready(d);
+    if (t === "USER_SETTINGS_PROTO_UPDATE") statusSync.update(d);
     if (t === "MESSAGE_CREATE" && typeof d?.channel_id === "string" && typeof d?.id === "string") {
       const state = store.getState();
       const message = selectMessages(state, d.channel_id).find((candidate) => candidate.id === d.id);

@@ -96,3 +96,15 @@ export async function searchArchivedThreads(
   });
   return rest.request<ThreadSearchResult>("GET", `/channels/${channelId}/threads/search?${params.toString()}`);
 }
+
+/**
+ * Cambia parte de los settings protobuf (docs.discord.food, "Modify User Settings Proto"):
+ * `settings` = el protobuf parcial en base64; la respuesta trae los settings en base64.
+ */
+export async function patchSettingsProto(
+  rest: RestClient,
+  type: number,
+  settings: string,
+): Promise<{ settings?: string; out_of_date?: boolean }> {
+  return rest.request("PATCH", `/users/@me/settings-proto/${type}`, { settings });
+}
