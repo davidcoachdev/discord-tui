@@ -10,7 +10,7 @@ export const SPEC_KEYS: KeyEntry[] = [
   { key: "k", desc: "subir (arriba: carga historial)", group: "Navegación" },
   { key: "h", desc: "panel anterior", group: "Navegación" },
   { key: "l", desc: "panel siguiente / abrir", group: "Navegación" },
-  { key: "Enter", desc: "abrir canal / entrar a voz", group: "Navegación" },
+  { key: "Enter", desc: "abrir canal, hilo o post / entrar a voz", group: "Navegación" },
   { key: "gg", desc: "ir al principio", group: "Navegación" },
   { key: "G", desc: "ir al final", group: "Navegación" },
   { key: "gn", desc: "primer mensaje nuevo del canal", group: "Navegación" },
@@ -28,7 +28,7 @@ export const SPEC_KEYS: KeyEntry[] = [
   { key: "1-9", desc: "votar en la encuesta seleccionada", group: "Mensajes" },
   { key: "R", desc: "reintentar el envío fallido", group: "Mensajes" },
   { key: "Ctrl-v", desc: "pegar imagen del portapapeles", group: "Mensajes" },
-  { key: "a", desc: "adjuntar archivo por path", group: "Mensajes" },
+  { key: "a", desc: "adjuntar archivo por path (en un foro: traer posts archivados)", group: "Mensajes" },
   { key: "x", desc: "quitar el último adjunto", group: "Mensajes" },
   // En modo insert (escribiendo). Ctrl-k acá borra hasta el fin de línea; en modo normal abre el switcher.
   { key: "← →", desc: "cursor (Ctrl/Alt: por palabra)", group: "Composer" },

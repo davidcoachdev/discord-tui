@@ -3,7 +3,7 @@ import { createEffect, createMemo, createSignal, For, on, Show, type JSX } from 
 
 import { toMessage } from "../../store/reducers/messages";
 import { privateChannelName } from "../../store/reducers/ready";
-import { selectOutbox, selectTyping } from "../../store/selectors";
+import { FORUM_TYPES, isMessageChannelType, selectOutbox, selectTyping } from "../../store/selectors";
 import type { Store } from "../../store/store";
 import type { AppState, Message, OutboxItem } from "../../store/types";
 import { selectUnreadView, unreadSince } from "../../store/unread";
@@ -12,6 +12,7 @@ import { dayLabel, displayName, sameDay, truncate, typingText } from "../format"
 import { jsonEqual, shallowEqual, useSelector } from "../store-bridge";
 import type { Theme } from "../theme";
 import { Button } from "./Button";
+import { ForumView } from "./ForumView";
 import { MessageItem, type MessageAction } from "./MessageItem";
 
 const GROUP_WINDOW_MS = 7 * 60_000;
@@ -26,7 +27,13 @@ export function channelTitle(state: AppState): string {
     return `@ ${name}`;
   }
   const guild = state.guilds[channel.guildId]?.name;
-  const icon = channel.type === 2 ? "🔊" : "#";
+  if (channel.thread !== undefined) {
+    const parent = channel.parentId ? state.channels[channel.parentId] : undefined;
+    const where = parent ? `${FORUM_TYPES.has(parent.type) ? "💬" : "#"}${parent.name}` : "hilo";
+    const flags = `${channel.thread.locked ? " 🔒" : ""}${channel.thread.archived ? " (archivado)" : ""}`;
+    return `🧵 ${channel.name}${flags} · ${where}`;
+  }
+  const icon = channel.type === 2 ? "🔊" : channel.type === 15 ? "💬" : channel.type === 16 ? "🖼" : "#";
   return `${icon} ${channel.name}${guild ? `  ·  ${guild}` : ""}`;
 }
 
@@ -50,6 +57,10 @@ export function MessageView(props: {
   onJumpBottom?(): void;
   /** Cada vez que cambia, la vista baja al final (Esc, G). */
   bottomTick?: number;
+  onOpenPost?(postId: string): void;
+  onLoadArchived?(forumId: string): void;
+  /** Ancho que entra en el borde de arriba (si el título no entra, OpenTUI no lo muestra). */
+  titleWidth?: number;
 }): JSX.Element {
   const voiceHere = useSelector(props.store, (s) => s.voice.channelId !== null && s.voice.channelId === s.ui.selectedChannelId);
   const voiceCount = useSelector(props.store, (s) => {
@@ -198,12 +209,16 @@ export function MessageView(props: {
 
   const isText = (): boolean => {
     const type = channelId() ? view().channels[channelId()!]?.type : undefined;
-    return type !== 2 && type !== 4;
+    return type === undefined || isMessageChannelType(type);
+  };
+  const isForum = (): boolean => {
+    const type = channelId() ? view().channels[channelId()!]?.type : undefined;
+    return type !== undefined && FORUM_TYPES.has(type);
   };
 
   return (
     <box
-      title={` ${truncate(title(), 60)} `}
+      title={` ${truncate(title(), props.titleWidth ?? 60)} `}
       titleColor={props.focused ? props.theme.borderFocus : props.theme.header}
       border
       borderStyle="rounded"
@@ -216,6 +231,19 @@ export function MessageView(props: {
       <Show
         when={channelId() !== null && isText()}
         fallback={
+          <Show
+            when={!isForum()}
+            fallback={
+              <ForumView
+                store={props.store}
+                theme={props.theme}
+                forumId={channelId()!}
+                selectedId={props.selectedId}
+                onOpenPost={(id) => props.onOpenPost?.(id)}
+                onLoadArchived={(id) => props.onLoadArchived?.(id)}
+              />
+            }
+          >
           <box flexGrow={1} justifyContent="center" alignItems="center" flexDirection="column" rowGap={1}>
             <Show
               when={channelId() !== null}
@@ -235,6 +263,7 @@ export function MessageView(props: {
               <text fg={props.theme.faint}>o apretá v</text>
             </Show>
           </box>
+          </Show>
         }
       >
         <Show when={unread().missing}>

@@ -73,3 +73,26 @@ export async function deleteOwnReaction(
   const path = encodeURIComponent(emoji.id !== null ? `${emoji.name}:${emoji.id}` : emoji.name);
   await rest.request("DELETE", `/channels/${channelId}/messages/${messageId}/reactions/${path}/@me`);
 }
+
+export interface ThreadSearchResult {
+  threads?: unknown[];
+  has_more?: boolean;
+  /** 202 "Index not yet available": viene `code` 110000 y `retry_after` en vez de `threads`. */
+  code?: number;
+}
+
+/** Posts archivados de un foro, los de actividad más reciente primero (25 por página). */
+export async function searchArchivedThreads(
+  rest: RestClient,
+  channelId: string,
+  opts: { offset?: number } = {},
+): Promise<ThreadSearchResult> {
+  const params = new URLSearchParams({
+    archived: "true",
+    sort_by: "last_message_time",
+    sort_order: "desc",
+    limit: "25",
+    offset: String(opts.offset ?? 0),
+  });
+  return rest.request<ThreadSearchResult>("GET", `/channels/${channelId}/threads/search?${params.toString()}`);
+}

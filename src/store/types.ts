@@ -59,6 +59,16 @@ export interface ChannelState {
   recipientIds?: string[];
   /** Grupos: nombre puesto a mano (si no, se arma con los participantes). */
   ownName?: string | null;
+  /** Hilos (tipos 10, 11, 12): `parentId` es el canal de texto o foro donde está. */
+  thread?: ThreadInfo;
+}
+
+export interface ThreadInfo {
+  archived: boolean;
+  locked: boolean;
+  ownerId: string | null;
+  messageCount: number | null;
+  memberCount: number | null;
 }
 
 export interface GuildState {
@@ -214,6 +224,7 @@ export interface AppState {
 export type Action =
   | { type: "gw"; t: string; d: any }
   | { type: "connection"; status: GatewayStatus }
+  | { type: "threads/loaded"; guildId: string; threads: unknown[] }
   | { type: "messages/page"; channelId: string; messages: ApiMessage[]; mode: "older" | "latest" }
   | { type: "messages/loading"; channelId: string; loading: boolean }
   | { type: "messages/staleAll" }

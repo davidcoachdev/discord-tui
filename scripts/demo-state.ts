@@ -4,6 +4,7 @@ import { selectChannelList } from "../src/store/selectors";
 import { createStore, emptyState, type Store } from "../src/store/store";
 import { seedPolls } from "./demo/polls";
 import { seedUnread } from "./demo/unread";
+import { seedThreads } from "./demo/threads";
 
 /**
  * Estado de demostración, sin red ni cuenta: sirve para mirar la UI (`bun run demo`)
@@ -209,6 +210,7 @@ export function buildDemoStore(): Store {
     ] as never,
     mode: "latest",
   });
+  seedThreads(store);
   seedUnread(store);
   store.dispatch({ type: "ui/selectGuild", id: G1 });
   store.dispatch({ type: "ui/selectChannel", id: general });

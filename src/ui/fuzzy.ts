@@ -1,11 +1,11 @@
-import { selectChannelList } from "../store/selectors";
+import { selectChannelList, selectForumPosts } from "../store/selectors";
 import type { AppState } from "../store/types";
 
 export interface SwitcherItem {
   channelId: string;
   label: string;
   unread: boolean;
-  kind: "text" | "voice" | "dm" | "group_dm";
+  kind: "text" | "voice" | "dm" | "group_dm" | "thread" | "forum";
 }
 
 const MAX_ITEMS = 20;
@@ -57,6 +57,17 @@ function switcherItems(s: AppState): SwitcherItem[] {
     for (const row of selectChannelList(s, guildId)) {
       if (row.kind === "text") items.push({ channelId: row.id, label: `${guildName} › #${row.name}`, unread: row.unread, kind: "text" });
       else if (row.kind === "voice") items.push({ channelId: row.id, label: `${guildName} › 🔊 ${row.name}`, unread: row.unread, kind: "voice" });
+      else if (row.kind === "thread") {
+        const parent = s.channels[s.channels[row.id]?.parentId ?? ""]?.name ?? "canal";
+        items.push({ channelId: row.id, label: `${guildName} › #${parent} › 🧵 ${row.name}`, unread: row.unread, kind: "thread" });
+      } else if (row.kind === "forum" || row.kind === "media") {
+        items.push({ channelId: row.id, label: `${guildName} › 💬 ${row.name}`, unread: false, kind: "forum" });
+        // Los posts activos del foro (los archivados no: solo se piden a mano).
+        for (const post of selectForumPosts(s, row.id)) {
+          if (post.archived) continue;
+          items.push({ channelId: post.id, label: `${guildName} › 💬 ${row.name} › 🧵 ${post.name}`, unread: post.unread, kind: "thread" });
+        }
+      }
     }
   }
   for (const row of selectChannelList(s, "@dms")) {

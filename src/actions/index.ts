@@ -1,6 +1,6 @@
 import type { Gateway } from "../gateway/connection";
 import type { RestClient } from "../rest/client";
-import { getMessages, postAck, postTyping } from "../rest/routes";
+import { getMessages, postAck, postTyping, searchArchivedThreads } from "../rest/routes";
 import { buildGuildSubscription } from "../gateway/subscriptions";
 import { uploadAttachments } from "../uploads/upload";
 import { createAckScheduler } from "./ack";
@@ -11,7 +11,7 @@ import { createEditActions } from "./edit";
 import { createReactActions } from "./react";
 import { createPollActions } from "./poll";
 import { createSendActions } from "./send";
-import { selectChannelList } from "../store/selectors";
+import { FORUM_TYPES, selectChannelList } from "../store/selectors";
 import type { Store } from "../store/store";
 import type { Focus, PendingAttachment } from "../store/types";
 import { HttpError } from "../rest/errors";
@@ -20,6 +20,8 @@ export interface Actions {
   selectGuild(id: string | "@dms"): void;
   openChannel(id: string): Promise<void>;
   loadOlder(id: string): Promise<void>;
+  /** Posts archivados de un foro: solo con un click o tecla del usuario, nunca solo. */
+  loadArchivedPosts?(forumId: string): Promise<void>;
   focus(focus: Focus): void;
   toggleMembers(): void;
   send(channelId: string, content: string, opts?: { replyTo?: string; attachments?: PendingAttachment[] }): Promise<void>;
@@ -58,8 +60,13 @@ export function createActions(deps: ActionsDeps): Actions {
     deps.store.dispatch({ type: "notice/push", key, level: "warn", text: noticeText(action, error) });
   }
 
-  function subscribeGuild(channelId: string): void {
+  function subscribeGuild(id: string): void {
     const state = deps.store.getState();
+    const opened = state.channels[id];
+    // Un hilo usa la lista de miembros de su canal; los posts de un foro no cambian la suscripción.
+    const channelId = opened?.thread !== undefined ? opened.parentId : id;
+    const type = channelId === null ? undefined : state.channels[channelId]?.type;
+    if (channelId === null || type === undefined || FORUM_TYPES.has(type)) return;
     const guildId = state.channels[channelId]?.guildId;
     if (!guildId || state.subscribedChannels[guildId] === channelId) return;
     const payload = buildGuildSubscription(guildId, channelId);
@@ -70,7 +77,8 @@ export function createActions(deps: ActionsDeps): Actions {
   async function openChannel(id: string): Promise<void> {
     deps.store.dispatch({ type: "ui/selectChannel", id });
     const kind = deps.store.getState().channels[id]?.type;
-    if (kind === 2 || kind === 4) return;
+    // Voz, categorías y foros no tienen mensajes: el foro muestra sus posts (hilos que ya están en el store).
+    if (kind === 2 || kind === 4 || (kind !== undefined && FORUM_TYPES.has(kind))) return;
     subscribeGuild(id);
     const slice = deps.store.getState().messages[id];
     if (slice !== undefined && !slice.stale) return;
@@ -96,6 +104,33 @@ export function createActions(deps: ActionsDeps): Actions {
       deps.store.dispatch({ type: "messages/page", channelId: id, messages, mode: "older" });
     } finally {
       deps.store.dispatch({ type: "messages/loading", channelId: id, loading: false });
+    }
+  }
+
+  const archivedOffset: Record<string, number> = {};
+  const loadingArchived = new Set<string>();
+
+  async function loadArchivedPosts(forumId: string): Promise<void> {
+    const forum = deps.store.getState().channels[forumId];
+    if (!forum?.guildId || loadingArchived.has(forumId)) return;
+    const guildId = forum.guildId;
+    loadingArchived.add(forumId);
+    try {
+      const result = await searchArchivedThreads(deps.rest, forumId, { offset: archivedOffset[forumId] ?? 0 });
+      if (!Array.isArray(result?.threads)) {
+        deps.store.dispatch({ type: "notice/push", key: "archived-posts", level: "info", text: "Discord todavía está indexando el foro, probá en un rato" });
+        return;
+      }
+      archivedOffset[forumId] = (archivedOffset[forumId] ?? 0) + result.threads.length;
+      deps.store.dispatch({ type: "threads/loaded", guildId, threads: result.threads });
+      if (result.threads.length === 0 || result.has_more === false) {
+        deps.store.dispatch({ type: "notice/push", key: "archived-posts", level: "info", text: "no hay más posts archivados" });
+      }
+    } catch (error) {
+      reportError("archived-posts", "traer los posts archivados", error);
+      throw error;
+    } finally {
+      loadingArchived.delete(forumId);
     }
   }
 
@@ -167,6 +202,7 @@ export function createActions(deps: ActionsDeps): Actions {
     },
     openChannel,
     loadOlder,
+    loadArchivedPosts,
     focus(focus: Focus): void {
       deps.store.dispatch({ type: "ui/focus", focus });
     },
