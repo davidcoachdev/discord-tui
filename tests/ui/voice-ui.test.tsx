@@ -74,16 +74,19 @@ test("a voice error is shown in the bar", async () => {
   expect(captureCharFrame()).toContain("✗ voz: Discord exige cifrado E2EE (DAVE) y no se pudo negociar");
 });
 
-test("v on a selected voice channel toggles voice; Enter on it too", async () => {
+test("v on a selected voice channel toggles voice; Enter only opens its chat", async () => {
   const s = setup();
   s.store.dispatch({ type: "ui/selectChannel", id: DEMO.voice });
   s.store.dispatch({ type: "ui/focus", focus: "channels" });
   const { mockInput, renderOnce } = await render(s);
   await renderOnce();
-  mockInput.pressKey("v");
   mockInput.pressEnter();
   await renderOnce();
-  expect(s.calls).toEqual([`toggle:${DEMO.voice}`, `toggle:${DEMO.voice}`]);
+  expect(s.calls).toEqual([]);
+  expect(s.store.getState().ui.focus).toBe("messages");
+  mockInput.pressKey("v");
+  await renderOnce();
+  expect(s.calls).toEqual([`toggle:${DEMO.voice}`]);
 });
 
 test("v on a text channel while connected leaves voice", async () => {

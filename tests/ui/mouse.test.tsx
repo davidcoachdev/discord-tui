@@ -97,16 +97,24 @@ test("click on a text channel opens it and focuses the messages", async () => {
   expect(s.store.getState().ui.focus).toBe("messages");
 });
 
-test("click on a voice channel joins; clicking it again while inside does nothing", async () => {
+test("click on a voice channel opens its chat without joining; the 🎧 button or a double click joins", async () => {
   const s = setup();
   const h = await render(s);
   await click(h, "Sala 1");
-  expect(s.calls).toContain(`toggleVoice:${DEMO.voice}`);
+  expect(s.calls).toContain(`openChannel:${DEMO.voice}`);
+  expect(s.calls.filter((c) => c.startsWith("toggleVoice"))).toHaveLength(0);
+  expect(h.captureCharFrame()).toContain("llamada de voz");
+
+  await click(h, "🎧");
+  expect(s.calls.filter((c) => c.startsWith("toggleVoice"))).toEqual([`toggleVoice:${DEMO.voice}`]);
   await Bun.sleep(450);
   await h.renderOnce();
-  expect(s.store.getState().voice.status).toBe("connected");
-  await click(h, "🔊 Sala 1");
-  expect(s.calls.filter((c) => c.startsWith("toggleVoice")).length).toBe(1);
+
+  const { x, y } = find(h.captureCharFrame(), "Sala 2");
+  await h.mockMouse.click(x, y);
+  await h.mockMouse.click(x, y);
+  await h.renderOnce();
+  expect(s.calls).toContain(`toggleVoice:${DEMO.voice2}`);
 });
 
 test("the big Entrar a voz button in a voice channel joins, and then leaves", async () => {
@@ -332,15 +340,11 @@ test("direct messages: ordered by activity with presence, click opens the chat a
   expect(opened).toContain("i para escribirle a @CinLo💜");
 });
 
-test("voice channels have their own chat: click joins and opens it, and you can write there", async () => {
+test("voice channels have their own chat and you can write there without joining", async () => {
   const s = setup();
   const h = await render(s);
   await click(h, "Sala 1");
-  expect(s.calls).toContain(`toggleVoice:${DEMO.voice}`);
   expect(s.calls).toContain(`openChannel:${DEMO.voice}`);
-  await Bun.sleep(450);
-  await h.renderOnce();
-  expect(h.captureCharFrame()).toContain("estás en la llamada");
   expect(h.captureCharFrame()).toContain("i para escribir en el chat de 🔊 Sala 1");
   h.mockInput.pressKey("i");
   await h.mockInput.typeText("hola desde la sala");
@@ -348,6 +352,7 @@ test("voice channels have their own chat: click joins and opens it, and you can 
   await h.renderOnce();
   expect(s.calls.find((c) => c.startsWith("send:"))).toBe(`send:${DEMO.voice}:hola desde la sala:{}`);
   expect(h.captureCharFrame()).toContain("hola desde la sala");
+  expect(s.calls.filter((c) => c.startsWith("toggleVoice"))).toHaveLength(0);
 });
 
 test("a voice channel's chat can be read without joining (Ctrl-k) and the strip offers to join", async () => {

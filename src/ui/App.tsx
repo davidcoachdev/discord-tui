@@ -426,9 +426,10 @@ export function App(props: {
     const id = state.ui.selectedChannelId;
     if (id === null) return;
     if (state.channels[id]?.type === 2 && state.ui.focus === "channels") {
-      // Como Discord: entrar al canal de voz y abrir su chat.
-      if (state.voice.channelId !== id) void props.actions.voice?.toggleVoice(id);
+      // Enter/l en un canal de voz abre su chat sin entrar a la llamada (para entrar: v, 🎧 o doble click).
       void props.actions.openChannel(id).catch(() => {});
+      props.actions.focus("messages");
+      if (state.voice.channelId !== id) flash("chat del canal de voz · v entra a la llamada");
       return;
     }
     const post = selectedId();

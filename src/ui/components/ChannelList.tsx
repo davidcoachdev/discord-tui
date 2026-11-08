@@ -8,8 +8,10 @@ import type { AppState } from "../../store/types";
 import { cellWidth, displayName, truncate } from "../format";
 import { jsonEqual, useSelector } from "../store-bridge";
 import { presenceColor, type Theme } from "../theme";
+import { Button } from "./Button";
 
 export const CHANNEL_WIDTH = 32;
+const DOUBLE_CLICK_MS = 400;
 
 function icon(kind: ChannelRow["kind"]): string {
   if (kind === "voice") return "🔊";
@@ -77,6 +79,7 @@ export function ChannelList(props: {
   onVolume?(userId: string, delta: number): void;
 }): JSX.Element {
   const [hovered, setHovered] = createSignal<string | null>(null);
+  let lastClick: { id: string; at: number } | null = null;
   const view = useSelector(props.store, listView, jsonEqual);
   const selected = useSelector(props.store, (s) => s.ui.selectedChannelId);
   const rows = (): ChannelRow[] => view().rows;
@@ -103,13 +106,21 @@ export function ChannelList(props: {
     props.store.dispatch({ type: "ui/selectChannel", id: row.id });
     props.actions.focus("channels");
     if (row.kind === "voice") {
-      // Como Discord: click entra a la llamada y abre el chat del canal de voz.
-      if (view().voiceChannelId !== row.id) void props.actions.voice?.toggleVoice(row.id);
+      // Click abre el chat del canal de voz sin entrar a la llamada; doble click (o 🎧) entra.
+      const now = Date.now();
+      const isDouble = lastClick?.id === row.id && now - lastClick.at < DOUBLE_CLICK_MS;
+      lastClick = { id: row.id, at: now };
+      if (isDouble) joinVoice(row.id);
       void props.actions.openChannel(row.id).catch(() => {});
+      props.actions.focus("messages");
       return;
     }
     void props.actions.openChannel(row.id).catch(() => {});
     props.actions.focus("messages");
+  }
+
+  function joinVoice(id: string): void {
+    if (view().voiceChannelId !== id) void props.actions.voice?.toggleVoice(id);
   }
 
   return (
@@ -193,6 +204,9 @@ export function ChannelList(props: {
                   <text fg={props.theme.modeFg} bg={props.theme.error} attributes={TextAttributes.BOLD}>
                     {badge}
                   </text>
+                  <Show when={row.kind === "voice" && !connectedHere() && (isSel() || hovered() === row.id)}>
+                    <Button label="🎧" theme={props.theme} active onPress={() => joinVoice(row.id)} />
+                  </Show>
                 </box>
                 <For each={participants()}>
                   {(p) => {
