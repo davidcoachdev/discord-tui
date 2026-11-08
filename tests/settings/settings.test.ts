@@ -119,3 +119,32 @@ describe("settings persistence in the store", () => {
     }
   });
 });
+
+describe("sound settings", () => {
+  test("defaults: on, volume 60, every cue on", () => {
+    const s = normalizeSettings({});
+    expect(s.sounds.enabled).toBe(true);
+    expect(s.sounds.volume).toBe(60);
+    expect(Object.values(s.sounds.events).every((v) => v === true)).toBe(true);
+    expect(Object.keys(s.sounds.events)).toContain("userJoin");
+  });
+
+  test("keeps valid values, clamps volume, drops unknown cues and bad types", () => {
+    const s = normalizeSettings({ sounds: { enabled: false, volume: 140.4, events: { message: false, join: "no", bogus: false } } });
+    expect(s.sounds.enabled).toBe(false);
+    expect(s.sounds.volume).toBe(100);
+    expect(s.sounds.events.message).toBe(false);
+    expect(s.sounds.events.join).toBe(true);
+    expect("bogus" in s.sounds.events).toBe(false);
+    expect(normalizeSettings({ sounds: { volume: -5 } }).sounds.volume).toBe(0);
+    expect(normalizeSettings({ sounds: "loud" }).sounds).toEqual(DEFAULT_SETTINGS.sounds);
+  });
+
+  test("a sounds patch through the store round-trips", async () => {
+    const { createStore, emptyState } = await import("../../src/store/store");
+    const store = createStore(emptyState());
+    const sounds = { ...DEFAULT_SETTINGS.sounds, volume: 30, events: { ...DEFAULT_SETTINGS.sounds.events, message: false } };
+    store.dispatch({ type: "settings/set", patch: { sounds } });
+    expect(store.getState().settings.sounds).toEqual(sounds);
+  });
+});
