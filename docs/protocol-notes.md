@@ -156,7 +156,7 @@ Fuentes: discord.food (`topics/gateway-events`, `resources/presence`, `resources
 - El identify lleva el estado elegido en `presence` (y también el re-identify después de una reconexión). Ojo: discord.food dice que una cuenta de usuario debería mandar `status: "unknown"` en el primer identify y dejar que el gateway lo asigne, y usar `presence` solo para "la última presencia conocida" al re-identificar. Mandamos el estado elegido igual, porque si no el gateway pone el que tenga la cuenta y no el de discord-tui. **[sin verificar]** cómo lo combina con otras sesiones abiertas.
 - Después de un RESUME se manda op 3 solo si el estado cambió mientras no había conexión (la sesión conserva la presencia). Antes del READY no se manda op 3 (no hay sesión todavía).
 - El "ausente" automático por inactividad solo corre con el estado manual `online`; `dnd` e `invisible` no se pisan ni por inactividad ni por actividad.
-- **Diferencia conocida con el cliente oficial:** la presencia del gateway es por sesión (discord.food, Session Object: la sesión `all` es la que ven los demás). El cliente oficial además sincroniza el estado entre dispositivos con `PreloadedUserSettings.status` en `PATCH /users/@me/settings-proto/1` (protobuf en base64). No lo hacemos: no hay encoder de protobuf en el repo y no inventamos uno. Consecuencia probable: el estado elegido acá no se copia a los otros clientes abiertos, y si en otro cliente estás en `dnd` el estado global puede seguir siendo ese. **[sin verificar]**.
+- **Diferencia conocida con el cliente oficial:** la presencia del gateway es por sesión (discord.food, Session Object: la sesión `all` es la que ven los demás). El cliente oficial además sincroniza el estado entre dispositivos con `PreloadedUserSettings.status` en `PATCH /users/@me/settings-proto/1` (protobuf en base64). Ahora lo hacemos también: ver "Estado sincronizado (settings-proto)".
 - Rate limit de la doc: 5 op 3 cada 20 s. Solo se manda por acción del usuario (menú, settings, `gp`) o por el ausente automático, y nunca dos veces seguidas el mismo estado.
 
 **Lista de miembros más allá de 100.**
@@ -181,3 +181,40 @@ Fuentes: discord.food y docs de Discord (`reference#image-formatting`, consultad
 - **Reacciones custom:** con imágenes, el chip pasa de `<text>` a una fila de renderables (`" "`, imagen de 2x1, `" N "`) con el click en la caja, que sigue alternando la reacción. Se guarda `emoji.animated` de la reacción (REST y `MESSAGE_REACTION_ADD`) para pedir el GIF; al toggle se manda solo `{ id, name }`.
 - **Animados:** `ImageRenderable` no anima (no hay API de cuadros; `VideoRenderable` es solo MP4). El decoder nativo **rechaza el WebP animado** (`ImageError: unsupported image feature`, probado con un WebP de 2 cuadros) y del GIF animado decodifica el primer cuadro. Por eso los animados se piden como `.gif` y se ven quietos.
 - **Límite de OpenTUI 0.8.2: no hay imágenes dentro de una línea de texto.** Un `<text>` (`TextRenderable`) solo acepta `TextNodeRenderable`, `StyledText` o strings como hijos; `TextNodeRenderable.children` es `(string | TextNodeRenderable)[]` y lo que llega al buffer son `TextChunk` (`text`, `fg`, `bg`, `attributes`, `link`), sin lugar para una imagen ni para reservar un hueco de ancho fijo. Poner un `<image>` dentro de `<text>` tira `TextNodeRenderable only accepts strings, TextNodeRenderable instances, or StyledText instances` (probado con `testRender`). Por eso un emoji custom en medio de una frase sigue como `:nombre:`. La única salida sería dejar espacios en el texto y superponer imágenes con posición absoluta calculando dónde cayeron con `TextBufferRenderable.lineInfo` (`lineStartCols`/`lineWidthCols`) después de cada layout; se descartó: el ancho de un emoji (2 celdas) no coincide con el de los espacios cuando el wrap corta, y cada resize o scroll obliga a recalcular. Partir la frase en una fila de `<text>` + `<image>` rompe el wrap por palabras.
+
+## Estado sincronizado (settings-proto)
+
+Fuentes (consultadas 2026-11-08): docs.discord.food `resources/user-settings-proto` (endpoint, partial updates, rate limit), `topics/gateway-events` (READY `user_settings_proto`, User Settings Proto Update), `topics/gateway` (capability `USER_SETTINGS_PROTO = 1 << 9`, incluida en nuestro `GATEWAY_CAPABILITIES` 1734653). La doc no trae números de campo; salen del repo que enlaza: `github.com/discord-userdoccers/discord-protos`, `discord_protos/discord_users/v1/PreloadedUserSettings.proto` (commit `921d792`, 2026-11-07). Código: `src/proto/settings.ts`, `src/actions/status-sync.ts`. Nada de esto se probó contra la cuenta real (**🧍 Paso de Gon**).
+
+**Campos usados (proto3).**
+
+| Mensaje | Campo | Nº | Tipo | Wire type |
+|---|---|---|---|---|
+| `PreloadedUserSettings` | `status` | 11 | `StatusSettings` | 2 (tag `0x5a`) |
+| `StatusSettings` | `status` | 1 | `google.protobuf.StringValue` | 2 (tag `0x0a`) |
+| `StatusSettings` | `custom_status` | 2 | `CustomStatus` | 2 (se copia, no se interpreta) |
+| `StatusSettings` | `show_current_game` | 3 | `BoolValue` | 2 (se copia) |
+| `StatusSettings` | `status_expires_at_ms` | 4 | `fixed64` | 1 (se saca al escribir) |
+| `StatusSettings` | `status_created_at_ms` | 5 | `UInt64Value` | 2 (se copia) |
+| `StringValue` | `value` | 1 | `string` | 2 |
+
+Ejemplo: `dnd` = `5a 07 0a 05 0a 03 64 6e 64` = `WgcKBQoDZG5k`.
+
+**Lectura.**
+- READY `user_settings_proto` (string base64; si falta, defaults) y `USER_SETTINGS_PROTO_UPDATE` `{ settings: { type, proto }, partial }` (solo `type: 1`, PRELOADED). El decoder saltea cualquier campo desconocido (wire 0, 1, 2, 5); grupos (3/4), wire 6/7, campo 0, largos que se pasan, varints cortados o de más de 10 bytes, base64 inválido o UTF-8 inválido → null, nunca tira.
+- Varias apariciones del campo 11 (o del 1) se concatenan: en protobuf eso es mergear. Un update `partial: true` se concatena al StatusSettings cacheado; uno no parcial lo reemplaza.
+- Solo se adoptan `online`/`idle`/`dnd`/`invisible`; `unknown` (el default de la doc) o ausente no cambia nada. Si el de la cuenta difiere del guardado se adopta (es la fuente de verdad entre dispositivos): `settings.status` se actualiza y se manda op 3 para que esta sesión coincida. Adoptar nunca hace PATCH.
+
+**Escritura.**
+- Solo cuando el usuario elige un estado (`actions.setStatus`): primero op 3 (como antes), después `PATCH /users/@me/settings-proto/1` con `{ settings: <base64> }` por la cola del RestClient. Respuesta `{ settings, out_of_date? }`; si trae settings legibles con campo 11 se usan como nuevo cache.
+- La doc dice que un campo de primer nivel se manda entero: lo que falte vuelve al default. Por eso el PATCH lleva el StatusSettings conocido completo con `status` reemplazado (así no se borra el estado personalizado). Si no conocemos el StatusSettings (READY con proto ilegible, o antes del READY) no se manda nada y sale el aviso.
+- Si el PATCH falla: queda el estado local y el op 3, y aviso warn "no se pudo sincronizar el estado con tus otros dispositivos" (clave `status-sync`). No se reintenta solo.
+- Mientras hay un PATCH propio en vuelo y hasta 5 s después no se adopta lo que llegue por USER_SETTINGS_PROTO_UPDATE (puede ser el eco de un estado anterior si se eligieron dos seguidos) **[nuestra]**.
+
+**Sin verificar.**
+- Que el PATCH parcial con solo el campo 11 sea lo que manda el cliente oficial y que el server lo mergee como dice la doc.
+- Sacar `status_expires_at_ms` al elegir un estado: suponemos que el cliente oficial lo pone en 0 para un estado sin vencimiento; si quedara uno viejo, Discord podría volver el estado al vencer. No mantenemos `status_created_at_ms` (se copia el que había).
+- No leemos el vencimiento: si en el celular elegiste "no molestar por 1 hora", al vencer dependemos de que llegue un USER_SETTINGS_PROTO_UPDATE.
+- No mandamos `required_data_version`, así que un PATCH puede pisar un cambio más nuevo hecho en otro dispositivo (la doc lo describe solo para ediciones offline).
+- Rate limit: la doc dice "ratelimited heavily" y que el cliente oficial agrupa los cambios frecuentes (~10 s). Nosotros mandamos un PATCH por elección; elegir muchos estados seguidos puede dar 429 (la cola los espera).
+- Qué hace el gateway con la presencia de las sesiones cuando cambia `StatusSettings.status` (si propaga solo o hace falta el op 3 de cada sesión).

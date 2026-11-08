@@ -17,6 +17,7 @@ import type { Focus, PendingAttachment } from "../store/types";
 import { HttpError } from "../rest/errors";
 import type { OwnStatus } from "../settings/settings";
 import type { IdlePresence } from "./presence";
+import type { StatusSync } from "./status-sync";
 
 export interface Actions {
   selectGuild(id: string | "@dms"): void;
@@ -45,7 +46,7 @@ export interface Actions {
    * siguiente con op 37 (solo para el canal abierto, a lo sumo uno cada 500 ms).
    */
   loadMoreMembers?(channelId: string): void;
-  /** Estado propio elegido a mano: se guarda en settings y se manda por op 3. */
+  /** Estado propio elegido a mano: se guarda en settings, se manda por op 3 y se copia a los settings de la cuenta. */
   setStatus?(status: OwnStatus): void;
 }
 
@@ -58,6 +59,8 @@ export interface ActionsDeps {
   now?: () => number;
   openUrl?: (url: string) => boolean;
   presence?: Pick<IdlePresence, "statusChanged">;
+  /** Copia el estado elegido a PreloadedUserSettings (los otros dispositivos). */
+  statusSync?: Pick<StatusSync, "push">;
   setTimer?: typeof setTimeout;
 }
 
@@ -272,6 +275,7 @@ export function createActions(deps: ActionsDeps): Actions {
     setStatus(status: OwnStatus): void {
       deps.store.dispatch({ type: "settings/set", patch: { status } });
       deps.presence?.statusChanged();
+      void deps.statusSync?.push(status);
     },
     retry: sendActions.retry,
     edit,
