@@ -52,3 +52,12 @@ export function demoStreamActions(store: Store, me: string): Pick<VoiceActions, 
   };
   return actions;
 }
+
+/** Alguien de la demo ya está transmitiendo en Sala 1 (para ver el `📺 en vivo` en la lista). */
+export function seedGoLive(store: Store, guildId: string, channelId: string, userId: string): void {
+  store.dispatch({
+    type: "gw",
+    t: "VOICE_STATE_UPDATE",
+    d: { guild_id: guildId, user_id: userId, channel_id: channelId, self_mute: false, self_deaf: false, self_stream: true },
+  });
+}

@@ -12,7 +12,7 @@ import { useSelector } from "../store-bridge";
 import { useTheme } from "../theme";
 import { Button, type Click } from "../components/Button";
 import { statusLabel } from "../components/StatusMenu";
-import { OWN_STATUSES } from "../../settings/settings";
+import { OWN_STATUSES, STREAM_QUALITIES } from "../../settings/settings";
 
 export interface SettingsDeps {
   listAudioDevices(): Promise<{ inputs: AudioDevice[]; outputs: AudioDevice[] }>;
@@ -20,8 +20,8 @@ export interface SettingsDeps {
   startPlayback: (opts?: { target?: string }) => Promise<any>;
 }
 
-type Section = "input" | "output" | "inputMode" | "sensitivity" | "testMic" | "status" | "theme" | "images";
-const SECTIONS: Section[] = ["input", "output", "inputMode", "sensitivity", "testMic", "status", "theme", "images"];
+type Section = "input" | "output" | "inputMode" | "sensitivity" | "testMic" | "streamMonitor" | "streamQuality" | "status" | "theme" | "images";
+const SECTIONS: Section[] = ["input", "output", "inputMode", "sensitivity", "testMic", "streamMonitor", "streamQuality", "status", "theme", "images"];
 
 export function SettingsScreen(props: {
   store: Store;
@@ -32,6 +32,7 @@ export function SettingsScreen(props: {
 }): JSX.Element {
   const settings = useSelector(props.store, (state) => state.settings);
   const [devices] = createResource(() => props.deps.listAudioDevices());
+  const [monitors] = createResource(async () => (await props.actions.voice?.listMonitors?.().catch(() => [])) ?? []);
   const [row, setRow] = createSignal<Section>("input");
   const [testing, setTesting] = createSignal(false);
   const [level, setLevel] = createSignal(-96);
@@ -75,6 +76,13 @@ export function SettingsScreen(props: {
     if (next) patch({ [field]: next.name } as never);
   }
 
+  /** Monitor de Go Live: "preguntar" (null) y después cada monitor conectado. */
+  function cycleMonitor(delta: number): void {
+    const names: (string | null)[] = [null, ...(monitors() ?? []).map((m) => m.name).filter((n) => n !== "")];
+    const index = Math.max(0, names.indexOf(settings().streamMonitor));
+    patch({ streamMonitor: names[(index + delta + names.length) % names.length] ?? null });
+  }
+
   function nudgeSensitivity(deltaDb: number): void {
     const current = settings().vadSensitivity;
     const base = current === "auto" ? threshold() : current;
@@ -100,6 +108,11 @@ export function SettingsScreen(props: {
       if (testing()) void stopTest();
       else void startTest();
       return;
+    }
+    if (section === "streamMonitor") return cycleMonitor(dir === 0 ? 1 : dir);
+    if (section === "streamQuality") {
+      const index = STREAM_QUALITIES.indexOf(settings().streamQuality);
+      return patch({ streamQuality: STREAM_QUALITIES[(index + (dir === 0 ? 1 : dir) + STREAM_QUALITIES.length) % STREAM_QUALITIES.length]! });
     }
     if (section === "status") {
       const index = OWN_STATUSES.indexOf(settings().status);
@@ -138,7 +151,8 @@ export function SettingsScreen(props: {
   });
 
   const theme = useTheme(props.store);
-  const arrows = (section: Section): boolean => section === "input" || section === "output" || section === "sensitivity";
+  const arrows = (section: Section): boolean =>
+    section === "input" || section === "output" || section === "sensitivity" || section === "streamMonitor";
   const line = (section: Section, text: string): JSX.Element => (
     <box
       flexDirection="row"
@@ -203,6 +217,12 @@ export function SettingsScreen(props: {
             <Button label="auto" theme={theme()} onPress={() => patch({ vadSensitivity: "auto" })} />
           </box>
         </Show>
+        <text fg={theme().header}>Transmitir pantalla</text>
+        {line("streamMonitor", `monitor: ${settings().streamMonitor ?? "preguntar si hay más de uno"}  (h/l)`)}
+        {line(
+          "streamQuality",
+          `calidad: ${settings().streamQuality}${settings().streamQuality === "1080p30" ? " (puede necesitar Nitro)" : ""}`,
+        )}
         <text fg={theme().header}>Cuenta</text>
         {line("status", `estado: ${statusLabel(settings().status)}  (Enter o h/l)`)}
         <text fg={theme().header}>Apariencia</text>

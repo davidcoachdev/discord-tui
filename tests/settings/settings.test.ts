@@ -33,6 +33,12 @@ describe("settings", () => {
     });
   });
 
+  test("Go Live settings: defaults to ask + 720p30, keeps valid values, drops invalid ones", () => {
+    expect(normalizeSettings({})).toMatchObject({ streamMonitor: null, streamQuality: "720p30" });
+    expect(normalizeSettings({ streamMonitor: "DP-1", streamQuality: "1080p30" })).toMatchObject({ streamMonitor: "DP-1", streamQuality: "1080p30" });
+    expect(normalizeSettings({ streamMonitor: 3, streamQuality: "4k60" })).toMatchObject({ streamMonitor: null, streamQuality: "720p30" });
+  });
+
   test("broken JSON gives defaults", async () => {
     await withTempDir(async (dir) => {
       const path = join(dir, "settings.json");

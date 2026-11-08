@@ -1,5 +1,5 @@
 /**
- * Servidor de stream FALSO para Go Live (del spike scripts/spike-golive/shim-fake.ts): un WS TLS local que
+ * Servidor de stream FALSO para Go Live (del spike de Go Live, antes scripts/spike-golive/shim-fake.ts): un WS TLS local que
  * contesta como el servidor de video de Discord (HELLO, READY con un stream de video, SELECT_PROTOCOL_ACK con
  * una SDP real de libdatachannel y DAVE v1). Más un gateway falso que anota lo que se le manda.
  * Sin Discord ni cuenta: todo en 127.0.0.1.

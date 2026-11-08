@@ -126,4 +126,35 @@ describe("SettingsScreen", () => {
     await renderOnce();
     expect(closed).toBe(1);
   });
+
+  test("Go Live rows: monitor cycles ask → each monitor, quality toggles 720p30/1080p30 with the Nitro note", async () => {
+    const { store, deps } = setup();
+    const actions = {
+      voice: { listMonitors: async () => [{ name: "DP-1", width: 1920, height: 1080, focused: true }, { name: "HDMI-A-1", width: 1920, height: 1080, focused: false }] },
+    } as unknown as Actions;
+    const { mockInput, renderOnce, captureCharFrame } = await testRender(
+      () => <SettingsScreen store={store} actions={actions} deps={deps} inVoice={false} onClose={() => {}} />,
+      { width: 90, height: 30 },
+    );
+    await Bun.sleep(5);
+    await renderOnce();
+    expect(captureCharFrame()).toContain("monitor: preguntar si hay más de uno");
+    expect(captureCharFrame()).toContain("calidad: 720p30");
+    for (let i = 0; i < 5; i += 1) mockInput.pressKey("j");
+    mockInput.pressKey("l");
+    await renderOnce();
+    expect(store.getState().settings.streamMonitor).toBe("DP-1");
+    mockInput.pressKey("l");
+    mockInput.pressKey("l");
+    await renderOnce();
+    expect(store.getState().settings.streamMonitor).toBeNull();
+    mockInput.pressKey("h");
+    await renderOnce();
+    expect(store.getState().settings.streamMonitor).toBe("HDMI-A-1");
+    mockInput.pressKey("j");
+    mockInput.pressEnter();
+    await renderOnce();
+    expect(store.getState().settings.streamQuality).toBe("1080p30");
+    expect(captureCharFrame()).toContain("calidad: 1080p30 (puede necesitar Nitro)");
+  });
 });

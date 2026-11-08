@@ -7,7 +7,7 @@ import { seedUnread } from "./demo/unread";
 import { seedThreads } from "./demo/threads";
 import { seedPresence } from "./demo/presence";
 import { seedEmoji } from "./demo/emoji";
-import { demoStreamActions } from "./demo/golive";
+import { demoStreamActions, seedGoLive } from "./demo/golive";
 
 /**
  * Estado de demostración, sin red ni cuenta: sirve para mirar la UI (`bun run demo`)
@@ -220,6 +220,7 @@ export function buildDemoStore(): Store {
   store.dispatch({ type: "ui/selectChannel", id: general });
   store.dispatch({ type: "ui/focus", focus: "messages" });
   seedPresence(store);
+  seedGoLive(store, G1, DEMO.voice, U(1));
   return store;
 }
 

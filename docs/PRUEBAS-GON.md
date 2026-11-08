@@ -67,3 +67,23 @@ Con auriculares y el teléfono mirando el canal de voz **sin entrar** (el teléf
 
 - [ ] `⚙ settings` (o `gs`) → elegir micrófono y salida con `◀ ▶`, mover la sensibilidad mirando el medidor, "probar mic" (eco), tema claro/oscuro, imágenes sí/no.
 - [ ] Un día de laburo usando solo discord-tui; anotá todo lo que te hizo abrir la app oficial o te molestó y pasáselo al agente.
+
+## 6. Transmitir pantalla (Go Live) [2ª]
+
+Necesita a un amigo en el canal de voz (desde el cliente oficial). Usa tu cuenta: la librería avisa que automatizar puede
+terminar en ban (ver `docs/protocol-notes.md`, "Transmitir pantalla").
+
+- [ ] Una vez: `sudo pacman -S wf-recorder` (ya está instalado en tu PC). Sin él usa grim a ~10 fps y te avisa.
+- [ ] `bun run demo` primero: en `🔊 Sala 1` Ragnar figura con `📺 en vivo`; entrá a la sala, click en `📺 transmitir` → aparece
+      `¿Qué pantalla transmitir?` con tus monitores → elegí uno → `⏳ iniciando…` → `🔴 EN VIVO · detener` y `📺 en vivo` al lado
+      tuyo. Click otra vez lo corta. `S` hace lo mismo con el teclado.
+- [ ] `bun run dev`, entrá al canal de voz donde está tu amigo, click en `📺 transmitir` (o `S`), elegí el monitor (en `gs` →
+      "Transmitir pantalla" podés dejar uno fijo y la calidad, 720p30 por defecto). En menos de 15 s la barra dice
+      `🔴 EN VIVO · detener`. Si sale `✗ transmisión: …`, copiá esa línea y el final del log.
+- [ ] Tu amigo hace click en "LIVE" en tu nombre y te cuenta: ¿ve la pantalla? ¿fluido o trabado? ¿tarda en arrancar (debería
+      verse en ≤ 2 s, hay keyframe cada 2 s)? ¿hay audio (no debería: transmitimos solo video)? En su cliente, ¿el stream
+      muestra el candado / código de privacidad E2EE? Cuando entra, la barra pasa a `👁 1`.
+- [ ] Mientras transmitís, en la lista de la izquierda vos (y cualquiera que transmita) figura con `📺 en vivo`.
+- [ ] `🔴 EN VIVO · detener` → tu amigo deja de verla. Probá también salir de la voz transmitiendo (`✕ salir`): corta solo.
+- [ ] Con la TUI todavía abierta y sin transmitir: `pgrep -a "wf-recorder|ffmpeg|grim"` no muestra nada. Y después de `q`, tampoco.
+- [ ] `bun run leak-check` → `OK`.
