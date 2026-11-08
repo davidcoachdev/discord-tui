@@ -211,6 +211,7 @@ export function MessageView(props: {
     const type = channelId() ? view().channels[channelId()!]?.type : undefined;
     return type === undefined || isMessageChannelType(type);
   };
+  const isVoiceChannel = (): boolean => (channelId() ? view().channels[channelId()!]?.type === 2 : false);
   const isForum = (): boolean => {
     const type = channelId() ? view().channels[channelId()!]?.type : undefined;
     return type !== undefined && FORUM_TYPES.has(type);
@@ -266,6 +267,23 @@ export function MessageView(props: {
           </Show>
         }
       >
+        <Show when={isVoiceChannel()}>
+          <box width="100%" flexDirection="row" paddingLeft={1} paddingRight={1} flexShrink={0} backgroundColor={props.theme.panel} columnGap={1}>
+            <text fg={voiceHere() ? props.theme.speaking : props.theme.header} wrapMode="none">
+              {`🔊 ${voiceHere() ? "estás en la llamada" : "llamada de voz"}`}
+            </text>
+            <text fg={props.theme.dim} wrapMode="none" flexGrow={1}>
+              {voiceCount() === 0 ? "· no hay nadie" : `· ${voiceCount()} ${voiceCount() === 1 ? "persona" : "personas"}`}
+            </text>
+            <Button
+              label={voiceHere() ? "✕ Salir de la llamada" : "🔊 Entrar a voz"}
+              theme={props.theme}
+              danger={voiceHere()}
+              active={!voiceHere()}
+              onPress={() => props.onVoiceToggle?.(channelId()!)}
+            />
+          </box>
+        </Show>
         <Show when={unread().missing}>
           <box width="100%" paddingLeft={1} flexShrink={0} onMouseDown={() => props.onJumpUnread?.()}>
             <text fg={props.theme.error} wrapMode="word">

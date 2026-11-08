@@ -128,7 +128,7 @@ export function createActions(deps: ActionsDeps): Actions {
     deps.store.dispatch({ type: "ui/selectChannel", id });
     const kind = deps.store.getState().channels[id]?.type;
     // Voz, categorías y foros no tienen mensajes: el foro muestra sus posts (hilos que ya están en el store).
-    if (kind === 2 || kind === 4 || (kind !== undefined && FORUM_TYPES.has(kind))) return;
+    if (kind === 4 || (kind !== undefined && FORUM_TYPES.has(kind))) return;
     subscribeGuild(id);
     const slice = deps.store.getState().messages[id];
     if (slice !== undefined && !slice.stale) return;

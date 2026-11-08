@@ -30,9 +30,9 @@ export const THREAD_CHANNEL_TYPES = new Set([10, 11, 12]);
 /** Foros (15) y canales de medios (16): no tienen mensajes propios, solo posts (hilos). */
 export const FORUM_TYPES = new Set([15, 16]);
 
-/** Canales donde se leen y escriben mensajes (texto, DMs, hilos). */
+/** Canales donde se leen y escriben mensajes: texto, DMs, hilos y el chat de los canales de voz (como Discord). */
 export function isMessageChannelType(type: number | undefined): boolean {
-  return type !== undefined && type !== 2 && type !== 4 && !FORUM_TYPES.has(type);
+  return type !== undefined && type !== 4 && !FORUM_TYPES.has(type);
 }
 
 function kindOf(channel: ChannelState): ChannelRow["kind"] | null {

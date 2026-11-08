@@ -218,3 +218,8 @@ Ejemplo: `dnd` = `5a 07 0a 05 0a 03 64 6e 64` = `WgcKBQoDZG5k`.
 - No mandamos `required_data_version`, así que un PATCH puede pisar un cambio más nuevo hecho en otro dispositivo (la doc lo describe solo para ediciones offline).
 - Rate limit: la doc dice "ratelimited heavily" y que el cliente oficial agrupa los cambios frecuentes (~10 s). Nosotros mandamos un PATCH por elección; elegir muchos estados seguidos puede dar 429 (la cola los espera).
 - Qué hace el gateway con la presencia de las sesiones cuando cambia `StatusSettings.status` (si propaga solo o hace falta el op 3 de cada sesión).
+
+## Chat de los canales de voz (2026-11-08, pedido de Gon)
+
+- Los canales de voz (tipo 2) tienen su propio chat ("Text in Voice"): es el mismo `GET/POST /channels/{id}/messages` con el id del canal de voz, y los `MESSAGE_CREATE` llegan con ese `channel_id`. `isMessageChannelType` ya no excluye el tipo 2, así que abrir, leer, escribir, typing, ack, reacciones y adjuntos funcionan igual que en un canal de texto.
+- Click (o Enter en la lista) en un canal 🔊 entra a la llamada y abre su chat, como Discord; con Ctrl-k se puede leer el chat sin entrar. Arriba del chat hay una franja con el estado de la llamada y el botón entrar/salir.

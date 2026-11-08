@@ -103,7 +103,9 @@ export function ChannelList(props: {
     props.store.dispatch({ type: "ui/selectChannel", id: row.id });
     props.actions.focus("channels");
     if (row.kind === "voice") {
+      // Como Discord: click entra a la llamada y abre el chat del canal de voz.
       if (view().voiceChannelId !== row.id) void props.actions.voice?.toggleVoice(row.id);
+      void props.actions.openChannel(row.id).catch(() => {});
       return;
     }
     void props.actions.openChannel(row.id).catch(() => {});

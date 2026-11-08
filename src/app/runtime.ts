@@ -166,7 +166,7 @@ export function createRuntime(deps: RuntimeDeps): Runtime {
   const offAck = store.subscribe(() => {
     const state = store.getState();
     const raw = state.ui.selectedChannelId;
-    const channelId = raw !== null && state.channels[raw]?.type !== 2 && state.channels[raw]?.type !== 4 ? raw : null;
+    const channelId = raw !== null && state.channels[raw]?.type !== 4 ? raw : null;
     const newest = channelId === null ? null : state.messages[channelId]?.ids.at(-1) ?? null;
     const key = `${channelId}:${newest}`;
     if (key === lastViewed) return;

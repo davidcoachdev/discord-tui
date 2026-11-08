@@ -259,13 +259,9 @@ export function App(props: {
     props.store.dispatch({ type: "ui/selectGuild", id: channel.guildId ?? "@dms" });
     props.store.dispatch({ type: "ui/selectChannel", id });
     setSelectedId(null);
-    if (channel.type === 2) {
-      props.actions.focus("channels");
-      flash("canal de voz: v para entrar");
-      return;
-    }
     void props.actions.openChannel(id).catch(() => {});
     props.actions.focus("messages");
+    if (channel.type === 2) flash("chat del canal de voz · v entra a la llamada");
   }
 
   function moveGuild(delta: number): void {
@@ -429,8 +425,10 @@ export function App(props: {
     }
     const id = state.ui.selectedChannelId;
     if (id === null) return;
-    if (state.channels[id]?.type === 2) {
-      if (state.ui.focus === "channels") void props.actions.voice?.toggleVoice(id);
+    if (state.channels[id]?.type === 2 && state.ui.focus === "channels") {
+      // Como Discord: entrar al canal de voz y abrir su chat.
+      if (state.voice.channelId !== id) void props.actions.voice?.toggleVoice(id);
+      void props.actions.openChannel(id).catch(() => {});
       return;
     }
     const post = selectedId();
@@ -1044,7 +1042,7 @@ export function App(props: {
     const id = state.ui.selectedChannelId;
     const channel = id ? state.channels[id] : undefined;
     if (!channel) return "elegí un canal";
-    if (channel.type === 2) return "canal de voz · click en el canal o v para entrar";
+    if (channel.type === 2) return `i para escribir en el chat de 🔊 ${channel.name}`;
     if (FORUM_TYPES.has(channel.type)) return "foro · abrí un post con click o j/k y Enter para escribir";
     if (channel.thread !== undefined) return `i para escribir en 🧵 ${channel.name}`;
     return channel.guildId === null ? `i para escribirle a @${channel.name}` : `i para escribir en #${channel.name}`;
