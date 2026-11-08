@@ -5,12 +5,15 @@ export type MessageAction = "reply" | "edit" | "delete" | "react";
 
 import { attachmentView, emojiUrl, sizedUrl, stickerView } from "../../images/cdn";
 import { imageCache } from "../../images/cache";
+import { frameCache } from "../../images/frames";
+import { mayAnimate, type Animation } from "../../images/gif";
 import { IMAGE_MODE } from "../../images/mode";
 import { jumboEmoji, type JumboEmoji } from "../../markdown/jumbo";
 import { parseMarkdown, plainText } from "../../markdown/parse";
 import type { ApiEmbed, ApiPoll, AppState, Message } from "../../store/types";
 import { clockTime, displayName, hashIndex, memberColor, truncate } from "../format";
 import { roleHex, type Theme } from "../theme";
+import { AnimatedImage } from "./AnimatedImage";
 import { Button, type Click } from "./Button";
 import { Markdown, type MdContext } from "./Markdown";
 import { PollBox } from "./PollBox";
@@ -19,26 +22,38 @@ function authorColor(state: AppState, theme: Theme, userId: string, guildId: str
   return roleHex(memberColor(state, userId, guildId)) ?? theme.names[hashIndex(userId, theme.names.length)]!;
 }
 
-function InlineImage(props: { url: string; cols: number; rows: number; label: string; theme: Theme; raw?: boolean }): JSX.Element {
-  const [bytes] = createResource(
-    () => (props.raw ? props.url : sizedUrl(props.url, props.cols, props.rows)),
-    (url) => imageCache.get(url),
+function InlineImage(props: { url: string; cols: number; rows: number; label: string; theme: Theme; raw?: boolean; animate?: boolean }): JSX.Element {
+  const url = (): string => (props.raw ? props.url : sizedUrl(props.url, props.cols, props.rows));
+  const [bytes] = createResource(url, (u) => imageCache.get(u));
+  // GIF/WebP con animaciones prendidas: se decodifican los cuadros. Mientras tanto, o si falla o es de
+  // un solo cuadro, queda la imagen quieta de siempre (OpenTUI muestra el primer cuadro).
+  const [animation] = createResource(
+    () => {
+      const data = bytes();
+      return props.animate && data && mayAnimate(data) ? url() : false;
+    },
+    (u) => frameCache.get(u, props.cols, props.rows),
   );
+  const still = (data: Uint8Array): JSX.Element => <image source={data} width={props.cols} height={props.rows} fit="fit" protocol="auto" />;
   return (
     <Show when={bytes()} fallback={<text fg={props.theme.dim}>{props.label}</text>}>
-      {(data: () => Uint8Array) => <image source={data()} width={props.cols} height={props.rows} fit="fit" protocol="auto" />}
+      {(data: () => Uint8Array) => (
+        <Show when={props.animate ? animation() : null} fallback={still(data())}>
+          {(anim: () => Animation) => <AnimatedImage animation={anim()} cols={props.cols} rows={props.rows} />}
+        </Show>
+      )}
     </Show>
   );
 }
 
 /** Mensaje de sólo emojis: los custom como imagen de 4x2 celdas, los unicode como texto en la misma fila. */
-function JumboRow(props: { emoji: JumboEmoji[]; theme: Theme; edited: boolean }): JSX.Element {
+function JumboRow(props: { emoji: JumboEmoji[]; theme: Theme; edited: boolean; animate?: boolean }): JSX.Element {
   return (
     <box flexDirection="row" flexWrap="wrap" columnGap={1} width="100%">
       <For each={props.emoji}>
         {(emoji) =>
           emoji.kind === "custom" ? (
-            <InlineImage url={emojiUrl(emoji.id, emoji.animated)} cols={4} rows={2} label={`:${emoji.name}:`} theme={props.theme} raw />
+            <InlineImage url={emojiUrl(emoji.id, emoji.animated)} cols={4} rows={2} label={`:${emoji.name}:`} theme={props.theme} raw animate={props.animate} />
           ) : (
             <text fg={props.theme.fg} height={2}>{emoji.text}</text>
           )
@@ -51,15 +66,39 @@ function JumboRow(props: { emoji: JumboEmoji[]; theme: Theme; edited: boolean })
   );
 }
 
-function EmbedView(props: { embed: ApiEmbed; ctx: MdContext; images: boolean; onOpen?(url: string): void }): JSX.Element {
+type EmbedMedia = { url: string; proxy_url?: string; width?: number; height?: number };
+
+/** La imagen de un embed gifv que ya es un GIF (por la extensión o el content_type), si hay. */
+function gifvGif(embed: ApiEmbed): EmbedMedia | undefined {
+  const isGifUrl = (u: string | undefined): boolean => {
+    try {
+      return u !== undefined && new URL(u).pathname.toLowerCase().endsWith(".gif");
+    } catch {
+      return false;
+    }
+  };
+  return [embed.image, embed.thumbnail].find(
+    (m) => m && ((m as { content_type?: string }).content_type === "image/gif" || isGifUrl(m.proxy_url) || isGifUrl(m.url)),
+  ) as EmbedMedia | undefined;
+}
+
+function EmbedView(props: { embed: ApiEmbed; ctx: MdContext; images: boolean; animate?: boolean; onOpen?(url: string): void }): JSX.Element {
   const theme = props.ctx.theme;
   const bar = (): string => roleHex(props.embed.color ?? 0) ?? theme.border;
   const description = (): string => {
     const lines = (props.embed.description ?? "").split("\n");
     return lines.length > 6 ? `${lines.slice(0, 6).join("\n")}\n…` : lines.join("\n");
   };
-  const image = (): { url: string; width?: number; height?: number } | undefined =>
-    (props.embed.image ?? props.embed.thumbnail) as { url: string; width?: number; height?: number } | undefined;
+  // gifv (Tenor/Giphy): si alguna imagen del embed es un GIF se anima; si no, miniatura quieta + ▶ que abre el link.
+  const gifv = (): boolean => props.embed.type === "gifv";
+  const gifMedia = (): EmbedMedia | undefined => (gifv() ? gifvGif(props.embed) : undefined);
+  const image = (): EmbedMedia | undefined => gifMedia() ?? ((props.embed.image ?? props.embed.thumbnail) as EmbedMedia | undefined);
+  const playUrl = (): string | undefined => (gifv() && !gifMedia() ? (props.embed.url ?? props.embed.video?.url) : undefined);
+  const open = (url: string | undefined) => (e: Click): void => {
+    if (!url) return;
+    e.stopPropagation();
+    props.onOpen?.(url);
+  };
   return (
     <box flexDirection="row" width="100%" marginTop={0}>
       <text fg={bar()}>▌</text>
@@ -88,7 +127,7 @@ function EmbedView(props: { embed: ApiEmbed; ctx: MdContext; images: boolean; on
           <Markdown nodes={parseMarkdown(description())} ctx={props.ctx} />
         </Show>
         <Show when={image()}>
-          {(img: () => { url: string; width?: number; height?: number }) => {
+          {(img: () => EmbedMedia) => {
             const view = attachmentView(
               {
                 filename: "imagen",
@@ -102,9 +141,16 @@ function EmbedView(props: { embed: ApiEmbed; ctx: MdContext; images: boolean; on
               props.images ? IMAGE_MODE : "links",
             );
             return view.kind === "image" ? (
-              <InlineImage url={view.url} cols={Math.min(view.cols, 30)} rows={Math.min(view.rows, 8)} label="🖼 imagen" theme={theme} />
+              <box onMouseDown={open(playUrl() ?? (gifMedia() ? props.embed.url : undefined))}>
+                <InlineImage url={view.url} cols={Math.min(view.cols, 30)} rows={Math.min(view.rows, 8)} label="🖼 imagen" theme={theme} animate={props.animate} />
+              </box>
             ) : null;
           }}
+        </Show>
+        <Show when={playUrl()}>
+          <text fg={theme.link} wrapMode="none" onMouseDown={open(playUrl())}>
+            ▶ GIF · click para verlo
+          </text>
         </Show>
       </box>
     </box>
@@ -119,6 +165,8 @@ export function MessageItem(props: {
   grouped: boolean;
   selected?: boolean;
   images?: boolean;
+  /** GIFs y emojis animados se mueven (setting `animateImages`); sin esto, primer cuadro. */
+  animate?: boolean;
   onSelect?(): void;
   onAction?(action: MessageAction): void;
   onReact?(emoji: { id: string | null; name: string }): void;
@@ -126,6 +174,7 @@ export function MessageItem(props: {
   onVote?(answerId: number): void;
 }): JSX.Element {
   const theme = (): Theme => props.theme;
+  const animate = (): boolean => props.images === true && props.animate === true;
   const [hover, setHover] = createSignal(false);
   const mine = (): boolean => props.message.authorId === props.state.me?.id;
   const ctx = (): MdContext => ({ state: props.state, theme: props.theme, guildId: props.guildId, revealSpoilers: props.selected === true });
@@ -187,7 +236,7 @@ export function MessageItem(props: {
             />
           }
         >
-          {(emoji: () => JumboEmoji[]) => <JumboRow emoji={emoji()} theme={props.theme} edited={props.message.editedTimestamp !== null} />}
+          {(emoji: () => JumboEmoji[]) => <JumboRow emoji={emoji()} theme={props.theme} edited={props.message.editedTimestamp !== null} animate={animate()} />}
         </Show>
         <For each={props.message.attachments}>
           {(attachment) => {
@@ -198,7 +247,7 @@ export function MessageItem(props: {
             };
             return view.kind === "image" ? (
               <box onMouseDown={openIt}>
-                <InlineImage url={view.url} cols={view.cols} rows={view.rows} label={view.label} theme={props.theme} />
+                <InlineImage url={view.url} cols={view.cols} rows={view.rows} label={view.label} theme={props.theme} animate={animate()} />
               </box>
             ) : (
               <text wrapMode="none" onMouseDown={openIt}>
@@ -213,7 +262,7 @@ export function MessageItem(props: {
           {(sticker) => {
             const view = stickerView(sticker, props.images ? IMAGE_MODE : "links");
             return view.kind === "image" ? (
-              <InlineImage url={view.url} cols={view.cols} rows={view.rows} label={view.label} theme={props.theme} raw />
+              <InlineImage url={view.url} cols={view.cols} rows={view.rows} label={view.label} theme={props.theme} raw animate={animate()} />
             ) : (
               <text fg={theme().dim} wrapMode="none">{view.label}</text>
             );
@@ -223,7 +272,7 @@ export function MessageItem(props: {
           {(poll: () => ApiPoll) => <PollBox poll={poll()} theme={props.theme} onVote={props.onVote} />}
         </Show>
         <For each={props.message.embeds.filter((embed) => embed.title || embed.description || embed.image || embed.thumbnail)}>
-          {(embed) => <EmbedView embed={embed} ctx={ctx()} images={props.images === true} onOpen={props.onOpen} />}
+          {(embed) => <EmbedView embed={embed} ctx={ctx()} images={props.images === true} animate={animate()} onOpen={props.onOpen} />}
         </For>
         <Show when={props.message.reactions.length > 0}>
           <box flexDirection="row" flexWrap="wrap" columnGap={1}>
@@ -248,7 +297,7 @@ export function MessageItem(props: {
                   >
                     <box flexDirection="row" backgroundColor={bg()} onMouseDown={toggle}>
                       <text fg={fg()} bg={bg()}>{" "}</text>
-                      <InlineImage url={emojiUrl(id!, reaction.emoji.animated === true)} cols={2} rows={1} label={`:${reaction.emoji.name}:`} theme={props.theme} raw />
+                      <InlineImage url={emojiUrl(id!, reaction.emoji.animated === true)} cols={2} rows={1} label={`:${reaction.emoji.name}:`} theme={props.theme} raw animate={animate()} />
                       <text fg={fg()} bg={bg()}>{` ${reaction.count} `}</text>
                     </box>
                   </Show>

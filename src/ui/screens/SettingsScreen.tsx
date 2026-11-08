@@ -20,8 +20,8 @@ export interface SettingsDeps {
   startPlayback: (opts?: { target?: string }) => Promise<any>;
 }
 
-type Section = "input" | "output" | "inputMode" | "sensitivity" | "testMic" | "streamMonitor" | "streamQuality" | "status" | "theme" | "images";
-const SECTIONS: Section[] = ["input", "output", "inputMode", "sensitivity", "testMic", "streamMonitor", "streamQuality", "status", "theme", "images"];
+type Section = "input" | "output" | "inputMode" | "sensitivity" | "testMic" | "streamMonitor" | "streamQuality" | "status" | "theme" | "images" | "animate";
+const SECTIONS: Section[] = ["input", "output", "inputMode", "sensitivity", "testMic", "streamMonitor", "streamQuality", "status", "theme", "images", "animate"];
 
 export function SettingsScreen(props: {
   store: Store;
@@ -123,6 +123,7 @@ export function SettingsScreen(props: {
     }
     if (section === "theme" && dir === 0) return patch({ theme: settings().theme === "dark" ? "light" : "dark" });
     if (section === "images" && dir === 0) patch({ inlineImages: !settings().inlineImages });
+    if (section === "animate" && dir === 0) patch({ animateImages: !settings().animateImages });
   }
 
   useKeyboard((key) => {
@@ -228,6 +229,7 @@ export function SettingsScreen(props: {
         <text fg={theme().header}>Apariencia</text>
         {line("theme", `tema: ${settings().theme === "dark" ? "oscuro" : "claro"}`)}
         {line("images", `imágenes inline: ${settings().inlineImages ? "sí" : "no (solo links)"}`)}
+        {line("animate", `animar GIFs y emojis: ${settings().animateImages ? "sí" : "no (primer cuadro)"}`)}
       </box>
     </box>
   );

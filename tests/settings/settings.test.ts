@@ -35,6 +35,9 @@ describe("settings", () => {
 
   test("Go Live settings: defaults to ask + 720p30, keeps valid values, drops invalid ones", () => {
     expect(normalizeSettings({})).toMatchObject({ streamMonitor: null, streamQuality: "720p30" });
+    expect(normalizeSettings({}).animateImages).toBe(true);
+    expect(normalizeSettings({ animateImages: false }).animateImages).toBe(false);
+    expect(normalizeSettings({ animateImages: "no" }).animateImages).toBe(true);
     expect(normalizeSettings({ streamMonitor: "DP-1", streamQuality: "1080p30" })).toMatchObject({ streamMonitor: "DP-1", streamQuality: "1080p30" });
     expect(normalizeSettings({ streamMonitor: 3, streamQuality: "4k60" })).toMatchObject({ streamMonitor: null, streamQuality: "720p30" });
   });

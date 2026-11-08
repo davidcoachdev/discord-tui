@@ -43,6 +43,8 @@ export function MessageView(props: {
   selectedId?: string | null;
   focused?: boolean;
   images?: boolean;
+  /** Animar GIFs y emojis animados (setting `animateImages`). */
+  animate?: boolean;
   onSelect?(messageId: string): void;
   onAction?(action: MessageAction, messageId: string): void;
   onReact?(messageId: string, emoji: { id: string | null; name: string }): void;
@@ -338,6 +340,7 @@ export function MessageView(props: {
                   grouped={isGrouped(message, index())}
                   selected={props.selectedId === message.id}
                   images={props.images}
+                  animate={props.animate}
                   onSelect={() => props.onSelect?.(message.id)}
                   onAction={props.onAction ? (action) => props.onAction?.(action, message.id) : undefined}
                   onReact={(emoji) => props.onReact?.(message.id, emoji)}
