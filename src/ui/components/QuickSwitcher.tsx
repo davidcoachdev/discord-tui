@@ -1,6 +1,7 @@
 import { TextAttributes } from "@opentui/core";
 import { For, Show, type JSX } from "solid-js";
 
+import { truncate } from "../format";
 import type { SwitcherItem } from "../fuzzy";
 import type { Theme } from "../theme";
 import type { Click } from "./Button";
@@ -64,7 +65,7 @@ export function QuickSwitcher(props: {
                 attributes={item.unread ? TextAttributes.BOLD : 0}
                 wrapMode="none"
               >
-                {` ${item.label}${item.unread ? "  •" : ""}`}
+                {` ${truncate(item.label, item.unread ? 56 : 59)}${item.unread ? "  •" : ""}`}
               </text>
             </box>
           )}

@@ -6,7 +6,10 @@ import type { Actions } from "../actions";
 import { COMMON_EMOJI } from "../emoji/common";
 import { parseMarkdown, plainText } from "../markdown/parse";
 import {
+  FORUM_TYPES,
+  isMessageChannelType,
   selectChannelList,
+  selectForumPosts,
   selectMessages,
   selectNextUnread,
   selectVisibleChannelList,
@@ -18,11 +21,11 @@ import { readClipboardImage, readClipboardText } from "../uploads/clipboard";
 import { readAttachmentFromPath } from "../uploads/file";
 import { listAudioDevices } from "../voice/devices";
 import { startCapture, startPlayback } from "../voice/audio-io";
-import { ChannelList } from "./components/ChannelList";
+import { CHANNEL_WIDTH, ChannelList } from "./components/ChannelList";
 import { Composer, MentionPopup } from "./components/Composer";
-import { GuildList } from "./components/GuildList";
+import { GUILD_WIDTH, GuildList } from "./components/GuildList";
 import { HelpOverlay } from "./components/HelpOverlay";
-import { MemberList } from "./components/MemberList";
+import { MEMBER_WIDTH, MemberList } from "./components/MemberList";
 import { MessageView } from "./components/MessageView";
 import type { MessageAction } from "./components/MessageItem";
 import { Button } from "./components/Button";
@@ -45,7 +48,7 @@ import { useSelector } from "./store-bridge";
 import { useTheme } from "./theme";
 
 function isOpenable(kind: string): boolean {
-  return kind === "text" || kind === "dm" || kind === "group_dm";
+  return kind === "text" || kind === "dm" || kind === "group_dm" || kind === "thread" || kind === "forum" || kind === "media";
 }
 
 const defaultSettingsDeps: SettingsDeps = { listAudioDevices, startCapture, startPlayback };
@@ -82,7 +85,7 @@ export function App(props: {
   const textChannel = useSelector(props.store, (state) => {
     const id = state.ui.selectedChannelId;
     const type = id === null ? undefined : state.channels[id]?.type;
-    return id !== null && type !== 2 && type !== 4;
+    return id !== null && (type === undefined || isMessageChannelType(type));
   });
 
   const [insert, setInsert] = createSignal(false);
@@ -134,7 +137,7 @@ export function App(props: {
   const isTextChannel = (): boolean => {
     const id = channelId();
     const type = id === null ? undefined : props.store.getState().channels[id]?.type;
-    return id !== null && type !== 2 && type !== 4;
+    return id !== null && (type === undefined || isMessageChannelType(type));
   };
 
   function setText(text: string, picked: PickedMention[] = currentMentions()): void {
@@ -286,9 +289,19 @@ export function App(props: {
     if (next) props.store.dispatch({ type: "ui/selectChannel", id: next.id });
   }
 
+  /** El canal abierto es un foro: el panel de mensajes muestra sus posts. */
+  function openForumId(): string | null {
+    const id = channelId();
+    const type = id === null ? undefined : props.store.getState().channels[id]?.type;
+    return id !== null && type !== undefined && FORUM_TYPES.has(type) ? id : null;
+  }
+
+  /** Lo que j/k recorre en el panel de mensajes: los mensajes, o los posts si es un foro. */
   function messageIds(): string[] {
     const id = channelId();
-    return id === null ? [] : selectMessages(props.store.getState(), id).map((message) => message.id);
+    if (id === null) return [];
+    if (openForumId() !== null) return selectForumPosts(props.store.getState(), id).map((post) => post.id);
+    return selectMessages(props.store.getState(), id).map((message) => message.id);
   }
 
   function moveMessage(delta: number): void {
@@ -296,6 +309,12 @@ export function App(props: {
     if (id === null) return;
     const ids = messageIds();
     if (ids.length === 0) return;
+    if (openForumId() !== null) {
+      // Posts: de arriba (el más activo) hacia abajo.
+      const index = selectedId() === null ? -1 : ids.indexOf(selectedId()!);
+      setSelectedId(ids[Math.min(ids.length - 1, Math.max(0, index + delta))] ?? null);
+      return;
+    }
     const current = selectedId();
     if (current === null) {
       if (delta < 0) setSelectedId(ids.at(-1)!);
@@ -336,6 +355,11 @@ export function App(props: {
     if (id === null) return;
     if (state.channels[id]?.type === 2) {
       if (state.ui.focus === "channels") void props.actions.voice?.toggleVoice(id);
+      return;
+    }
+    const post = selectedId();
+    if (state.ui.focus === "messages" && openForumId() !== null && post !== null) {
+      goToChannel(post);
       return;
     }
     setSelectedId(null);
@@ -832,10 +856,13 @@ export function App(props: {
           else flash("seleccioná un canal 🔊 para entrar a voz");
           return;
         }
-        case "a":
+        case "a": {
+          const forum = openForumId();
+          if (forum !== null) return void props.actions.loadArchivedPosts?.(forum).catch(() => {});
           if (!isTextChannel()) return;
           setAttachPrompt("");
           return;
+        }
         case "x": {
           const id = channelId();
           if (id !== null && currentAttachments().length > 0) {
@@ -897,6 +924,8 @@ export function App(props: {
     const channel = id ? state.channels[id] : undefined;
     if (!channel) return "elegí un canal";
     if (channel.type === 2) return "canal de voz · click en el canal o v para entrar";
+    if (FORUM_TYPES.has(channel.type)) return "foro · abrí un post con click o j/k y Enter para escribir";
+    if (channel.thread !== undefined) return `i para escribir en 🧵 ${channel.name}`;
     return channel.guildId === null ? `i para escribirle a @${channel.name}` : `i para escribir en #${channel.name}`;
   });
 
@@ -937,6 +966,9 @@ export function App(props: {
           }}
           onFocus={() => props.actions.focus("messages")}
           onVoiceToggle={(id) => void props.actions.voice?.toggleVoice(id)}
+          onOpenPost={(id) => goToChannel(id)}
+          titleWidth={Math.max(10, Math.min(60, dims().width - GUILD_WIDTH - CHANNEL_WIDTH - (showMembers() ? MEMBER_WIDTH : 0) - 6))}
+          onLoadArchived={(id) => void props.actions.loadArchivedPosts?.(id).catch(() => {})}
         />
         <Show when={showMembers()}>
           <MemberList store={props.store} theme={theme()} onMember={mentionMember} />

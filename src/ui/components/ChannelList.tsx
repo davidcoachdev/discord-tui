@@ -15,7 +15,15 @@ function icon(kind: ChannelRow["kind"]): string {
   if (kind === "voice") return "🔊";
   if (kind === "dm") return "@";
   if (kind === "group_dm") return "👥";
+  if (kind === "forum") return "💬";
+  if (kind === "media") return "🖼";
   return "#";
+}
+
+/** Sangría e ícono: un hilo cuelga con └ debajo del # de su canal. */
+function leadOf(row: ChannelRow): string {
+  if (row.kind === "thread") return `${"  ".repeat(Math.max(0, row.depth - 1))}└ `;
+  return `${"  ".repeat(row.depth)}${row.kind === "dm" ? "" : `${icon(row.kind)} `}`;
 }
 
 interface ParticipantView {
@@ -142,7 +150,7 @@ export function ChannelList(props: {
             }
             const isSel = (): boolean => selected() === row.id;
             const badge = row.mentions > 0 ? ` ${row.mentions > 99 ? "99+" : row.mentions} ` : "";
-            const lead = `${"  ".repeat(row.depth)}${row.kind === "dm" ? "" : `${icon(row.kind)} `}`;
+            const lead = leadOf(row);
             const name = truncate(row.name, inner - 1 - cellWidth(lead) - cellWidth(badge));
             const bright = row.unread && !row.muted;
             const participants = (): ParticipantView[] => view().participants[row.id] ?? [];
