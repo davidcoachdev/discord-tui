@@ -15,6 +15,19 @@ function asList(value: unknown, idKey: string): any[] {
   return [];
 }
 
+/** `discriminator` solo cuando es del sistema viejo de nombres (no "0"). */
+export function legacyDiscriminator(raw: any): { discriminator?: string } {
+  const disc = raw?.discriminator;
+  return typeof disc === "string" && disc !== "0" && disc !== "" ? { discriminator: disc } : {};
+}
+
+/** `member.avatar` (avatar propio del server) solo si vino en el payload. */
+export function memberAvatar(raw: any, previous?: string | null): { avatar?: string | null } {
+  if (typeof raw?.avatar === "string") return { avatar: raw.avatar };
+  if (raw?.avatar === null) return { avatar: null };
+  return previous !== undefined ? { avatar: previous } : {};
+}
+
 export function toUser(raw: any): UserState {
   return {
     id: raw.id,
@@ -22,6 +35,7 @@ export function toUser(raw: any): UserState {
     globalName: raw.global_name ?? null,
     avatar: raw.avatar ?? null,
     bot: raw.bot === true,
+    ...legacyDiscriminator(raw),
   };
 }
 
@@ -121,6 +135,7 @@ export function applyReady(state: AppState, d: any): AppState {
         guildId: rawGuild.id,
         roles: Array.isArray(rawMember.roles) ? rawMember.roles : [],
         nick: rawMember.nick ?? null,
+        ...memberAvatar(rawMember),
       };
       if (rawMember.user) rememberUser(rawMember.user);
     }

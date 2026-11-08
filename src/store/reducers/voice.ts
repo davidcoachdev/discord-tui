@@ -1,4 +1,5 @@
 import type { AppState, VoiceMemberState, VoiceSlice } from "../types";
+import { memberAvatar } from "./ready";
 
 function toVoiceMember(raw: any): VoiceMemberState | null {
   if (typeof raw?.channel_id !== "string") return null;
@@ -46,7 +47,7 @@ export function applyReadyVoiceStates(state: AppState, d: any): AppState {
           ...members,
           [guild.id]: {
             ...(members[guild.id] ?? {}),
-            [raw.user_id]: { userId: raw.user_id, guildId: guild.id, roles: raw.member.roles ?? [], nick: raw.member.nick ?? null },
+            [raw.user_id]: { userId: raw.user_id, guildId: guild.id, roles: raw.member.roles ?? [], nick: raw.member.nick ?? null, ...memberAvatar(raw.member) },
           },
         };
       }
@@ -73,6 +74,7 @@ export function applySupplementalMembers(state: AppState, d: any): AppState {
         guildId: guild.id,
         roles: Array.isArray(raw.roles) ? raw.roles : byUser[raw.user_id]?.roles ?? [],
         nick: raw.nick ?? byUser[raw.user_id]?.nick ?? null,
+        ...memberAvatar(raw, byUser[raw.user_id]?.avatar),
       };
     }
     members[guild.id] = byUser;

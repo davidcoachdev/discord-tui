@@ -76,7 +76,7 @@ type Sharp = (typeof import("sharp"))["default"];
 let sharpModule: Promise<Sharp | null> | null = null;
 
 /** sharp es nativo: si no carga, `null` y se queda el primer cuadro de siempre. */
-function loadSharp(): Promise<Sharp | null> {
+export function loadSharp(): Promise<Sharp | null> {
   sharpModule ??= import("sharp").then((m) => m.default).catch(() => null);
   return sharpModule;
 }
