@@ -211,11 +211,30 @@ describe("SettingsScreen", () => {
     await renderOnce();
     expect(captureCharFrame()).toContain("animar GIFs y emojis: sí");
     for (let i = 0; i < 20; i += 1) mockInput.pressKey("j");
+    mockInput.pressKey("k");
     await renderOnce();
     mockInput.pressEnter();
     await renderOnce();
     expect(store.getState().settings.animateImages).toBe(false);
     expect(store.getState().settings.inlineImages).toBe(true);
     expect(captureCharFrame()).toContain("animar GIFs y emojis: no (primer cuadro)");
+  });
+
+  test("avatares toggles showAvatars (default on), last row under the image options", async () => {
+    const { store, actions, deps } = setup();
+    expect(store.getState().settings.showAvatars).toBe(true);
+    const { mockInput, renderOnce, captureCharFrame } = await testRender(
+      () => <SettingsScreen store={store} actions={actions} deps={deps} inVoice={false} onClose={() => {}} />,
+      { width: 90, height: 40 },
+    );
+    await renderOnce();
+    expect(captureCharFrame()).toMatch(/animar GIFs y emojis: sí\s*│?\s*│?\s*avatares: sí/);
+    for (let i = 0; i < 20; i += 1) mockInput.pressKey("j");
+    await renderOnce();
+    mockInput.pressEnter();
+    await renderOnce();
+    expect(store.getState().settings.showAvatars).toBe(false);
+    expect(store.getState().settings.animateImages).toBe(true);
+    expect(captureCharFrame()).toContain("avatares: no");
   });
 });

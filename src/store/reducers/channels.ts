@@ -1,5 +1,5 @@
 import type { AppState, ChannelState } from "../types";
-import { privateChannelName, toChannel, toPrivateChannel, toUser } from "./ready";
+import { memberAvatar, privateChannelName, toChannel, toPrivateChannel, toUser } from "./ready";
 
 const PRIVATE_TYPES = new Set([1, 3]);
 
@@ -78,6 +78,7 @@ export function applyGuildMemberUpdate(state: AppState, d: any): AppState {
           guildId,
           roles: Array.isArray(d.roles) ? d.roles : previous?.roles ?? [],
           nick: d.nick !== undefined ? d.nick : previous?.nick ?? null,
+          ...memberAvatar(d, previous?.avatar),
         },
       },
     },

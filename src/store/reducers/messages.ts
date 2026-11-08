@@ -1,6 +1,7 @@
 import type { ApiMessage, ApiPoll, AppState, Message, MessageSlice } from "../types";
 import { compareSnowflakes } from "../../util/snowflake";
 import { toStickers } from "./polls";
+import { legacyDiscriminator } from "./ready";
 
 const RING_SIZE = 500;
 
@@ -16,13 +17,15 @@ function rememberAuthor(state: AppState, raw: any): AppState {
     globalName: author.global_name !== undefined ? author.global_name : previous?.globalName ?? null,
     avatar: author.avatar !== undefined ? author.avatar : previous?.avatar ?? null,
     bot: author.bot !== undefined ? author.bot === true : previous?.bot ?? false,
+    ...legacyDiscriminator(author.discriminator !== undefined ? author : previous),
   };
   if (
     previous &&
     previous.username === next.username &&
     previous.globalName === next.globalName &&
     previous.avatar === next.avatar &&
-    previous.bot === next.bot
+    previous.bot === next.bot &&
+    previous.discriminator === next.discriminator
   ) {
     return state;
   }

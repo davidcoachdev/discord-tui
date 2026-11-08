@@ -1,3 +1,4 @@
+import { legacyDiscriminator, memberAvatar } from "./ready";
 import type { AppState, MemberListRow, MemberState, PresenceState, UserState } from "../types";
 
 function toUser(raw: any): UserState {
@@ -7,6 +8,7 @@ function toUser(raw: any): UserState {
     globalName: raw.global_name ?? null,
     avatar: raw.avatar ?? null,
     bot: raw.bot === true,
+    ...legacyDiscriminator(raw),
   };
 }
 
@@ -29,6 +31,7 @@ function toRow(item: any, guildId: string, out: Collected): MemberListRow | null
     guildId,
     roles: Array.isArray(member.roles) ? member.roles : [],
     nick: member.nick ?? null,
+    ...memberAvatar(member),
   };
   if (member.presence && typeof member.presence.status === "string") {
     out.presences[user.id] = {

@@ -2,12 +2,14 @@ import { TextAttributes, type ScrollBoxRenderable } from "@opentui/core";
 import { createEffect, createSignal, For, on, Show, type JSX } from "solid-js";
 
 import type { Actions } from "../../actions";
+import { AVATAR_COLS, userAvatarUrl } from "../../images/avatar";
 import { selectVisibleChannelList, selectVoiceParticipants, type ChannelRow } from "../../store/selectors";
 import type { Store } from "../../store/store";
 import type { AppState } from "../../store/types";
 import { cellWidth, displayName, truncate } from "../format";
 import { jsonEqual, useSelector } from "../store-bridge";
 import { presenceColor, type Theme } from "../theme";
+import { Avatar } from "./Avatar";
 import { Button } from "./Button";
 
 export const CHANNEL_WIDTH = 32;
@@ -37,6 +39,8 @@ interface ParticipantView {
   me: boolean;
   streaming: boolean;
   volume: number;
+  /** null = avatares apagados (setting `showAvatars`). */
+  avatar: string | null;
 }
 
 interface ListView {
@@ -45,6 +49,8 @@ interface ListView {
   rows: ChannelRow[];
   participants: Record<string, ParticipantView[]>;
   voiceChannelId: string | null;
+  /** DM 1 a 1 → el otro (para el avatar), solo con `showAvatars`. */
+  dmUsers: Record<string, { userId: string; avatar: string }>;
 }
 
 function listView(s: AppState): ListView {
@@ -52,6 +58,15 @@ function listView(s: AppState): ListView {
   const guildId = selectedGuild === null || selectedGuild === "@dms" ? null : selectedGuild;
   const rows = selectedGuild === null ? [] : selectVisibleChannelList(s, selectedGuild);
   const participants: Record<string, ParticipantView[]> = {};
+  const avatars = s.settings.showAvatars;
+  const animate = s.settings.animateImages;
+  const dmUsers: ListView["dmUsers"] = {};
+  if (avatars) {
+    for (const row of rows) {
+      const other = row.kind === "dm" ? s.channels[row.id]?.recipientIds?.[0] : undefined;
+      if (other !== undefined) dmUsers[row.id] = { userId: other, avatar: userAvatarUrl(s, other, null, animate) };
+    }
+  }
   if (guildId !== null) {
     for (const row of rows) {
       if (row.kind !== "voice") continue;
@@ -59,6 +74,7 @@ function listView(s: AppState): ListView {
         ...p,
         name: displayName(s, p.userId, guildId),
         volume: s.settings.userVolumes[p.userId] ?? 100,
+        avatar: avatars ? userAvatarUrl(s, p.userId, guildId, animate) : null,
       }));
     }
   }
@@ -66,7 +82,7 @@ function listView(s: AppState): ListView {
     selectedGuild === "@dms"
       ? " Mensajes directos "
       : ` ${truncate((guildId ? s.guilds[guildId]?.name : null) ?? "Canales", CHANNEL_WIDTH - 6)} `;
-  return { title, rows, participants, voiceChannelId: s.voice.channelId, collapsed: s.ui.collapsedCategories };
+  return { title, rows, participants, voiceChannelId: s.voice.channelId, collapsed: s.ui.collapsedCategories, dmUsers };
 }
 
 export function ChannelList(props: {
@@ -78,6 +94,8 @@ export function ChannelList(props: {
   /** Click en un participante de voz (para el control de volumen). */
   onParticipant?(channelId: string, userId: string): void;
   onVolume?(userId: string, delta: number): void;
+  /** Imágenes inline prendidas: los avatares se bajan; si no, queda la inicial. */
+  images?: boolean;
 }): JSX.Element {
   const [hovered, setHovered] = createSignal<string | null>(null);
   let lastClick: { id: string; at: number } | null = null;
@@ -165,7 +183,10 @@ export function ChannelList(props: {
             const isSel = (): boolean => selected() === row.id;
             const badge = row.mentions > 0 ? ` ${row.mentions > 99 ? "99+" : row.mentions} ` : "";
             const lead = leadOf(row);
-            const name = truncate(row.name, inner - 1 - cellWidth(lead) - cellWidth(badge));
+            const dmUser = view().dmUsers[row.id];
+            // DM: "● " de presencia y, con avatares, el avatar y un espacio.
+            const dmLead = row.kind === "dm" ? 2 + (dmUser ? AVATAR_COLS + 1 : 0) : 0;
+            const name = truncate(row.name, inner - 1 - dmLead - cellWidth(lead) - cellWidth(badge));
             const bright = row.unread && !row.muted;
             const participants = (): ParticipantView[] => view().participants[row.id] ?? [];
             const connectedHere = (): boolean => view().voiceChannelId === row.id;
@@ -183,6 +204,10 @@ export function ChannelList(props: {
                   <text fg={props.theme.accent}>{isSel() ? "▌" : " "}</text>
                   <Show when={row.kind === "dm"}>
                     <text fg={presenceColor(props.theme, row.status)}>{row.status === "offline" || !row.status ? "○ " : "● "}</text>
+                  </Show>
+                  <Show when={dmUser}>
+                    <Avatar userId={dmUser!.userId} name={row.name} url={props.images ? dmUser!.avatar : null} theme={props.theme} />
+                    <text width={1}> </text>
                   </Show>
                   <text
                     flexGrow={1}
@@ -202,9 +227,11 @@ export function ChannelList(props: {
                   >
                     {`${lead}${name}`}
                   </text>
-                  <text fg={props.theme.modeFg} bg={props.theme.error} attributes={TextAttributes.BOLD}>
-                    {badge}
-                  </text>
+                  <Show when={badge}>
+                    <text fg={props.theme.modeFg} bg={props.theme.error} attributes={TextAttributes.BOLD}>
+                      {badge}
+                    </text>
+                  </Show>
                   <Show when={row.kind === "voice" && !connectedHere() && (isSel() || hovered() === row.id)}>
                     <Button label="🎧" theme={props.theme} active onPress={() => joinVoice(row.id)} />
                   </Show>
@@ -228,11 +255,16 @@ export function ChannelList(props: {
                           onMouseOut={() => setHovered((h) => (h === `p-${p.userId}` ? null : h))}
                         >
                           <text fg={p.speaking ? props.theme.speaking : props.theme.faint}>{p.speaking ? "●" : "○"}</text>
+                          <Show when={p.avatar !== null}>
+                            <text width={1}> </text>
+                            <Avatar userId={p.userId} name={p.name} url={props.images ? p.avatar : null} theme={props.theme} />
+                          </Show>
                           {(() => {
                             // Íconos compactos como Discord: 🔇 mic apagado, 🙉 ensordecido, 📺 transmitiendo.
                             const badges = (): string =>
                               `${p.volume !== 100 ? ` ${p.volume}%` : ""}${p.streaming ? " 📺" : ""}${p.deafened ? " 🙉" : p.muted ? " 🔇" : ""}`;
-                            const room = (): number => Math.max(4, inner - row.depth * 2 - 4 - cellWidth(badges()));
+                            const room = (): number =>
+                              Math.max(4, inner - row.depth * 2 - 5 - (p.avatar !== null ? AVATAR_COLS + 1 : 0) - cellWidth(badges()));
                             return (
                               <>
                                 <text
@@ -242,11 +274,18 @@ export function ChannelList(props: {
                                 >
                                   {` ${truncate(p.name, room())}`}
                                 </text>
-                                <text fg={props.theme.accent} wrapMode="none" flexShrink={0}>{p.volume !== 100 ? ` ${p.volume}%` : ""}</text>
-                                <text fg={props.theme.error} wrapMode="none" flexShrink={0}>{p.streaming ? " 📺" : ""}</text>
-                                <text fg={p.deafened ? props.theme.error : props.theme.warn} wrapMode="none" flexShrink={0}>
-                                  {p.deafened ? " 🙉" : p.muted ? " 🔇" : ""}
-                                </text>
+                                {/* Un <text> vacío igual ocupa una celda: solo se montan los que tienen algo. */}
+                                <Show when={p.volume !== 100}>
+                                  <text fg={props.theme.accent} wrapMode="none" flexShrink={0}>{` ${p.volume}%`}</text>
+                                </Show>
+                                <Show when={p.streaming}>
+                                  <text fg={props.theme.error} wrapMode="none" flexShrink={0}>{" 📺"}</text>
+                                </Show>
+                                <Show when={p.deafened || p.muted}>
+                                  <text fg={p.deafened ? props.theme.error : props.theme.warn} wrapMode="none" flexShrink={0}>
+                                    {p.deafened ? " 🙉" : " 🔇"}
+                                  </text>
+                                </Show>
                               </>
                             );
                           })()}

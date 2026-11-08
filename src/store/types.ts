@@ -29,6 +29,8 @@ export interface UserState {
   globalName: string | null;
   avatar: string | null;
   bot: boolean;
+  /** Solo si no es "0" (sistema viejo de nombres, sobre todo bots): elige el avatar por defecto. */
+  discriminator?: string;
 }
 
 export interface RoleState {
@@ -85,6 +87,8 @@ export interface MemberState {
   guildId: string;
   roles: string[];
   nick: string | null;
+  /** Avatar propio del server (`member.avatar`), si lo tiene. */
+  avatar?: string | null;
 }
 
 export interface Message {
