@@ -59,6 +59,11 @@ export async function putReaction(
   await rest.request("PUT", `/channels/${channelId}/messages/${messageId}/reactions/${path}/@me`);
 }
 
+/** Vota en una encuesta (docs.discord.food, "Create Poll Vote"): `answer_ids` vacío saca el voto. 204 sin cuerpo. */
+export async function putPollVote(rest: RestClient, channelId: string, messageId: string, answerIds: number[]): Promise<void> {
+  await rest.request("PUT", `/channels/${channelId}/polls/${messageId}/answers/@me`, { answer_ids: answerIds });
+}
+
 export async function deleteOwnReaction(
   rest: RestClient,
   channelId: string,
