@@ -7,6 +7,22 @@ export type ApiMessage = APIMessage;
 export type ApiAttachment = APIAttachment;
 export type ApiEmbed = APIEmbed;
 
+/** `message.poll` (docs.discord.food, Messages → Poll Object). Todo opcional: viene de la red. */
+export interface ApiPoll {
+  question?: { text?: string };
+  answers?: { answer_id?: number; poll_media?: { text?: string; emoji?: { id?: string | null; name?: string | null } } }[];
+  expiry?: string | null;
+  allow_multiselect?: boolean;
+  results?: { is_finalized?: boolean; answer_counts?: { id: number; count: number; me_voted: boolean }[] };
+}
+
+/** `message.sticker_items[]`: format_type 1 PNG, 2 APNG, 3 Lottie, 4 GIF. */
+export interface StickerItem {
+  id: string;
+  name: string;
+  formatType: number;
+}
+
 export interface UserState {
   id: string;
   username: string;
@@ -75,6 +91,8 @@ export interface Message {
   referenced: { id: string; authorId: string; content: string } | null;
   reactions: { emoji: { id: string | null; name: string }; count: number; me: boolean }[];
   nonce: string | null;
+  poll?: ApiPoll | null;
+  stickers?: StickerItem[];
 }
 
 export interface MessageSlice {

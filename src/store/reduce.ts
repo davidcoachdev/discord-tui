@@ -9,6 +9,7 @@ import {
 } from "./reducers/messages";
 import { applyChannelUnreadUpdate, applyMessageAck } from "./reducers/read-state";
 import { applyReaction } from "./reducers/reactions";
+import { applyPollVote } from "./reducers/polls";
 import {
   applyOutboxEnqueue,
   applyOutboxFailed,
@@ -68,6 +69,9 @@ export function reduce(state: AppState, action: Action): AppState {
         case "MESSAGE_REACTION_REMOVE_ALL":
         case "MESSAGE_REACTION_REMOVE_EMOJI":
           return applyReaction(state, action.t, action.d);
+        case "MESSAGE_POLL_VOTE_ADD":
+        case "MESSAGE_POLL_VOTE_REMOVE":
+          return applyPollVote(state, action.t, action.d);
         case "GUILD_MEMBER_LIST_UPDATE":
           return applyMemberListUpdate(state, action.d);
         case "PRESENCE_UPDATE":

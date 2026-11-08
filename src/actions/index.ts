@@ -9,6 +9,7 @@ import type { VoiceActions } from "./voice";
 import { openUrl } from "../proc/open-url";
 import { createEditActions } from "./edit";
 import { createReactActions } from "./react";
+import { createPollActions } from "./poll";
 import { createSendActions } from "./send";
 import { selectChannelList } from "../store/selectors";
 import type { Store } from "../store/store";
@@ -26,6 +27,8 @@ export interface Actions {
   edit(channelId: string, messageId: string, content: string): Promise<void>;
   remove(channelId: string, messageId: string): Promise<void>;
   toggleReaction(channelId: string, messageId: string, emoji: { id: string | null; name: string }): Promise<void>;
+  /** Vota (o saca el voto) en una respuesta de encuesta; no pide nada si la encuesta terminó. */
+  votePoll?(channelId: string, messageId: string, answerId: number): Promise<void>;
   /** Cada tecla escrita en el composer: manda typing como máximo cada 8 s. */
   keystroke?(channelId: string, textAfter: string): void;
   /** El canal que se está mirando y su mensaje más nuevo: ack con debounce. */
@@ -111,6 +114,7 @@ export function createActions(deps: ActionsDeps): Actions {
   });
   const editActions = createEditActions({ rest: deps.rest });
   const reactActions = createReactActions({ store: deps.store, rest: deps.rest });
+  const pollActions = createPollActions({ store: deps.store, rest: deps.rest, now: deps.now });
 
   async function edit(channelId: string, messageId: string, content: string): Promise<void> {
     try {
@@ -139,6 +143,16 @@ export function createActions(deps: ActionsDeps): Actions {
       await reactActions.toggleReaction(channelId, messageId, emoji);
     } catch (error) {
       reportError("toggle-reaction", "reaccionar", error);
+      throw error;
+    }
+  }
+
+  async function votePoll(channelId: string, messageId: string, answerId: number): Promise<void> {
+    try {
+      const sent = await pollActions.vote(channelId, messageId, answerId);
+      if (!sent) deps.store.dispatch({ type: "notice/push", key: "poll-vote", level: "info", text: "la encuesta ya terminó" });
+    } catch (error) {
+      reportError("poll-vote", "votar", error);
       throw error;
     }
   }
@@ -175,5 +189,6 @@ export function createActions(deps: ActionsDeps): Actions {
     edit,
     remove,
     toggleReaction,
+    votePoll,
   };
 }

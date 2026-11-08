@@ -50,6 +50,19 @@ export function attachmentView(a: Pick<ApiAttachment, "filename" | "size" | "url
   return { kind: "image", url, cols, rows, label };
 }
 
+export type StickerView = { kind: "image"; url: string; cols: number; rows: number; label: string } | { kind: "label"; label: string };
+
+/**
+ * PNG/APNG (1, 2) y GIF (4) como imagen desde el proxy de medios (los GIF no están en el CDN,
+ * docs.discord.food → Stickers); Lottie (3), formatos desconocidos o sin imágenes: `🏷 nombre`.
+ */
+export function stickerView(s: { id: string; name: string; formatType: number }, mode: ImageMode): StickerView {
+  const label = `🏷 ${s.name}`;
+  const ext = s.formatType === 4 ? "gif" : s.formatType === 1 || s.formatType === 2 ? "png" : null;
+  if (ext === null || mode === "links" || !/^\d+$/.test(s.id)) return { kind: "label", label };
+  return { kind: "image", url: `https://media.discordapp.net/stickers/${s.id}.${ext}?size=160`, cols: 16, rows: 8, label };
+}
+
 /** Pide la versión reducida al proxy de medios de Discord para no bajar originales enormes. */
 export function sizedUrl(url: string, cols: number, rows: number): string {
   try {

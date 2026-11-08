@@ -24,6 +24,7 @@ export const SPEC_KEYS: KeyEntry[] = [
   { key: "e", desc: "editar mensaje propio", group: "Mensajes" },
   { key: "dd", desc: "borrar mensaje propio (pide y/n)", group: "Mensajes" },
   { key: "+", desc: "reaccionar con emoji", group: "Mensajes" },
+  { key: "1-9", desc: "votar en la encuesta seleccionada", group: "Mensajes" },
   { key: "R", desc: "reintentar el envío fallido", group: "Mensajes" },
   { key: "Ctrl-v", desc: "pegar imagen del portapapeles", group: "Mensajes" },
   { key: "a", desc: "adjuntar archivo por path", group: "Mensajes" },

@@ -1,5 +1,6 @@
-import type { ApiMessage, AppState, Message, MessageSlice } from "../types";
+import type { ApiMessage, ApiPoll, AppState, Message, MessageSlice } from "../types";
 import { compareSnowflakes } from "../../util/snowflake";
+import { toStickers } from "./polls";
 
 const RING_SIZE = 500;
 
@@ -66,6 +67,12 @@ function updateMessage(state: AppState, raw: Partial<ApiMessage>): AppState {
   if (!slice || !previous) return state;
 
   const merged = { ...previous, ...raw } as ApiMessage;
+  // Un MESSAGE_UPDATE con la encuesta sin `results` no borra los votos que ya contamos.
+  const prevPoll = (previous as any).poll;
+  const nextPoll = (raw as any).poll;
+  if (prevPoll && nextPoll && typeof nextPoll === "object" && nextPoll.results === undefined && prevPoll.results !== undefined) {
+    (merged as any).poll = { ...nextPoll, results: prevPoll.results };
+  }
   return {
     ...rememberAuthor(state, raw),
     messages: { ...state.messages, [channelId]: { ...slice, byId: { ...slice.byId, [raw.id!]: merged } } },
@@ -188,5 +195,7 @@ function buildMessage(me: string | null, raw: ApiMessage): Message {
         }))
       : [],
     nonce: raw.nonce !== undefined && raw.nonce !== null ? String(raw.nonce) : null,
+    poll: (raw as any).poll && typeof (raw as any).poll === "object" ? ((raw as any).poll as ApiPoll) : null,
+    stickers: toStickers((raw as any).sticker_items),
   };
 }

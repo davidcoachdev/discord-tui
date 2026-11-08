@@ -13,7 +13,7 @@ import {
   selectVoiceParticipants,
 } from "../store/selectors";
 import type { Store } from "../store/store";
-import type { PendingAttachment } from "../store/types";
+import type { ApiPoll, PendingAttachment } from "../store/types";
 import { readClipboardImage, readClipboardText } from "../uploads/clipboard";
 import { readAttachmentFromPath } from "../uploads/file";
 import { listAudioDevices } from "../voice/devices";
@@ -517,6 +517,15 @@ export function App(props: {
     }
   }
 
+  /** 1-9 sobre un mensaje con encuesta: vota la respuesta N (en el orden en que se muestran). */
+  function votePollKey(n: number): void {
+    const id = channelId();
+    const message = selectedMessage() as { id: string; poll?: ApiPoll } | undefined;
+    if (id === null || !message?.poll) return;
+    const answer = (message.poll.answers ?? []).filter((a) => typeof a?.answer_id === "number")[n - 1];
+    if (answer) void props.actions.votePoll?.(id, message.id, answer.answer_id!).catch(() => {});
+  }
+
   /** Barra de acciones de un mensaje (click): igual que r / e / dd / +. */
   function messageAction(action: MessageAction, messageId: string): void {
     setSelectedId(messageId);
@@ -851,6 +860,10 @@ export function App(props: {
         nudgeVolume(key.sequence === "+" ? 10 : -10);
         return;
       }
+      if (focused === "messages" && /^[1-9]$/.test(key.sequence ?? "")) {
+        votePollKey(Number(key.sequence));
+        return;
+      }
       if (key.sequence === "+") {
         setPickerOpen(true);
         setPickerQuery("");
@@ -931,6 +944,10 @@ export function App(props: {
             if (id !== null) void props.actions.toggleReaction(id, messageId, emoji).catch(() => {});
           }}
           onOpen={(url) => props.actions.openUrl?.(url)}
+          onVote={(messageId, answerId) => {
+            const id = channelId();
+            if (id !== null) void props.actions.votePoll?.(id, messageId, answerId).catch(() => {});
+          }}
           onLoadOlder={() => {
             const id = channelId();
             if (id !== null) void props.actions.loadOlder(id).catch(() => {});
