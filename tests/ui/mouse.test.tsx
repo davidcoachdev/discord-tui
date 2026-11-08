@@ -143,7 +143,7 @@ test("click on a category collapses and expands it", async () => {
 test("click on a voice participant shows the volume control and − / + change it", async () => {
   const s = setup();
   const h = await render(s);
-  await click(h, "○ Ragnar");
+  await click(h, "○ R  Ragnar");
   expect(h.captureCharFrame()).toContain("vol");
   await click(h, " − ");
   await click(h, " − ");
@@ -252,7 +252,7 @@ test("click on a mention suggestion picks it", async () => {
 test("click on a member mentions it in the composer", async () => {
   const s = setup();
   const h = await render(s);
-  await click(h, "● CinLo💜");
+  await click(h, "● C  CinLo💜");
   h.mockInput.pressEnter();
   await h.renderOnce();
   expect(s.calls.find((c) => c.startsWith("send:"))).toBe(`send:${DEMO.general}:<@900000000000000102> :{}`);
@@ -332,7 +332,7 @@ test("direct messages: ordered by activity with presence, click opens the chat a
   const frame = h.captureCharFrame();
   const order = ["Los del ajedrez", "CinLo💜", "Ragnar, djromoro", "PmmR", "zero"].map((name) => frame.indexOf(name));
   expect(order.every((at, i) => at > -1 && (i === 0 || at > order[i - 1]!))).toBe(true);
-  await click(h, "● CinLo💜");
+  await click(h, "● C  CinLo💜");
   const opened = h.captureCharFrame();
   expect(opened).toContain("@ CinLo💜");
   expect(opened).toContain("jaja ¿en serio en la terminal?");

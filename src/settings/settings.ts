@@ -36,6 +36,8 @@ export interface Settings {
   inlineImages: boolean;
   /** GIFs, stickers y emojis animados se mueven; con false se ve el primer cuadro. */
   animateImages: boolean;
+  /** Avatares chiquitos (2 celdas) en mensajes, miembros, voz, DMs y menciones. */
+  showAvatars: boolean;
   status: OwnStatus;
   /** Monitor a transmitir (nombre de `hyprctl monitors`); null = preguntar si hay más de uno. */
   streamMonitor: string | null;
@@ -54,6 +56,7 @@ export const DEFAULT_SETTINGS: Settings = {
   idleAfterMinutes: 10,
   inlineImages: true,
   animateImages: true,
+  showAvatars: true,
   status: "online",
   streamMonitor: null,
   streamQuality: "720p30",
@@ -142,6 +145,7 @@ export function normalizeSettings(raw: unknown): Settings {
     idleAfterMinutes: parseIdle(record.idleAfterMinutes),
     inlineImages: typeof record.inlineImages === "boolean" ? record.inlineImages : DEFAULT_SETTINGS.inlineImages,
     animateImages: typeof record.animateImages === "boolean" ? record.animateImages : DEFAULT_SETTINGS.animateImages,
+    showAvatars: typeof record.showAvatars === "boolean" ? record.showAvatars : DEFAULT_SETTINGS.showAvatars,
     status: OWN_STATUSES.includes(record.status as OwnStatus) ? (record.status as OwnStatus) : DEFAULT_SETTINGS.status,
     streamMonitor: parseDevice(record.streamMonitor),
     streamQuality: STREAM_QUALITIES.includes(record.streamQuality as StreamQuality)

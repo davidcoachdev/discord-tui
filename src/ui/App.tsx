@@ -5,6 +5,7 @@ import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import type { Actions } from "../actions";
 import { COMMON_EMOJI } from "../emoji/common";
 import { animationScheduler } from "../images/animation";
+import { userAvatarUrl } from "../images/avatar";
 import { parseMarkdown, plainText } from "../markdown/parse";
 import {
   FORUM_TYPES,
@@ -105,6 +106,7 @@ export function App(props: {
   });
   const inlineImages = useSelector(props.store, (state) => state.settings.inlineImages);
   const animateImages = useSelector(props.store, (state) => state.settings.animateImages);
+  const showAvatars = useSelector(props.store, (state) => state.settings.showAvatars);
   // Terminal sin foco (Ghostty manda CSI I / CSI O): los GIFs se frenan y no queda timer vivo.
   const renderer = useRenderer();
   const pauseAnimations = (): void => animationScheduler.setPaused(true);
@@ -1104,6 +1106,7 @@ export function App(props: {
           selectedParticipant={focus() === "channels" ? participant() : null}
           onParticipant={(_channelId, userId) => setParticipant(userId)}
           onVolume={(userId, delta) => nudgeVolume(delta, userId)}
+          images={props.images === true && inlineImages()}
         />
         <MessageView
           store={props.store}
@@ -1112,6 +1115,7 @@ export function App(props: {
           focused={focus() === "messages"}
           images={props.images === true && inlineImages()}
           animate={animateImages()}
+          avatars={showAvatars()}
           onSelect={(id) => {
             setSelectedId(id);
             props.actions.focus("messages");
@@ -1143,6 +1147,7 @@ export function App(props: {
           <MemberList
             store={props.store}
             theme={theme()}
+            images={props.images === true && inlineImages()}
             onMember={mentionMember}
             onNearEnd={() => {
               const id = channelId();
@@ -1182,6 +1187,16 @@ export function App(props: {
             theme={theme()}
             onPick={(i) => pickMention(i)}
             onMove={(i) => setMentionIndex(i)}
+            avatar={
+              showAvatars()
+                ? (userId) => {
+                    if (props.images !== true || !inlineImages()) return null;
+                    const state = props.store.getState();
+                    const id = channelId();
+                    return userAvatarUrl(state, userId, id !== null ? state.channels[id]?.guildId ?? null : null, animateImages());
+                  }
+                : undefined
+            }
           />
         )}
       </Show>

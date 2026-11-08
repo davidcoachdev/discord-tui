@@ -6,6 +6,7 @@ import type { PendingAttachment } from "../../store/types";
 import type { MentionCandidate } from "../mentions";
 import { nextGrapheme, offsetAt } from "../text-edit";
 import type { Theme } from "../theme";
+import { Avatar } from "./Avatar";
 import { Button, type Click } from "./Button";
 
 export function MentionPopup(props: {
@@ -14,6 +15,8 @@ export function MentionPopup(props: {
   theme: Theme;
   onPick?(index: number): void;
   onMove?(index: number): void;
+  /** Con avatares (setting `showAvatars`): la URL de cada uno, o null si las imágenes están apagadas. */
+  avatar?(userId: string): string | null;
 }): JSX.Element {
   return (
     <box
@@ -43,6 +46,10 @@ export function MentionPopup(props: {
               props.onPick?.(i());
             }}
           >
+            <Show when={props.avatar}>
+              <text width={1}> </text>
+              <Avatar userId={candidate.userId} name={candidate.label} url={props.avatar!(candidate.userId)} theme={props.theme} />
+            </Show>
             <text fg={i() === props.index ? props.theme.selectionFg : props.theme.fg} wrapMode="none">
               {` ${candidate.label}`}
             </text>

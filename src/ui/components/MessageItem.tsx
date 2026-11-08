@@ -3,6 +3,7 @@ import { createResource, createSignal, For, Show, type JSX } from "solid-js";
 
 export type MessageAction = "reply" | "edit" | "delete" | "react";
 
+import { userAvatarUrl } from "../../images/avatar";
 import { attachmentView, emojiUrl, sizedUrl, stickerView } from "../../images/cdn";
 import { imageCache } from "../../images/cache";
 import { frameCache } from "../../images/frames";
@@ -14,6 +15,7 @@ import type { ApiEmbed, ApiPoll, AppState, Message } from "../../store/types";
 import { clockTime, displayName, hashIndex, memberColor, truncate } from "../format";
 import { roleHex, type Theme } from "../theme";
 import { AnimatedImage } from "./AnimatedImage";
+import { Avatar } from "./Avatar";
 import { Button, type Click } from "./Button";
 import { Markdown, type MdContext } from "./Markdown";
 import { PollBox } from "./PollBox";
@@ -167,6 +169,8 @@ export function MessageItem(props: {
   images?: boolean;
   /** GIFs y emojis animados se mueven (setting `animateImages`); sin esto, primer cuadro. */
   animate?: boolean;
+  /** Avatar antes del nombre (setting `showAvatars`); con `images` apagado queda la inicial. */
+  avatars?: boolean;
   onSelect?(): void;
   onAction?(action: MessageAction): void;
   onReact?(emoji: { id: string | null; name: string }): void;
@@ -216,7 +220,17 @@ export function MessageItem(props: {
           <text fg={theme().dim} wrapMode="none">{referenced()}</text>
         </Show>
         <Show when={!props.grouped}>
-          <text wrapMode="none">
+          <box flexDirection="row" width="100%" height={1}>
+          <Show when={props.avatars}>
+            <Avatar
+              userId={props.message.authorId}
+              name={author()}
+              url={props.images ? userAvatarUrl(props.state, props.message.authorId, props.guildId, animate()) : null}
+              theme={props.theme}
+            />
+            <text width={1}> </text>
+          </Show>
+          <text wrapMode="none" flexGrow={1}>
             <b>
               <span style={{ fg: authorColor(props.state, props.theme, props.message.authorId, props.guildId) }}>{author()}</span>
             </b>
@@ -225,6 +239,7 @@ export function MessageItem(props: {
             </Show>
             <span style={{ fg: theme().dim }}>{`  ${clockTime(props.message.timestamp)}`}</span>
           </text>
+          </box>
         </Show>
         <Show
           when={jumbo()}

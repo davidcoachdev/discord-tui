@@ -45,7 +45,7 @@ test("participants appear under the voice channel with mute/deaf badges", async 
   await renderOnce();
   const frame = captureCharFrame();
   expect(frame).toContain("🔊 Sala 1");
-  expect(frame).toMatch(/○ Ragnar/);
+  expect(frame).toMatch(/○ R  Ragnar/);
   expect(frame).toMatch(/CinLo💜\s+🔇/);
   expect(frame).toMatch(/PmmR\s+🙉/);
 });
@@ -63,7 +63,7 @@ test("connected bar shows channel, E2EE with the privacy code, input mode and wh
   const frame = captureCharFrame();
   expect(frame).toContain("🔊 Sala 1 · Mu Gondor · 🔒 E2EE 12345 12345 · VAD · ● vos 🔇");
   expect(frame).toContain("hablando: Ragnar");
-  expect(frame).toMatch(/● Ragnar/);
+  expect(frame).toMatch(/● R  Ragnar/);
 });
 
 test("a voice error is shown in the bar", async () => {

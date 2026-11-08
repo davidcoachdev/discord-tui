@@ -51,7 +51,8 @@ type Section =
   | "status"
   | "theme"
   | "images"
-  | "animate";
+  | "animate"
+  | "avatars";
 const SECTIONS: Section[] = [
   "input",
   "output",
@@ -67,6 +68,7 @@ const SECTIONS: Section[] = [
   "theme",
   "images",
   "animate",
+  "avatars",
 ];
 
 export function SettingsScreen(props: {
@@ -181,6 +183,7 @@ export function SettingsScreen(props: {
     if (section === "theme" && dir === 0) return patch({ theme: settings().theme === "dark" ? "light" : "dark" });
     if (section === "images" && dir === 0) patch({ inlineImages: !settings().inlineImages });
     if (section === "animate" && dir === 0) patch({ animateImages: !settings().animateImages });
+    if (section === "avatars" && dir === 0) patch({ showAvatars: !settings().showAvatars });
   }
 
   useKeyboard((key) => {
@@ -299,6 +302,7 @@ export function SettingsScreen(props: {
         {line("theme", `tema: ${settings().theme === "dark" ? "oscuro" : "claro"}`)}
         {line("images", `imágenes inline: ${settings().inlineImages ? "sí" : "no (solo links)"}`)}
         {line("animate", `animar GIFs y emojis: ${settings().animateImages ? "sí" : "no (primer cuadro)"}`)}
+        {line("avatars", `avatares: ${settings().showAvatars ? "sí" : "no"}`)}
       </box>
     </box>
   );

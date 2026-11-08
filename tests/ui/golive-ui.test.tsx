@@ -81,11 +81,11 @@ test("click 📺 transmitir → monitor picker → ⏳ iniciando… → 🔴 EN 
   const live = h.captureCharFrame();
   expect(live).toContain("🔴 EN VIVO · detener");
   expect(live).toContain("👁 1");
-  expect(live).toMatch(/○ Gon\s+📺/);
+  expect(live).toMatch(/○ G  Gon\s+📺/);
   await click(h, "🔴 EN VIVO · detener");
   expect(s.calls).toEqual(["start:HDMI-A-1", "stop"]);
   expect(h.captureCharFrame()).toContain("📺 transmitir");
-  expect(h.captureCharFrame()).not.toMatch(/○ Gon\s+📺/);
+  expect(h.captureCharFrame()).not.toMatch(/○ G  Gon\s+📺/);
   await s.actions.voice!.leaveVoice();
 });
 
@@ -158,10 +158,10 @@ test("S outside a call only shows a notice", async () => {
 test("someone else streaming shows 📺 en vivo next to their name (from self_stream)", async () => {
   const s = setup();
   const h = await render(s);
-  expect(h.captureCharFrame()).toMatch(/○ Ragnar\s+📺/);
+  expect(h.captureCharFrame()).toMatch(/○ R  Ragnar\s+📺/);
   s.store.dispatch({ type: "gw", t: "VOICE_STATE_UPDATE", d: { guild_id: DEMO.guild, user_id: "900000000000000101", channel_id: DEMO.voice, self_stream: false } });
   await h.renderOnce();
-  expect(h.captureCharFrame()).not.toMatch(/○ Ragnar\s+📺/);
+  expect(h.captureCharFrame()).not.toMatch(/○ R  Ragnar\s+📺/);
 });
 
 test("a stream error shows in the voice bar", async () => {
