@@ -39,12 +39,21 @@ function toRow(item: any, guildId: string, out: Collected): MemberListRow | null
   return { kind: "member", userId: user.id };
 }
 
-/** GUILD_MEMBER_LIST_UPDATE: SYNC, INSERT, UPDATE, DELETE e INVALIDATE sobre la lista del guild. */
+/**
+ * GUILD_MEMBER_LIST_UPDATE: SYNC, INSERT, UPDATE, DELETE e INVALIDATE sobre la lista del guild.
+ * Los índices de Discord son absolutos (cuentan los encabezados de grupo), así que la lista guarda
+ * cada fila en su posición y deja `null` en lo que no está cargado: con varios rangos (0-99, 200-299)
+ * compactar correría las filas y los INSERT/DELETE siguientes caerían en otro lado.
+ */
 export function applyMemberListUpdate(state: AppState, d: any): AppState {
   if (!d || typeof d.guild_id !== "string" || !Array.isArray(d.ops)) return state;
   const guildId = d.guild_id;
-  const list: (MemberListRow | undefined)[] = [...(state.memberLists[guildId] ?? [])];
+  const list: (MemberListRow | null)[] = [...(state.memberLists[guildId] ?? [])];
   const out: Collected = { users: {}, members: {}, presences: {} };
+  const put = (index: number, row: MemberListRow | null): void => {
+    while (list.length < index) list.push(null);
+    list[index] = row;
+  };
 
   for (const op of d.ops) {
     switch (op?.op) {
@@ -53,18 +62,21 @@ export function applyMemberListUpdate(state: AppState, d: any): AppState {
         const items: any[] = Array.isArray(op.items) ? op.items : [];
         items.forEach((item, offset) => {
           const row = toRow(item, guildId, out);
-          if (row) list[start + offset] = row;
+          if (row) put(start + offset, row);
         });
         break;
       }
       case "INSERT": {
         const row = toRow(op.item, guildId, out);
-        if (row && typeof op.index === "number") list.splice(op.index, 0, row);
+        if (row && typeof op.index === "number") {
+          while (list.length < op.index) list.push(null);
+          list.splice(op.index, 0, row);
+        }
         break;
       }
       case "UPDATE": {
         const row = toRow(op.item, guildId, out);
-        if (row && typeof op.index === "number") list[op.index] = row;
+        if (row && typeof op.index === "number") put(op.index, row);
         break;
       }
       case "DELETE":
@@ -72,7 +84,7 @@ export function applyMemberListUpdate(state: AppState, d: any): AppState {
         break;
       case "INVALIDATE": {
         const [start, end] = Array.isArray(op.range) ? op.range : [0, -1];
-        for (let i = start; i <= end && i < list.length; i += 1) list[i] = undefined;
+        for (let i = start; i <= end && i < list.length; i += 1) list[i] = null;
         break;
       }
       default:
@@ -80,13 +92,18 @@ export function applyMemberListUpdate(state: AppState, d: any): AppState {
     }
   }
 
-  const compact = list.filter((row): row is MemberListRow => row !== undefined);
+  while (list.length > 0 && list[list.length - 1] === null) list.pop();
+  const counts =
+    typeof d.member_count === "number" && typeof d.online_count === "number"
+      ? { ...state.memberCounts, [guildId]: { members: d.member_count, online: d.online_count } }
+      : state.memberCounts;
   return {
     ...state,
     users: { ...state.users, ...out.users },
     members: { ...state.members, [guildId]: { ...(state.members[guildId] ?? {}), ...out.members } },
     presences: { ...state.presences, ...out.presences },
-    memberLists: { ...state.memberLists, [guildId]: compact },
+    memberLists: { ...state.memberLists, [guildId]: list },
+    memberCounts: counts,
   };
 }
 

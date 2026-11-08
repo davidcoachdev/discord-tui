@@ -204,11 +204,19 @@ export function selectMemberRows(state: AppState, guildId: string): MemberRow[] 
   const statusOf = (userId: string): string => state.presences[userId]?.status ?? "offline";
   if (list && list.length > 0) {
     const roles = state.guilds[guildId]?.roles ?? [];
-    return list.map((row) =>
-      row.kind === "group"
-        ? { kind: "group" as const, label: GROUP_LABELS[row.id] ?? roles.find((role) => role.id === row.id)?.name ?? row.id, count: row.count }
-        : { kind: "member" as const, userId: row.userId, status: statusOf(row.userId) },
-    );
+    // Solo lo cargado; una fila vieja de un rango que ya no está suscripto puede repetir a alguien.
+    const seen = new Set<string>();
+    const rows: MemberRow[] = [];
+    for (const row of list) {
+      if (row === null) continue;
+      if (row.kind === "group") {
+        rows.push({ kind: "group", label: GROUP_LABELS[row.id] ?? roles.find((role) => role.id === row.id)?.name ?? row.id, count: row.count });
+      } else if (!seen.has(row.userId)) {
+        seen.add(row.userId);
+        rows.push({ kind: "member", userId: row.userId, status: statusOf(row.userId) });
+      }
+    }
+    return rows;
   }
   const members = Object.keys(state.members[guildId] ?? {});
   const online = members.filter((id) => statusOf(id) !== "offline");

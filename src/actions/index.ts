@@ -1,7 +1,7 @@
 import type { Gateway } from "../gateway/connection";
 import type { RestClient } from "../rest/client";
 import { getMessages, postAck, postTyping } from "../rest/routes";
-import { buildGuildSubscription } from "../gateway/subscriptions";
+import { buildGuildSubscription, nextMemberRanges } from "../gateway/subscriptions";
 import { uploadAttachments } from "../uploads/upload";
 import { createAckScheduler } from "./ack";
 import { createTypingNotifier } from "./typing";
@@ -35,6 +35,11 @@ export interface Actions {
   voice?: VoiceActions;
   /** Abre un link o adjunto en el navegador (solo https). */
   openUrl?(url: string): void;
+  /**
+   * El usuario scrolleó la lista de miembros hasta el final de lo cargado: pide la ventana
+   * siguiente con op 37 (solo para el canal abierto, a lo sumo uno cada 500 ms).
+   */
+  loadMoreMembers?(channelId: string): void;
   /** Estado propio elegido a mano: se guarda en settings y se manda por op 3. */
   setStatus?(status: OwnStatus): void;
 }
@@ -48,7 +53,11 @@ export interface ActionsDeps {
   now?: () => number;
   openUrl?: (url: string) => boolean;
   presence?: Pick<IdlePresence, "statusChanged">;
+  setTimer?: typeof setTimeout;
 }
+
+/** Mínimo entre dos op 37 por scroll de la lista de miembros. */
+export const MEMBER_SCROLL_THROTTLE_MS = 500;
 
 function noticeText(action: string, error: unknown): string {
   const status = error instanceof HttpError ? error.status : null;
@@ -67,6 +76,39 @@ export function createActions(deps: ActionsDeps): Actions {
     const payload = buildGuildSubscription(guildId, channelId);
     deps.gateway.send(payload.op, payload.d);
     deps.store.dispatch({ type: "members/subscribed", guildId, channelId });
+  }
+
+  const now = deps.now ?? Date.now;
+  const setTimer = deps.setTimer ?? setTimeout;
+  let lastMembersOp = -Infinity;
+  let pendingMembers: string | null = null;
+
+  function sendMoreMembers(channelId: string): void {
+    const state = deps.store.getState();
+    if (state.ui.selectedChannelId !== channelId) return;
+    const guildId = state.channels[channelId]?.guildId;
+    if (!guildId || state.subscribedChannels[guildId] !== channelId) return;
+    const subscribed = state.subscribedRanges[guildId] ?? [[0, 99]];
+    const ranges = nextMemberRanges(subscribed, state.memberLists[guildId]?.length ?? 0);
+    if (ranges === null || JSON.stringify(ranges) === JSON.stringify(subscribed)) return;
+    lastMembersOp = now();
+    const payload = buildGuildSubscription(guildId, channelId, ranges);
+    deps.gateway.send(payload.op, payload.d);
+    deps.store.dispatch({ type: "members/subscribed", guildId, channelId, ranges });
+  }
+
+  function loadMoreMembers(channelId: string): void {
+    const wait = lastMembersOp + MEMBER_SCROLL_THROTTLE_MS - now();
+    if (wait <= 0) return sendMoreMembers(channelId);
+    // Dentro de la ventana: un solo envío al final de los 500 ms, con el último canal pedido.
+    const scheduled = pendingMembers !== null;
+    pendingMembers = channelId;
+    if (scheduled) return;
+    setTimer(() => {
+      const id = pendingMembers;
+      pendingMembers = null;
+      if (id !== null) sendMoreMembers(id);
+    }, wait);
   }
 
   async function openChannel(id: string): Promise<void> {
@@ -176,6 +218,7 @@ export function createActions(deps: ActionsDeps): Actions {
         deps.store.dispatch({ type: "notice/push", key: "open-url", level: "warn", text: "no pude abrir el link" });
       }
     },
+    loadMoreMembers,
     setStatus(status: OwnStatus): void {
       deps.store.dispatch({ type: "settings/set", patch: { status } });
       deps.presence?.statusChanged();

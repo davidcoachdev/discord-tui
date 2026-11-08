@@ -944,7 +944,15 @@ export function App(props: {
           onVoiceToggle={(id) => void props.actions.voice?.toggleVoice(id)}
         />
         <Show when={showMembers()}>
-          <MemberList store={props.store} theme={theme()} onMember={mentionMember} />
+          <MemberList
+            store={props.store}
+            theme={theme()}
+            onMember={mentionMember}
+            onNearEnd={() => {
+              const id = channelId();
+              if (id !== null) props.actions.loadMoreMembers?.(id);
+            }}
+          />
         </Show>
       </box>
       <Show when={confirmDelete() !== null}>

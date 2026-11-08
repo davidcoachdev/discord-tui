@@ -2,6 +2,7 @@ import type { Actions } from "../src/actions";
 import type { VoiceActions } from "../src/actions/voice";
 import { selectChannelList } from "../src/store/selectors";
 import { createStore, emptyState, type Store } from "../src/store/store";
+import { seedPresence } from "./demo/presence";
 
 /**
  * Estado de demostración, sin red ni cuenta: sirve para mirar la UI (`bun run demo`)
@@ -209,6 +210,7 @@ export function buildDemoStore(): Store {
   store.dispatch({ type: "ui/selectGuild", id: G1 });
   store.dispatch({ type: "ui/selectChannel", id: general });
   store.dispatch({ type: "ui/focus", focus: "messages" });
+  seedPresence(store);
   return store;
 }
 

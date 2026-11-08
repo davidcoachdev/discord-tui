@@ -135,6 +135,7 @@ export function createRuntime(deps: RuntimeDeps): Runtime {
     if (readySessions === 1) return;
 
     store.dispatch({ type: "messages/staleAll" });
+    store.dispatch({ type: "members/resetSubscriptions" });
     const open = store.getState().ui.selectedChannelId;
     if (open !== null) void actions.openChannel(open).catch(() => {});
   });
