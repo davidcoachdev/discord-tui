@@ -189,7 +189,7 @@ function buildMessage(me: string | null, raw: ApiMessage): Message {
     referenced,
     reactions: Array.isArray(raw.reactions)
       ? raw.reactions.map((reaction: any) => ({
-          emoji: { id: reaction.emoji?.id ?? null, name: reaction.emoji?.name ?? "" },
+          emoji: { id: reaction.emoji?.id ?? null, name: reaction.emoji?.name ?? "", ...(reaction.emoji?.animated === true ? { animated: true } : {}) },
           count: reaction.count ?? 0,
           me: reaction.me === true,
         }))

@@ -6,6 +6,7 @@ import { seedPolls } from "./demo/polls";
 import { seedUnread } from "./demo/unread";
 import { seedThreads } from "./demo/threads";
 import { seedPresence } from "./demo/presence";
+import { seedEmoji } from "./demo/emoji";
 
 /**
  * Estado de demostración, sin red ni cuenta: sirve para mirar la UI (`bun run demo`)
@@ -200,6 +201,7 @@ export function buildDemoStore(): Store {
   ];
   store.dispatch({ type: "messages/page", channelId: general, messages: messages as never, mode: "latest" });
   seedPolls(store);
+  seedEmoji(store);
   store.dispatch({ type: "gw", t: "TYPING_START", d: { channel_id: general, user_id: U(2), timestamp: Math.floor(Date.now() / 1000) + 3600 } });
   store.dispatch({
     type: "messages/page",

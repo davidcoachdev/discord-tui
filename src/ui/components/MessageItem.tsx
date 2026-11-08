@@ -3,9 +3,10 @@ import { createResource, createSignal, For, Show, type JSX } from "solid-js";
 
 export type MessageAction = "reply" | "edit" | "delete" | "react";
 
-import { attachmentView, sizedUrl, stickerView } from "../../images/cdn";
+import { attachmentView, emojiUrl, sizedUrl, stickerView } from "../../images/cdn";
 import { imageCache } from "../../images/cache";
 import { IMAGE_MODE } from "../../images/mode";
+import { jumboEmoji, type JumboEmoji } from "../../markdown/jumbo";
 import { parseMarkdown, plainText } from "../../markdown/parse";
 import type { ApiEmbed, ApiPoll, AppState, Message } from "../../store/types";
 import { clockTime, displayName, hashIndex, memberColor, truncate } from "../format";
@@ -30,6 +31,25 @@ function InlineImage(props: { url: string; cols: number; rows: number; label: st
   );
 }
 
+/** Mensaje de sólo emojis: los custom como imagen de 4x2 celdas, los unicode como texto en la misma fila. */
+function JumboRow(props: { emoji: JumboEmoji[]; theme: Theme; edited: boolean }): JSX.Element {
+  return (
+    <box flexDirection="row" flexWrap="wrap" columnGap={1} width="100%">
+      <For each={props.emoji}>
+        {(emoji) =>
+          emoji.kind === "custom" ? (
+            <InlineImage url={emojiUrl(emoji.id, emoji.animated)} cols={4} rows={2} label={`:${emoji.name}:`} theme={props.theme} raw />
+          ) : (
+            <text fg={props.theme.fg} height={2}>{emoji.text}</text>
+          )
+        }
+      </For>
+      <Show when={props.edited}>
+        <text fg={props.theme.dim}>(editado)</text>
+      </Show>
+    </box>
+  );
+}
 
 function EmbedView(props: { embed: ApiEmbed; ctx: MdContext; images: boolean; onOpen?(url: string): void }): JSX.Element {
   const theme = props.ctx.theme;
@@ -111,6 +131,11 @@ export function MessageItem(props: {
   const ctx = (): MdContext => ({ state: props.state, theme: props.theme, guildId: props.guildId, revealSpoilers: props.selected === true });
   const author = (): string => displayName(props.state, props.message.authorId, props.guildId);
   const nodes = () => parseMarkdown(props.message.content);
+  const jumbo = (): JumboEmoji[] | null => {
+    if (!props.images) return null;
+    const emoji = jumboEmoji(nodes());
+    return emoji?.some((e) => e.kind === "custom") ? emoji : null;
+  };
   const bg = (): string | undefined => (props.selected ? props.theme.selection : hover() ? props.theme.panel : undefined);
   const gutter = (): string => (props.selected ? props.theme.accent : props.message.mentionsMe ? props.theme.mention : "");
 
@@ -152,11 +177,18 @@ export function MessageItem(props: {
             <span style={{ fg: theme().dim }}>{`  ${clockTime(props.message.timestamp)}`}</span>
           </text>
         </Show>
-        <Markdown
-          nodes={nodes()}
-          ctx={ctx()}
-          suffix={props.message.editedTimestamp ? <span style={{ fg: theme().dim }}> (editado)</span> : undefined}
-        />
+        <Show
+          when={jumbo()}
+          fallback={
+            <Markdown
+              nodes={nodes()}
+              ctx={ctx()}
+              suffix={props.message.editedTimestamp ? <span style={{ fg: theme().dim }}> (editado)</span> : undefined}
+            />
+          }
+        >
+          {(emoji: () => JumboEmoji[]) => <JumboRow emoji={emoji()} theme={props.theme} edited={props.message.editedTimestamp !== null} />}
+        </Show>
         <For each={props.message.attachments}>
           {(attachment) => {
             const view = attachmentView(attachment, props.images ? IMAGE_MODE : "links");
@@ -196,18 +228,32 @@ export function MessageItem(props: {
         <Show when={props.message.reactions.length > 0}>
           <box flexDirection="row" flexWrap="wrap" columnGap={1}>
             <For each={props.message.reactions}>
-              {(reaction) => (
-                <text
-                  fg={reaction.me ? theme().mentionFg : theme().fg}
-                  bg={reaction.me ? theme().mentionBg : theme().selection}
-                  onMouseDown={(e: Click) => {
-                    e.stopPropagation();
-                    props.onReact?.(reaction.emoji);
-                  }}
-                >
-                  {` ${reaction.emoji.id ? `:${reaction.emoji.name}:` : reaction.emoji.name} ${reaction.count} `}
-                </text>
-              )}
+              {(reaction) => {
+                const fg = (): string => (reaction.me ? theme().mentionFg : theme().fg);
+                const bg = (): string => (reaction.me ? theme().mentionBg : theme().selection);
+                const toggle = (e: Click): void => {
+                  e.stopPropagation();
+                  props.onReact?.({ id: reaction.emoji.id, name: reaction.emoji.name });
+                };
+                const id = reaction.emoji.id;
+                // Emoji custom con imágenes: chip = fila de renderables (texto, imagen de 2x1, texto).
+                return (
+                  <Show
+                    when={id && props.images}
+                    fallback={
+                      <text fg={fg()} bg={bg()} onMouseDown={toggle}>
+                        {` ${id ? `:${reaction.emoji.name}:` : reaction.emoji.name} ${reaction.count} `}
+                      </text>
+                    }
+                  >
+                    <box flexDirection="row" backgroundColor={bg()} onMouseDown={toggle}>
+                      <text fg={fg()} bg={bg()}>{" "}</text>
+                      <InlineImage url={emojiUrl(id!, reaction.emoji.animated === true)} cols={2} rows={1} label={`:${reaction.emoji.name}:`} theme={props.theme} raw />
+                      <text fg={fg()} bg={bg()}>{` ${reaction.count} `}</text>
+                    </box>
+                  </Show>
+                );
+              }}
             </For>
           </box>
         </Show>

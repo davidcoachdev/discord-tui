@@ -1,8 +1,14 @@
 import type { ApiAttachment } from "../store/types";
 import type { ImageMode } from "./mode";
 
+/**
+ * Animados como GIF: el decoder de OpenTUI 0.8.2 rechaza el WebP animado ("unsupported image
+ * feature") y del GIF muestra el primer cuadro.
+ */
 export function emojiUrl(id: string, animated: boolean, size = 48): string {
-  return `https://cdn.discordapp.com/emojis/${id}.webp?size=${size}&quality=lossless${animated ? "&animated=true" : ""}`;
+  return animated
+    ? `https://cdn.discordapp.com/emojis/${id}.gif?size=${size}`
+    : `https://cdn.discordapp.com/emojis/${id}.webp?size=${size}&quality=lossless`;
 }
 
 const ALLOWED_HOSTS = new Set(["cdn.discordapp.com", "media.discordapp.net"]);
