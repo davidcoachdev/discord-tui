@@ -33,6 +33,7 @@ import { Button } from "./components/Button";
 import { Notices } from "./components/Notices";
 import { QuickSwitcher } from "./components/QuickSwitcher";
 import { StatusBar, VoiceBar } from "./components/StatusBar";
+import { StatusMenu } from "./components/StatusMenu";
 import { validateOutgoing } from "./composer-state";
 import { displayName, truncate } from "./format";
 import { rankSwitcherItems } from "./fuzzy";
@@ -121,6 +122,7 @@ export function App(props: {
   const [settingsOpen, setSettingsOpen] = createSignal(false);
   const [pendingG, setPendingG] = createSignal(false);
   const [helpOpen, setHelpOpen] = createSignal(false);
+  const [statusMenuOpen, setStatusMenuOpen] = createSignal(false);
   const [switcherOpen, setSwitcherOpen] = createSignal(false);
   const [switcherQuery, setSwitcherQuery] = createSignal("");
   const [switcherIndex, setSwitcherIndex] = createSignal(0);
@@ -702,7 +704,7 @@ export function App(props: {
         return;
       }
       props.onActivity?.();
-      if (settingsOpen()) return;
+      if (settingsOpen() || statusMenuOpen()) return;
 
       if (helpOpen()) {
         if (key.name === "escape" || key.name === "q" || (key.name === "?" && !key.ctrl && !key.meta)) setHelpOpen(false);
@@ -844,6 +846,9 @@ export function App(props: {
         switch (key.name) {
           case "s":
             setSettingsOpen(true);
+            return;
+          case "p":
+            setStatusMenuOpen(true);
             return;
           case "m":
             props.actions.toggleMembers();
@@ -1082,7 +1087,15 @@ export function App(props: {
           onLoadArchived={(id) => void props.actions.loadArchivedPosts?.(id).catch(() => {})}
         />
         <Show when={showMembers()}>
-          <MemberList store={props.store} theme={theme()} onMember={mentionMember} />
+          <MemberList
+            store={props.store}
+            theme={theme()}
+            onMember={mentionMember}
+            onNearEnd={() => {
+              const id = channelId();
+              if (id !== null) props.actions.loadMoreMembers?.(id);
+            }}
+          />
         </Show>
       </box>
       <Show when={confirmDelete() !== null}>
@@ -1141,6 +1154,7 @@ export function App(props: {
         mode={insert() || attachPrompt() !== null ? "INSERT" : "NORMAL"}
         onHelp={() => setHelpOpen(true)}
         onSettings={() => setSettingsOpen(true)}
+        onStatus={() => setStatusMenuOpen(true)}
         onSwitcher={() => {
           setSwitcherOpen(true);
           setSwitcherQuery("");
@@ -1161,6 +1175,17 @@ export function App(props: {
             setSwitcherOpen(false);
             setSwitcherQuery("");
           }}
+        />
+      </Show>
+      <Show when={statusMenuOpen()}>
+        <StatusMenu
+          current={props.store.getState().settings.status}
+          theme={theme()}
+          onPick={(status) => {
+            setStatusMenuOpen(false);
+            props.actions.setStatus?.(status);
+          }}
+          onClose={() => setStatusMenuOpen(false)}
         />
       </Show>
       <Show when={helpOpen()}>

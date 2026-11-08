@@ -3,7 +3,7 @@ import { mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { DEFAULT_SETTINGS, loadSettings, saveSettings } from "../../src/settings/settings";
+import { DEFAULT_SETTINGS, loadSettings, normalizeSettings, saveSettings } from "../../src/settings/settings";
 
 async function withTempDir<T>(fn: (dir: string) => Promise<T>): Promise<T> {
   const dir = await mkdtemp(join(tmpdir(), "discord-tui-settings-"));
@@ -101,5 +101,15 @@ describe("settings persistence in the store", () => {
     const store = createStore(emptyState());
     store.dispatch({ type: "settings/set", patch: { vadSensitivity: -200 } });
     expect(store.getState().settings.vadSensitivity).toBe(-60);
+  });
+
+  test("status defaults to online, keeps the four valid values and drops anything else", () => {
+    expect(DEFAULT_SETTINGS.status).toBe("online");
+    for (const status of ["online", "idle", "dnd", "invisible"] as const) {
+      expect(normalizeSettings({ status }).status).toBe(status);
+    }
+    for (const status of ["offline", "unknown", "DND", 3, null]) {
+      expect(normalizeSettings({ status, theme: "light" })).toMatchObject({ status: "online", theme: "light" });
+    }
   });
 });

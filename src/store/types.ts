@@ -203,10 +203,17 @@ export interface AppState {
   presences: Record<string, PresenceState>;
   /** channelId → userId → vence (ms epoch). */
   typing: Record<string, Record<string, number>>;
-  /** Lista de miembros por guild, como la manda GUILD_MEMBER_LIST_UPDATE (grupos y miembros en orden). */
-  memberLists: Record<string, MemberListRow[]>;
+  /**
+   * Lista de miembros por guild, como la manda GUILD_MEMBER_LIST_UPDATE (grupos y miembros en orden).
+   * Los índices son las posiciones absolutas de Discord; `null` = posición sin cargar o invalidada.
+   */
+  memberLists: Record<string, (MemberListRow | null)[]>;
+  /** `member_count` y `online_count` del último GUILD_MEMBER_LIST_UPDATE, por guild. */
+  memberCounts: Record<string, { members: number; online: number }>;
   /** Último canal para el que se mandó op 37, por guild. */
   subscribedChannels: Record<string, string>;
+  /** Rangos de la lista de miembros que se pidieron en el último op 37, por guild. */
+  subscribedRanges: Record<string, [number, number][]>;
   voice: VoiceSlice;
   outbox: Record<string, OutboxItem>;
   ui: {
@@ -243,7 +250,9 @@ export type Action =
   | { type: "notice/dismiss"; id: string }
   | { type: "notice/sweep"; now: number }
   | { type: "typing/sweep"; now: number }
-  | { type: "members/subscribed"; guildId: string; channelId: string }
+  | { type: "members/subscribed"; guildId: string; channelId: string; ranges?: [number, number][] }
+  /** Sesión nueva del gateway: las suscripciones de la anterior ya no existen. */
+  | { type: "members/resetSubscriptions" }
   | { type: "voice/joining"; guildId: string; channelId: string }
   | { type: "voice/status"; status: VoiceStatus; error?: string | null }
   | { type: "voice/left"; error?: string | null }

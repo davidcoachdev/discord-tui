@@ -5,6 +5,7 @@ import { createStore, emptyState, type Store } from "../src/store/store";
 import { seedPolls } from "./demo/polls";
 import { seedUnread } from "./demo/unread";
 import { seedThreads } from "./demo/threads";
+import { seedPresence } from "./demo/presence";
 
 /**
  * Estado de demostración, sin red ni cuenta: sirve para mirar la UI (`bun run demo`)
@@ -215,6 +216,7 @@ export function buildDemoStore(): Store {
   store.dispatch({ type: "ui/selectGuild", id: G1 });
   store.dispatch({ type: "ui/selectChannel", id: general });
   store.dispatch({ type: "ui/focus", focus: "messages" });
+  seedPresence(store);
   return store;
 }
 
@@ -287,6 +289,7 @@ export function demoActions(store: Store): Actions {
       store.dispatch({ type: "gw", t: "MESSAGE_DELETE", d: { id: messageId, channel_id: channelId } });
     },
     toggleReaction: async () => {},
+    setStatus: (status) => store.dispatch({ type: "settings/set", patch: { status } }),
     voice,
   };
 }

@@ -11,6 +11,8 @@ import { LevelMeter } from "../components/LevelMeter";
 import { useSelector } from "../store-bridge";
 import { useTheme } from "../theme";
 import { Button, type Click } from "../components/Button";
+import { statusLabel } from "../components/StatusMenu";
+import { OWN_STATUSES } from "../../settings/settings";
 
 export interface SettingsDeps {
   listAudioDevices(): Promise<{ inputs: AudioDevice[]; outputs: AudioDevice[] }>;
@@ -18,8 +20,8 @@ export interface SettingsDeps {
   startPlayback: (opts?: { target?: string }) => Promise<any>;
 }
 
-type Section = "input" | "output" | "inputMode" | "sensitivity" | "testMic" | "theme" | "images";
-const SECTIONS: Section[] = ["input", "output", "inputMode", "sensitivity", "testMic", "theme", "images"];
+type Section = "input" | "output" | "inputMode" | "sensitivity" | "testMic" | "status" | "theme" | "images";
+const SECTIONS: Section[] = ["input", "output", "inputMode", "sensitivity", "testMic", "status", "theme", "images"];
 
 export function SettingsScreen(props: {
   store: Store;
@@ -97,6 +99,13 @@ export function SettingsScreen(props: {
     if (section === "testMic" && dir === 0) {
       if (testing()) void stopTest();
       else void startTest();
+      return;
+    }
+    if (section === "status") {
+      const index = OWN_STATUSES.indexOf(settings().status);
+      const next = OWN_STATUSES[(index + (dir === 0 ? 1 : dir) + OWN_STATUSES.length) % OWN_STATUSES.length]!;
+      if (props.actions.setStatus) props.actions.setStatus(next);
+      else patch({ status: next });
       return;
     }
     if (section === "theme" && dir === 0) return patch({ theme: settings().theme === "dark" ? "light" : "dark" });
@@ -194,6 +203,8 @@ export function SettingsScreen(props: {
             <Button label="auto" theme={theme()} onPress={() => patch({ vadSensitivity: "auto" })} />
           </box>
         </Show>
+        <text fg={theme().header}>Cuenta</text>
+        {line("status", `estado: ${statusLabel(settings().status)}  (Enter o h/l)`)}
         <text fg={theme().header}>Apariencia</text>
         {line("theme", `tema: ${settings().theme === "dark" ? "oscuro" : "claro"}`)}
         {line("images", `imágenes inline: ${settings().inlineImages ? "sí" : "no (solo links)"}`)}

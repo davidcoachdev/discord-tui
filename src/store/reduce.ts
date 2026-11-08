@@ -157,8 +157,22 @@ export function reduce(state: AppState, action: Action): AppState {
       return applyNoticeSweep(state, action.now);
     case "typing/sweep":
       return applyTypingSweep(state, action.now);
-    case "members/subscribed":
-      return { ...state, subscribedChannels: { ...state.subscribedChannels, [action.guildId]: action.channelId } };
+    case "members/subscribed": {
+      // Otro canal, otra lista: lo que estaba más allá de 0-99 era de la lista anterior.
+      const list = state.memberLists[action.guildId];
+      const memberLists =
+        list && list.length > 100 && state.subscribedChannels[action.guildId] !== action.channelId
+          ? { ...state.memberLists, [action.guildId]: list.slice(0, 100) }
+          : state.memberLists;
+      return {
+        ...state,
+        memberLists,
+        subscribedChannels: { ...state.subscribedChannels, [action.guildId]: action.channelId },
+        subscribedRanges: { ...state.subscribedRanges, [action.guildId]: action.ranges ?? [[0, 99]] },
+      };
+    }
+    case "members/resetSubscriptions":
+      return { ...state, subscribedChannels: {}, subscribedRanges: {} };
     case "voice/joining":
     case "voice/status":
     case "voice/left":

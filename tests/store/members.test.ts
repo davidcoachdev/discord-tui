@@ -36,7 +36,7 @@ test("SYNC then INSERT/DELETE keep groups and members in order", () => {
   const store = createStore(emptyState());
   store.dispatch({ type: "gw", t: "GUILD_MEMBER_LIST_UPDATE", d: read("gateway", "GUILD_MEMBER_LIST_UPDATE-1.json").d });
   const first = store.getState().memberLists[GUILD]!;
-  expect(first.filter((r) => r.kind === "member").length).toBeGreaterThanOrEqual(2);
+  expect(first.filter((r) => r?.kind === "member").length).toBeGreaterThanOrEqual(2);
   store.dispatch({
     type: "gw",
     t: "GUILD_MEMBER_LIST_UPDATE",

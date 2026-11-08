@@ -1,7 +1,7 @@
 import type { ClientProps } from "../client-props/props";
 import { log } from "../log/logger";
 import type { Secret } from "../secret";
-import { buildIdentify } from "./identify";
+import { buildIdentify, type IdentifyPresence } from "./identify";
 import { createZlibStreamInflater } from "./inflate";
 
 export type GatewayStatus = "connecting" | "identifying" | "ready" | "resuming" | "reconnecting" | "disconnected";
@@ -28,6 +28,8 @@ export interface GatewayDeps {
   WebSocketImpl?: typeof WebSocket;
   random?: () => number;
   setTimer?: typeof setTimeout;
+  /** Presencia para cada identify (el primero y los de después de una reconexión). */
+  presence?: () => IdentifyPresence;
 }
 
 const DEFAULT_URL = "wss://gateway.discord.gg/?v=9&encoding=json&compress=zlib-stream";
@@ -181,7 +183,7 @@ export function createGateway(deps: GatewayDeps): Gateway {
         } else {
           resuming = false;
           setStatus("identifying");
-          const identify = buildIdentify(deps.token, deps.props);
+          const identify = buildIdentify(deps.token, deps.props, deps.presence?.());
           send(2, identify.d);
         }
         startHeartbeat(interval);

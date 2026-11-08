@@ -66,6 +66,12 @@ export function createRuntime(deps: RuntimeDeps): Runtime {
     WebSocketImpl: deps.WebSocketImpl,
     setTimer: deps.setTimer,
     random: deps.random,
+    presence: () => idle.current(),
+  });
+  const idle = createIdlePresence({
+    gateway,
+    settings: () => store.getState().settings,
+    ready: () => gateway.status === "ready",
   });
   const voiceSession =
     deps.voiceSession ??
@@ -80,7 +86,7 @@ export function createRuntime(deps: RuntimeDeps): Runtime {
     media: deps.voiceMedia ?? defaultMedia,
     kittyKeyboard: deps.kittyKeyboard,
   });
-  const actions = createActions({ store, rest, gateway, voice, fetch: deps.fetch });
+  const actions = createActions({ store, rest, gateway, voice, fetch: deps.fetch, presence: idle });
   store.dispatch({ type: "connection", status: gateway.status });
 
   if (deps.initialSettings) store.dispatch({ type: "settings/loaded", settings: deps.initialSettings });
@@ -123,11 +129,13 @@ export function createRuntime(deps: RuntimeDeps): Runtime {
 
   let readySessions = 0;
   gateway.on("session", (kind) => {
+    idle.sessionStarted(kind);
     if (kind === "resumed") return;
     readySessions += 1;
     if (readySessions === 1) return;
 
     store.dispatch({ type: "messages/staleAll" });
+    store.dispatch({ type: "members/resetSubscriptions" });
     const open = store.getState().ui.selectedChannelId;
     if (open !== null) void actions.openChannel(open).catch(() => {});
   });
@@ -141,8 +149,6 @@ export function createRuntime(deps: RuntimeDeps): Runtime {
     });
     notifyUnauthorized();
   });
-
-  const idle = createIdlePresence({ gateway, settings: () => store.getState().settings });
 
   const noticeSweep = setInterval(() => {
     const now = Date.now();
