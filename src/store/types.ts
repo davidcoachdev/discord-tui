@@ -90,6 +90,12 @@ export interface ReadState {
   mentionCount: number;
 }
 
+/** Dónde iba la lectura del canal abierto al abrirlo: el divisor "mensajes nuevos" va después de afterId. */
+export interface UnreadMarker {
+  channelId: string;
+  afterId: string;
+}
+
 export interface PresenceState {
   status: string;
   activities: unknown[];
@@ -181,6 +187,7 @@ export interface AppState {
     focus: Focus;
     membersVisible: boolean;
     collapsedCategories: string[];
+    unreadMarker: UnreadMarker | null;
   };
   settings: Settings;
   notices: Record<string, Notice>;

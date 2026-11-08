@@ -9,6 +9,7 @@ import {
 } from "./reducers/messages";
 import { applyChannelUnreadUpdate, applyMessageAck } from "./reducers/read-state";
 import { applyReaction } from "./reducers/reactions";
+import { snapshotUnread } from "./unread";
 import {
   applyOutboxEnqueue,
   applyOutboxFailed,
@@ -110,7 +111,8 @@ export function reduce(state: AppState, action: Action): AppState {
     case "ui/selectGuild":
       return { ...state, ui: { ...state.ui, selectedGuildId: action.id } };
     case "ui/selectChannel":
-      return { ...state, ui: { ...state.ui, selectedChannelId: action.id } };
+      if (state.ui.selectedChannelId === action.id) return state;
+      return { ...state, ui: { ...state.ui, selectedChannelId: action.id, unreadMarker: snapshotUnread(state, action.id) } };
     case "ui/focus":
       return { ...state, ui: { ...state.ui, focus: action.focus } };
     case "ui/toggleCategory": {
