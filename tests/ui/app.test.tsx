@@ -56,7 +56,7 @@ test("tiny terminal still renders", async () => {
 });
 
 test("assertTty", () => {
-  expect(assertTty({ isTTY: false })).toBe("discord-tui necesita una terminal");
+  expect(assertTty({ isTTY: false })).toBe("zcord necesita una terminal");
   expect(assertTty({ isTTY: true })).toBeNull();
 });
 

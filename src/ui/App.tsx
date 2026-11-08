@@ -1,6 +1,6 @@
 import type { KeyEvent, PasteEvent } from "@opentui/core";
 import { useKeyboard, usePaste, useRenderer, useTerminalDimensions, type JSX } from "@opentui/solid";
-import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import { createEffect, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 
 import type { Actions } from "../actions";
 import { COMMON_EMOJI } from "../emoji/common";
@@ -38,6 +38,7 @@ import { moveInList } from "./list-window";
 import { StatusBar, VoiceBar } from "./components/StatusBar";
 import { StatusMenu } from "./components/StatusMenu";
 import { MonitorPicker } from "./components/MonitorPicker";
+import { Splash, splashStatus } from "./components/Splash";
 import { OutputPicker } from "./components/OutputPicker";
 import type { AudioDevice } from "../voice/devices";
 import type { Monitor } from "../golive/capture";
@@ -91,8 +92,30 @@ export function App(props: {
   deps?: Partial<AppDeps>;
   onActivity?(): void;
   images?: boolean;
+  /** Mostrar la pantalla de inicio de zcord mientras conecta (la app real; los tests no). */
+  splash?: boolean;
 }): JSX.Element {
   const deps = (): AppDeps => ({ ...defaultAppDeps, ...props.deps });
+  // Splash: mínimo 1,2 s; se va cuando ya hay servidores cargados, o si la conexión falla (para ver el error).
+  const [splashMinDone, setSplashMinDone] = createSignal(false);
+  const splashTimer = setTimeout(() => setSplashMinDone(true), 1_200);
+  onCleanup(() => clearTimeout(splashTimer));
+  const connectionState = useSelector(props.store, (state) => ({
+    connection: state.connection,
+    guilds: state.guildOrder.length,
+    loaded: state.guildOrder.length > 0 || state.privateChannelIds.length > 0,
+  }), (a, b) => a.connection === b.connection && a.guilds === b.guilds && a.loaded === b.loaded);
+  const [splashSeenConnecting, setSplashSeenConnecting] = createSignal(false);
+  createEffect(() => {
+    if (connectionState().connection !== "disconnected") setSplashSeenConnecting(true);
+  });
+  const showSplash = (): boolean => {
+    if (!props.splash) return false;
+    const { connection, loaded } = connectionState();
+    const failed = connection === "disconnected" && splashSeenConnecting();
+    if (failed) return false;
+    return !splashMinDone() || !(connection === "ready" && loaded);
+  };
   const theme = useTheme(props.store);
   const dims = useTerminalDimensions();
   const focus = useSelector(props.store, (state) => state.ui.focus);
@@ -1300,6 +1323,9 @@ export function App(props: {
           inVoice={props.store.getState().voice.channelId !== null}
           onClose={() => setSettingsOpen(false)}
         />
+      </Show>
+      <Show when={showSplash()}>
+        <Splash theme={theme()} status={splashStatus(connectionState().connection, connectionState().guilds)} />
       </Show>
     </box>
   );

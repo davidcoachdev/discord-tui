@@ -5,6 +5,7 @@ import { render } from "@opentui/solid";
 import { KITTY_KEYBOARD } from "../src/ui/kitty";
 
 import { App } from "../src/ui/App";
+import { APP_NAME } from "../src/ui/brand";
 import { buildDemoStore, demoActions } from "./demo-state";
 
 const store = buildDemoStore();
@@ -14,4 +15,5 @@ const quit = (): void => {
   renderer.destroy();
   void renderer.closed.then(() => process.exit(0));
 };
-await render(() => <App store={store} actions={actions} onQuit={quit} />, renderer);
+renderer.setTerminalTitle(`${APP_NAME} (demo)`);
+await render(() => <App store={store} actions={actions} onQuit={quit} splash />, renderer);

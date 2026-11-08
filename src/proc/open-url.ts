@@ -9,7 +9,7 @@ export function openUrl(url: string, deps: { spawn?: (cmd: string[]) => unknown 
     return false;
   }
   if (parsed.protocol !== "https:") return false;
-  const spawn = deps.spawn ?? ((cmd: string[]) => spawnClean(cmd, { stdout: "ignore" }));
+  const spawn = deps.spawn ?? ((cmd: string[]) => spawnClean(cmd, { stdin: "ignore", stdout: "ignore", stderr: "ignore" }));
   try {
     spawn(["xdg-open", parsed.toString()]);
     return true;

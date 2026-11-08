@@ -34,6 +34,8 @@ export interface Theme {
   modeFg: string;
   /** Paleta para colorear nombres de usuarios sin rol con color. */
   names: string[];
+  /** Degradé del logo de zcord en el splash. */
+  brand: string[];
 }
 
 export const THEMES: Record<"dark" | "light", Theme> = {
@@ -69,6 +71,7 @@ export const THEMES: Record<"dark" | "light", Theme> = {
     modeInsert: "#a6e3a1",
     modeFg: "#11111b",
     names: ["#f38ba8", "#fab387", "#f9e2af", "#a6e3a1", "#94e2d5", "#89dceb", "#89b4fa", "#cba6f7", "#f5c2e7", "#eba0ac"],
+    brand: ["#74c7ec", "#89b4fa", "#b4befe", "#cba6f7", "#f5c2e7", "#cba6f7", "#b4befe", "#89b4fa"],
   },
   light: {
     bg: "#eff1f5",
@@ -102,6 +105,7 @@ export const THEMES: Record<"dark" | "light", Theme> = {
     modeInsert: "#40a02b",
     modeFg: "#eff1f5",
     names: ["#d20f39", "#fe640b", "#df8e1d", "#40a02b", "#179299", "#04a5e5", "#1e66f5", "#8839ef", "#ea76cb", "#e64553"],
+    brand: ["#209fb5", "#1e66f5", "#7287fd", "#8839ef", "#ea76cb", "#8839ef", "#7287fd", "#1e66f5"],
   },
 };
 

@@ -25,5 +25,5 @@ export function notificationTitle(state: AppState, message: Message): string {
 
 export function notify(title: string, body: string, deps?: { spawn?: typeof spawnClean }): void {
   const spawn = deps?.spawn ?? spawnClean;
-  spawn(["notify-send", "-a", "discord-tui", title, body], { stdout: "ignore" });
+  spawn(["notify-send", "-a", "zcord", title, body], { stdout: "ignore" });
 }

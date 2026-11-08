@@ -209,7 +209,7 @@ export function buildDemoStore(): Store {
     channelId: DEMO.dm,
     messages: [
       { ...msg(50, DEMO.dm, U(2), "che, ¿te sumás a la llamada de las 22?", 25), guild_id: undefined },
-      { ...msg(51, DEMO.dm, ME, "dale, ahí entro desde discord-tui 😎", 20), guild_id: undefined },
+      { ...msg(51, DEMO.dm, ME, "dale, ahí entro desde zcord 😎", 20), guild_id: undefined },
       { ...msg(52, DEMO.dm, U(2), "jaja ¿en serio en la terminal?", 2), guild_id: undefined },
     ] as never,
     mode: "latest",

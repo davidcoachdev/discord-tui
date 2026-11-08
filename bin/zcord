@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# zcord: Discord en tu terminal. Lanzador para usar desde cualquier carpeta
+# (OpenTUI necesita el bunfig.toml del proyecto, por eso se corre desde acá).
+set -euo pipefail
+here="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+cd "$here"
+case "${1:-}" in
+  demo) shift; exec bun scripts/demo.tsx "$@" ;;
+  *) exec bun run src/main.tsx "$@" ;;
+esac

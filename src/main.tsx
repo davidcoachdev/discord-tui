@@ -15,10 +15,11 @@ import { createHttp } from "./rest/http";
 import { loadSettings, type Settings } from "./settings/settings";
 import type { Secret } from "./secret";
 import { App } from "./ui/App";
+import { APP_NAME } from "./ui/brand";
 import { LoginScreen } from "./ui/screens/LoginScreen";
 
 export function assertTty(stream: { isTTY?: boolean }): string | null {
-  return stream.isTTY ? null : "discord-tui necesita una terminal";
+  return stream.isTTY ? null : "zcord necesita una terminal";
 }
 
 function LoginRoot(props: {
@@ -91,6 +92,7 @@ function LoginRoot(props: {
           onQuit={() => props.onQuit(active())}
           onActivity={() => active().activity()}
           images
+          splash
         />
       )}
     </Show>
@@ -124,6 +126,7 @@ async function main(): Promise<void> {
 
   const renderer = await createCliRenderer({ useKittyKeyboard: KITTY_KEYBOARD });
   const kittyKeyboard = (): boolean => renderer.capabilities?.kitty_keyboard ?? true;
+  renderer.setTerminalTitle(APP_NAME);
   let quitting = false;
   const quit = (runtime: Runtime | null): void => {
     if (quitting) return;
@@ -155,7 +158,14 @@ async function main(): Promise<void> {
   runtime.start();
   await render(
     () => (
-      <App store={runtime.store} actions={runtime.actions} onQuit={() => quit(runtime)} onActivity={() => runtime.activity()} images />
+      <App
+        store={runtime.store}
+        actions={runtime.actions}
+        onQuit={() => quit(runtime)}
+        onActivity={() => runtime.activity()}
+        images
+        splash
+      />
     ),
     renderer,
   );

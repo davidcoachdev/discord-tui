@@ -82,7 +82,7 @@ function MicTest(props: { onQuit: () => void }): JSX.Element {
 
   return (
     <box flexDirection="column" width="100%" height="100%" padding={1}>
-      <text>discord-tui · prueba de micrófono (eco local, no toca la cuenta)</text>
+      <text>zcord · prueba de micrófono (eco local, no toca la cuenta)</text>
       <text>{`modo: ${gate()} · sensibilidad: ${sensitivity() === "auto" ? "auto" : `${sensitivity()} dBFS`}`}</text>
       <LevelMeter levelDb={level()} thresholdDb={threshold()} open={open()} width={40} />
       <text>{`${level().toFixed(1)} dBFS · umbral ${threshold().toFixed(1)} dBFS`}</text>

@@ -79,5 +79,5 @@ test("notify spawns notify-send with an args array and clean env", () => {
   }) as never;
 
   notify("gon (DM)", "hola", { spawn: spawn as never });
-  expect(calls[0]!.cmd).toEqual(["notify-send", "-a", "discord-tui", "gon (DM)", "hola"]);
+  expect(calls[0]!.cmd).toEqual(["notify-send", "-a", "zcord", "gon (DM)", "hola"]);
 });

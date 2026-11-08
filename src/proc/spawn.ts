@@ -36,6 +36,8 @@ export function spawnClean(
     env: cleanEnv(),
     stdin: opts?.stdin ?? "ignore",
     stdout: opts?.stdout ?? "pipe",
-    ...(opts?.stderr ? { stderr: opts.stderr } : {}),
+    // Por defecto los hijos no escriben en la terminal: un navegador abierto con xdg-open (o cualquier
+    // otro) metía sus logs arriba de la TUI ("zygote boot message: Broken pipe").
+    stderr: opts?.stderr ?? "ignore",
   });
 }

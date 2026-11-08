@@ -3,6 +3,8 @@ import { useKeyboard, usePaste } from "@opentui/solid";
 import { createSignal, onCleanup, onMount, Show, type JSX } from "solid-js";
 
 import type { RaEvent } from "../../auth/remote-auth";
+import { APP_NAME, APP_TAGLINE } from "../brand";
+import { THEMES } from "../theme";
 
 registerQRCode();
 
@@ -67,7 +69,10 @@ export function LoginScreen(props: LoginScreenProps): JSX.Element {
 
   return (
     <box flexDirection="column" width="100%" height="100%" padding={1} gap={1}>
-      <text>discord-tui</text>
+      <box flexDirection="column" alignItems="center" width="100%">
+        <ascii_font text={APP_NAME} font="block" color={THEMES.dark.brand.slice(0, 5)} />
+        <text fg={THEMES.dark.header}>{`${APP_TAGLINE} · iniciá sesión con tu cuenta`}</text>
+      </box>
       <Show when={qrUrl()}>
         <text>Escaneá el código con la app de Discord</text>
         <qr_code content={qrUrl()!} />
