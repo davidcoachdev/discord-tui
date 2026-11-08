@@ -174,7 +174,7 @@ test("reaccionar opens the emoji picker and an emoji click reacts", async () => 
   await click(h, "😀 reaccionar");
   await h.mockInput.typeText("fi");
   await h.renderOnce();
-  await click(h, "🔥 fire");
+  await click(h, "🔥  fire");
   expect(s.calls.some((c) => c.startsWith("react:920000000000000002:930000000000001010") && c.includes("🔥"))).toBe(true);
 });
 

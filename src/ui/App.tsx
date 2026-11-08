@@ -31,7 +31,9 @@ import { MessageView } from "./components/MessageView";
 import type { MessageAction } from "./components/MessageItem";
 import { Button } from "./components/Button";
 import { Notices } from "./components/Notices";
-import { QuickSwitcher } from "./components/QuickSwitcher";
+import { QuickSwitcher, SWITCHER_ROWS } from "./components/QuickSwitcher";
+import { EmojiPicker, PICKER_ROWS } from "./components/EmojiPicker";
+import { moveInList } from "./list-window";
 import { StatusBar, VoiceBar } from "./components/StatusBar";
 import { StatusMenu } from "./components/StatusMenu";
 import { validateOutgoing } from "./composer-state";
@@ -126,6 +128,9 @@ export function App(props: {
   const [switcherOpen, setSwitcherOpen] = createSignal(false);
   const [switcherQuery, setSwitcherQuery] = createSignal("");
   const [switcherIndex, setSwitcherIndex] = createSignal(0);
+  const [pickerIndex, setPickerIndex] = createSignal(0);
+  /** Cada cambio scrollea la ayuda (en filas); la ayuda lo aplica a su scrollbox. */
+  const [helpScroll, setHelpScroll] = createSignal(0);
   const [participant, setParticipant] = createSignal<string | null>(null);
   const [bottomTick, setBottomTick] = createSignal(0);
   const toBottom = (): void => {
@@ -631,6 +636,7 @@ export function App(props: {
     if (action === "react") {
       setPickerOpen(true);
       setPickerQuery("");
+      setPickerIndex(0);
       return;
     }
     const message = selectedMessage();
@@ -707,7 +713,10 @@ export function App(props: {
       if (settingsOpen() || statusMenuOpen()) return;
 
       if (helpOpen()) {
-        if (key.name === "escape" || key.name === "q" || (key.name === "?" && !key.ctrl && !key.meta)) setHelpOpen(false);
+        if (key.name === "escape" || key.name === "q" || (key.name === "?" && !key.ctrl && !key.meta)) return void setHelpOpen(false);
+        const step = key.name === "j" || key.name === "down" ? 1 : key.name === "k" || key.name === "up" ? -1 : key.name === "pagedown" || key.name === "space" ? 10 : key.name === "pageup" ? -10 : 0;
+        if (step !== 0) setHelpScroll((n) => n + step);
+        if (key.name === "g" || key.name === "home") setHelpScroll(-1e6);
         return;
       }
 
@@ -718,14 +727,8 @@ export function App(props: {
           return;
         }
         if (key.name === "return") return openFromSwitcher();
-        if (key.name === "down" || (key.ctrl && key.name === "n") || key.name === "tab") {
-          setSwitcherIndex((i) => Math.min(Math.max(0, Math.min(switcherItems().length, 12) - 1), i + 1));
-          return;
-        }
-        if (key.name === "up" || (key.ctrl && key.name === "p")) {
-          setSwitcherIndex((i) => Math.max(0, i - 1));
-          return;
-        }
+        const moved = moveInList(key, switcherIndex(), switcherItems().length, SWITCHER_ROWS);
+        if (moved !== null) return void setSwitcherIndex(moved);
         if (key.name === "backspace") {
           setSwitcherQuery((q) => q.slice(0, -1));
           setSwitcherIndex(0);
@@ -762,10 +765,18 @@ export function App(props: {
           setPickerQuery("");
           return;
         }
-        if (key.name === "return") return togglePickedReaction();
-        if (key.name === "backspace") return void setPickerQuery((previous) => previous.slice(0, -1));
+        if (key.name === "return") return togglePickedReaction(pickerIndex());
+        const moved = moveInList(key, pickerIndex(), pickerMatches().length, PICKER_ROWS);
+        if (moved !== null) return void setPickerIndex(moved);
+        if (key.name === "backspace") {
+          setPickerIndex(0);
+          return void setPickerQuery((previous) => previous.slice(0, -1));
+        }
         const ch = printable(key);
-        if (ch !== null) setPickerQuery((previous) => previous + ch);
+        if (ch !== null) {
+          setPickerIndex(0);
+          setPickerQuery((previous) => previous + ch);
+        }
         return;
       }
 
@@ -990,6 +1001,7 @@ export function App(props: {
       if (key.sequence === "+") {
         setPickerOpen(true);
         setPickerQuery("");
+        setPickerIndex(0);
         return;
       }
       if (key.sequence === "?") setHelpOpen(true);
@@ -1106,13 +1118,15 @@ export function App(props: {
         </box>
       </Show>
       <Show when={pickerOpen()}>
-        <box height={1} width="100%" paddingLeft={1} flexShrink={0} flexDirection="row" columnGap={1}>
-          <text fg={theme().accent} wrapMode="none" flexShrink={0}>{`reacción ❯ ${pickerQuery()}█`}</text>
-          <For each={pickerMatches().slice(0, 10)}>
-            {(emoji, i) => <Button label={`${emoji.char} ${emoji.name}`} theme={theme()} onPress={() => togglePickedReaction(i())} />}
-          </For>
-          <Button label="✕" theme={theme()} onPress={() => (setPickerOpen(false), setPickerQuery(""))} />
-        </box>
+        <EmojiPicker
+          query={pickerQuery()}
+          matches={pickerMatches()}
+          index={pickerIndex()}
+          theme={theme()}
+          onPick={(i) => togglePickedReaction(i)}
+          onMove={setPickerIndex}
+          onClose={() => (setPickerOpen(false), setPickerQuery(""))}
+        />
       </Show>
       <Show when={hint() !== null}>
         <box height={1} width="100%" paddingLeft={1} flexShrink={0}>
@@ -1121,7 +1135,13 @@ export function App(props: {
       </Show>
       <Show when={mentionState()}>
         {(popup: () => NonNullable<ReturnType<typeof mentionState>>) => (
-          <MentionPopup candidates={popup().candidates} index={mentionIndex()} theme={theme()} onPick={(i) => pickMention(i)} />
+          <MentionPopup
+            candidates={popup().candidates}
+            index={mentionIndex()}
+            theme={theme()}
+            onPick={(i) => pickMention(i)}
+            onMove={(i) => setMentionIndex(i)}
+          />
         )}
       </Show>
       <Notices store={props.store} theme={theme()} />
@@ -1171,6 +1191,7 @@ export function App(props: {
             setSwitcherIndex(i);
             openFromSwitcher();
           }}
+          onMove={setSwitcherIndex}
           onClose={() => {
             setSwitcherOpen(false);
             setSwitcherQuery("");
@@ -1189,7 +1210,7 @@ export function App(props: {
         />
       </Show>
       <Show when={helpOpen()}>
-        <HelpOverlay onClose={() => setHelpOpen(false)} theme={theme()} />
+        <HelpOverlay onClose={() => setHelpOpen(false)} theme={theme()} scroll={helpScroll()} height={dims().height} />
       </Show>
       <Show when={settingsOpen()}>
         <SettingsScreen

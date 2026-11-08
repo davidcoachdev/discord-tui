@@ -13,13 +13,21 @@ export function MentionPopup(props: {
   index: number;
   theme: Theme;
   onPick?(index: number): void;
+  onMove?(index: number): void;
 }): JSX.Element {
   return (
     <box
+      onMouseScroll={(e: { scroll?: { direction: string; delta?: number }; stopPropagation(): void }) => {
+        e.stopPropagation();
+        // OpenTUI junta las vueltas rápidas de la rueda en un evento con `delta` > 1.
+        const steps = Math.max(1, Math.round(Math.abs(e.scroll?.delta ?? 1)));
+        const delta = e.scroll?.direction === "down" ? steps : e.scroll?.direction === "up" ? -steps : 0;
+        if (delta !== 0) props.onMove?.(Math.max(0, Math.min(props.candidates.length - 1, props.index + delta)));
+      }}
       border
       borderStyle="rounded"
       borderColor={props.theme.accent}
-      title=" @ mencionar · Tab elige "
+      title=" @ mencionar · ↑↓ rueda · Tab elige "
       titleColor={props.theme.accent}
       flexDirection="column"
       width={44}

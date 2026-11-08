@@ -58,8 +58,8 @@ test("query ranks by score and drops non matches", () => {
   expect(rankSwitcherItems(state(), "luc").map((item) => item.channelId)).toEqual(["5"]);
 });
 
-test("at most 20 items", () => {
+test("at most 60 items (the switcher scrolls through them)", () => {
   const s = state();
-  for (let i = 0; i < 30; i += 1) s.channels[`x${i}`] = channel(`x${i}`, "g1", `canal-${i}`, 0, 10 + i);
-  expect(rankSwitcherItems(s, "")).toHaveLength(20);
+  for (let i = 0; i < 80; i += 1) s.channels[`x${i}`] = channel(`x${i}`, "g1", `canal-${i}`, 0, 10 + i);
+  expect(rankSwitcherItems(s, "")).toHaveLength(60);
 });

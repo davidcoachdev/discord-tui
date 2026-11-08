@@ -3,8 +3,11 @@ import { For, Show, type JSX } from "solid-js";
 
 import { truncate } from "../format";
 import type { SwitcherItem } from "../fuzzy";
+import { listWindow } from "../list-window";
 import type { Theme } from "../theme";
 import type { Click } from "./Button";
+
+export const SWITCHER_ROWS = 12;
 
 export function QuickSwitcher(props: {
   query: string;
@@ -12,8 +15,11 @@ export function QuickSwitcher(props: {
   index: number;
   theme: Theme;
   onPick?(index: number): void;
+  onMove?(index: number): void;
   onClose?(): void;
 }): JSX.Element {
+  const view = () => listWindow(props.index, props.items.length, SWITCHER_ROWS);
+  const visible = () => props.items.slice(view().start, view().end).map((item, i) => ({ item, at: view().start + i }));
   return (
     <box
       position="absolute"
@@ -28,13 +34,22 @@ export function QuickSwitcher(props: {
     >
       <box
         onMouseDown={(e: Click) => e.stopPropagation()}
+        onMouseScroll={(e: { scroll?: { direction: string; delta?: number }; stopPropagation(): void }) => {
+          e.stopPropagation();
+          // OpenTUI junta las vueltas rápidas de la rueda en un evento con `delta` > 1.
+        const steps = Math.max(1, Math.round(Math.abs(e.scroll?.delta ?? 1)));
+        const delta = e.scroll?.direction === "down" ? steps : e.scroll?.direction === "up" ? -steps : 0;
+          if (delta !== 0 && props.items.length > 0) {
+            props.onMove?.(Math.max(0, Math.min(props.items.length - 1, props.index + delta)));
+          }
+        }}
         border
         borderStyle="rounded"
         borderColor={props.theme.accent}
         backgroundColor={props.theme.panel}
         title=" Saltar a… "
         titleColor={props.theme.accent}
-        bottomTitle=" ↑↓ o Ctrl-n/p · Enter abre · Esc cierra "
+        bottomTitle={` ${props.items.length > 0 ? `${props.index + 1}/${props.items.length} · ` : ""}↑↓ rueda · Enter abre · Esc cierra `}
         bottomTitleAlignment="right"
         width={64}
         flexDirection="column"
@@ -50,26 +65,32 @@ export function QuickSwitcher(props: {
         <Show when={props.items.length === 0}>
           <text fg={props.theme.dim}> sin resultados</text>
         </Show>
-        <For each={props.items.slice(0, 12)}>
-          {(item, i) => (
+        <Show when={view().start > 0}>
+          <text fg={props.theme.faint}>{`   ↑ ${view().start} más`}</text>
+        </Show>
+        <For each={visible()}>
+          {(row) => (
             <box
               flexDirection="row"
-              backgroundColor={i() === props.index ? props.theme.selection : undefined}
+              backgroundColor={row.at === props.index ? props.theme.selection : undefined}
               onMouseDown={(e: Click) => {
                 e.stopPropagation();
-                props.onPick?.(i());
+                props.onPick?.(row.at);
               }}
             >
               <text
-                fg={i() === props.index ? props.theme.selectionFg : item.unread ? props.theme.unread : props.theme.dim}
-                attributes={item.unread ? TextAttributes.BOLD : 0}
+                fg={row.at === props.index ? props.theme.selectionFg : row.item.unread ? props.theme.unread : props.theme.dim}
+                attributes={row.item.unread ? TextAttributes.BOLD : 0}
                 wrapMode="none"
               >
-                {` ${truncate(item.label, item.unread ? 56 : 59)}${item.unread ? "  •" : ""}`}
+                {` ${truncate(row.item.label, 56)}${row.item.unread ? "  •" : ""}`}
               </text>
             </box>
           )}
         </For>
+        <Show when={view().end < props.items.length}>
+          <text fg={props.theme.faint}>{`   ↓ ${props.items.length - view().end} más`}</text>
+        </Show>
       </box>
     </box>
   );

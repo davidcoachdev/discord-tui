@@ -1,13 +1,32 @@
-import { TextAttributes } from "@opentui/core";
-import { For, type JSX } from "solid-js";
+import { TextAttributes, type ScrollBoxRenderable } from "@opentui/core";
+import { createEffect, For, on, type JSX } from "solid-js";
 
 import { keysByGroup } from "../keys";
 import type { Theme } from "../theme";
 import type { Click } from "./Button";
 
-export function HelpOverlay(props: { onClose(): void; theme?: Theme }): JSX.Element {
+export function HelpOverlay(props: {
+  onClose(): void;
+  theme?: Theme;
+  /** Acumulado de filas pedidas con el teclado (j/k, PgUp/PgDn); cada cambio scrollea la diferencia. */
+  scroll?: number;
+  /** Alto de la terminal: la ayuda no pasa de ahí y el resto se scrollea. */
+  height?: number;
+}): JSX.Element {
   const groups = [...keysByGroup().entries()];
   const accent = (): string | undefined => props.theme?.accent;
+  let scroll: ScrollBoxRenderable | undefined;
+  createEffect(
+    on(
+      () => props.scroll ?? 0,
+      (now, before) => {
+        if (!scroll || before === undefined) return;
+        const delta = now - before;
+        if (delta < -1e5) scroll.scrollTo(0);
+        else scroll.scrollBy(delta);
+      },
+    ),
+  );
   return (
     <box
       position="absolute"
@@ -27,12 +46,14 @@ export function HelpOverlay(props: { onClose(): void; theme?: Theme }): JSX.Elem
         backgroundColor={props.theme?.panel}
         title=" Ayuda · ? o Esc cierra · click afuera cierra "
         titleColor={accent()}
-        flexDirection="row"
-        flexWrap="wrap"
+        bottomTitle=" j/k ↑↓ PgUp/PgDn rueda: desplazar "
+        bottomTitleAlignment="right"
         width={96}
-        padding={1}
-        columnGap={3}
+        maxHeight={Math.max(8, (props.height ?? 50) - 3)}
+        flexDirection="column"
       >
+      <scrollbox ref={(el: ScrollBoxRenderable) => (scroll = el)} width="100%" flexGrow={1} flexShrink={1}>
+      <box flexDirection="row" flexWrap="wrap" padding={1} columnGap={3} width="100%">
         <For each={groups}>
           {([group, entries]) => (
             <box flexDirection="column" width={44} marginBottom={1}>
@@ -48,6 +69,8 @@ export function HelpOverlay(props: { onClose(): void; theme?: Theme }): JSX.Elem
             </box>
           )}
         </For>
+      </box>
+      </scrollbox>
       </box>
     </box>
   );

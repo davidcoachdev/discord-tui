@@ -8,7 +8,7 @@ export interface SwitcherItem {
   kind: "text" | "voice" | "dm" | "group_dm" | "thread" | "forum";
 }
 
-const MAX_ITEMS = 20;
+const MAX_ITEMS = 60;
 const WORD_BREAKS = new Set([" ", "-", "_", "/", "›", "#", "@"]);
 
 function normalize(value: string): string {
