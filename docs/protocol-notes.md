@@ -86,3 +86,11 @@ Datos que el agente resuelve y documenta mientras construye. Sin tokens ni ids r
 - `CHANNEL_CREATE` agrega DMs nuevos; además, el primer mensaje de alguien que no estaba en la lista crea el DM (`ensureDmForMessage`). `CHANNEL_UPDATE`/`DELETE`, `CHANNEL_RECIPIENT_ADD`/`REMOVE` y `GUILD_MEMBER_UPDATE` ahora se aplican.
 - Presencia de los DMs: `READY_SUPPLEMENTAL.merged_presences.friends`.
 - Bug arreglado de paso: un autor de mensaje sin `global_name` pisaba el nombre ya conocido (los DMs mostraban el username).
+
+## Mensajes nuevos (2026-11-07)
+
+- Al **seleccionar** un canal (`ui/selectChannel` con un id distinto al actual) el reducer guarda `ui.unreadMarker = { channelId, afterId: readState.lastAckedId }`, antes de que el ack con debounce de 1,5 s (`actions.viewing`) mueva `lastAckedId`. El marcador no cambia mientras sigas en el canal (ni con nuestro ack ni con `MESSAGE_ACK`/`CHANNEL_UNREAD_UPDATE` de otro cliente) y se recalcula al volver a abrirlo. Lógica en `src/store/unread.ts`.
+- Sin read state del canal no hay divisor (no se sabe desde dónde). Si el último mensaje del canal no es más nuevo que `lastAckedId`, tampoco: los que lleguen mientras mirás no cuentan como nuevos (para eso está el chip "↓ ir al final").
+- El divisor rojo `──── mensajes nuevos ────` va antes del primer mensaje cargado más nuevo que `afterId` que **no sea propio**.
+- Si hay sin leer más viejos que lo cargado (`hasMoreBefore` y el más viejo cargado > `afterId`) se muestra la barra `↑ N+ mensajes nuevos desde … · click o gn para saltar`. La hora sale del snowflake de `afterId`. Recién con el click o `gn` se piden páginas `before` (las mismas de `loadOlder`), como máximo 9 (los 500 mensajes que guarda el canal), y se selecciona el primero sin leer. La API también acepta `around`/`after`, pero dejarían huecos en el slice; no se usan.
+- Al abrir, si el divisor está cargado la vista lo pone arriba (si todo lo nuevo entra, queda al final). `Esc`/`G` siempre bajan al final; el chip "↓ ir al final" aparece si llegaron mensajes estando arriba o con un mensaje seleccionado.

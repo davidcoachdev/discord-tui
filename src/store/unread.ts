@@ -49,9 +49,16 @@ export function selectUnreadView(state: AppState, channelId: string | null): Unr
   return { firstUnreadId: missing ? null : firstUnreadId, count, missing, afterId: marker.afterId };
 }
 
-/** Hora (HH:MM, local) de un snowflake. */
-export function snowflakeTime(id: string): string {
-  const ms = Number((BigInt(id) >> 22n) + 1420070400000n);
-  const date = new Date(ms);
-  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+/**
+ * Desde cuándo, para la barra: " desde las HH:MM" si es de hoy, si no " desde el DD/MM HH:MM" (hora local
+ * del snowflake). Un id sin fecha (como "0", lo que queda en un canal nunca leído) no dice nada.
+ */
+export function unreadSince(id: string, now: Date = new Date()): string {
+  const offset = BigInt(id) >> 22n;
+  if (offset === 0n) return "";
+  const date = new Date(Number(offset + 1420070400000n));
+  const pad = (n: number): string => String(n).padStart(2, "0");
+  const time = `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  if (date.toDateString() === now.toDateString()) return ` desde las ${time}`;
+  return ` desde el ${pad(date.getDate())}/${pad(date.getMonth() + 1)} ${time}`;
 }

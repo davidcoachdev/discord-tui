@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 
 import { createStore, emptyState, type Store } from "../../src/store/store";
-import { selectUnreadView, snapshotUnread } from "../../src/store/unread";
+import { selectUnreadView, snapshotUnread, unreadSince } from "../../src/store/unread";
 
 const GUILD = "700000000000000001";
 const CHAN = "700000000000000002";
@@ -119,4 +119,12 @@ test("first unread older than the oldest loaded: missing, no divider yet", () =>
   const store = setup({ lastRead: "710000000000000001" });
   store.dispatch({ type: "ui/selectChannel", id: CHAN });
   expect(selectUnreadView(store.getState(), CHAN)).toMatchObject({ firstUnreadId: null, count: 6, missing: true });
+});
+
+test("the bar's time comes from the last read snowflake; an id without a date says nothing", () => {
+  const when = new Date(2026, 10, 7, 9, 5);
+  const id = ((BigInt(when.getTime()) - 1420070400000n) << 22n).toString();
+  expect(unreadSince(id, new Date(2026, 10, 7, 20, 0))).toBe(" desde las 09:05");
+  expect(unreadSince(id, new Date(2026, 10, 9, 20, 0))).toBe(" desde el 07/11 09:05");
+  expect(unreadSince("0")).toBe("");
 });
