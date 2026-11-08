@@ -35,6 +35,7 @@ interface ParticipantView {
   muted: boolean;
   deafened: boolean;
   me: boolean;
+  streaming: boolean;
   volume: number;
 }
 
@@ -232,12 +233,13 @@ export function ChannelList(props: {
                             wrapMode="none"
                             fg={p.speaking ? props.theme.speaking : p.me ? props.theme.fg : props.theme.dim}
                           >
-                            {` ${truncate(p.name, inner - row.depth * 2 - 12)}`}
+                            {` ${truncate(p.name, inner - row.depth * 2 - 12 - (p.streaming ? 6 : 0))}`}
                           </text>
                           <text fg={props.theme.accent}>{p.volume !== 100 ? `${p.volume}% ` : ""}</text>
                           <text fg={p.deafened ? props.theme.error : props.theme.warn}>
                             {p.deafened ? "[deaf]" : p.muted ? "[mute]" : ""}
                           </text>
+                          <text fg={props.theme.error} wrapMode="none" flexShrink={0}>{p.streaming ? " 📺 en vivo" : ""}</text>
                         </box>
                         <Show when={chosen() && !p.me}>
                           <box flexDirection="row" width="100%" paddingLeft={row.depth * 2 + 5}>

@@ -65,3 +65,22 @@ test("READY_SUPPLEMENTAL voice_states fill the channels (user READY guilds are l
   expect(store.getState().users["7"]?.globalName).toBe("Quique");
   expect(store.getState().members[GUILD]?.["8"]?.nick).toBe("Ocho");
 });
+
+test("self_stream marks streamers (READY and VOICE_STATE_UPDATE); our own live stream counts too", () => {
+  const store = createStore(emptyState());
+  store.dispatch({
+    type: "gw",
+    t: "READY",
+    d: { user: { id: ME, username: "me" }, guilds: [{ id: GUILD, voice_states: [{ user_id: "7", channel_id: VOICE, self_stream: true }, { user_id: ME, channel_id: VOICE }] }] },
+  });
+  const streaming = () => Object.fromEntries(selectVoiceParticipants(store.getState(), GUILD, VOICE).map((p) => [p.userId, p.streaming]));
+  expect(streaming()).toEqual({ "7": true, [ME]: false });
+  store.dispatch({ type: "gw", t: "VOICE_STATE_UPDATE", d: { guild_id: GUILD, user_id: "7", channel_id: VOICE, self_stream: false } });
+  expect(streaming()["7"]).toBe(false);
+  store.dispatch({ type: "voice/joining", guildId: GUILD, channelId: VOICE });
+  store.dispatch({ type: "voice/stream", patch: { status: "live", monitor: "DP-1" } });
+  expect(streaming()[ME]).toBe(true);
+  expect(store.getState().voice.stream).toEqual({ status: "live", monitor: "DP-1", error: null });
+  store.dispatch({ type: "voice/left" });
+  expect(store.getState().voice.stream).toEqual({ status: "idle", monitor: null, error: null });
+});

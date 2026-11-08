@@ -60,23 +60,108 @@ test("the voice bar has a 📺 transmitir button only while in a call", async ()
   await s.actions.voice!.leaveVoice();
 });
 
-test("click 📺 transmitir → ⏳ iniciando… → 🔴 EN VIVO · detener → click stops", async () => {
+test("click 📺 transmitir → monitor picker → ⏳ iniciando… → 🔴 EN VIVO · detener → click stops", async () => {
   const s = setup();
   const h = await render(s);
   await joinVoice(s);
   await h.renderOnce();
   await click(h, "📺 transmitir");
-  expect(s.calls).toEqual(["start:"]);
+  await Bun.sleep(5);
+  await h.renderOnce();
+  const picker = h.captureCharFrame();
+  expect(picker).toContain("¿Qué pantalla transmitir?");
+  expect(picker).toContain("🖥 DP-1 · 1920×1080 · activo");
+  expect(picker).toContain("🖥 HDMI-A-1 · 1920×1080");
+  await click(h, "HDMI-A-1 · 1920×1080");
+  expect(s.calls).toEqual(["start:HDMI-A-1"]);
+  expect(h.captureCharFrame()).not.toContain("¿Qué pantalla transmitir?");
   expect(h.captureCharFrame()).toContain("⏳ iniciando…");
   await Bun.sleep(650);
   await h.renderOnce();
   const live = h.captureCharFrame();
   expect(live).toContain("🔴 EN VIVO · detener");
   expect(live).toContain("👁 1");
+  expect(live).toMatch(/○ Gon\s+📺 en vivo/);
   await click(h, "🔴 EN VIVO · detener");
-  expect(s.calls).toEqual(["start:", "stop"]);
+  expect(s.calls).toEqual(["start:HDMI-A-1", "stop"]);
   expect(h.captureCharFrame()).toContain("📺 transmitir");
+  expect(h.captureCharFrame()).not.toMatch(/○ Gon\s+📺 en vivo/);
   await s.actions.voice!.leaveVoice();
+});
+
+test("S opens the picker; ↓ + Enter picks; Esc closes without streaming", async () => {
+  const s = setup();
+  const h = await render(s);
+  await joinVoice(s);
+  h.mockInput.pressKey("S");
+  await Bun.sleep(5);
+  await h.renderOnce();
+  expect(h.captureCharFrame()).toContain("¿Qué pantalla transmitir?");
+  h.mockInput.pressEscape();
+  await Bun.sleep(80); // Esc solo se distingue de una secuencia después de un timeout
+  await h.renderOnce();
+  expect(h.captureCharFrame()).not.toContain("¿Qué pantalla transmitir?");
+  expect(s.calls).toEqual([]);
+  h.mockInput.pressKey("S");
+  await Bun.sleep(5);
+  await h.renderOnce();
+  h.mockInput.pressArrow("down");
+  h.mockInput.pressEnter();
+  await h.renderOnce();
+  expect(s.calls).toEqual(["start:HDMI-A-1"]);
+  h.mockInput.pressKey("S");
+  await h.renderOnce();
+  expect(s.calls).toEqual(["start:HDMI-A-1", "stop"]);
+  await s.actions.voice!.leaveVoice();
+});
+
+test("the mouse wheel moves the picker selection", async () => {
+  const s = setup();
+  const h = await render(s);
+  await joinVoice(s);
+  h.mockInput.pressKey("S");
+  await Bun.sleep(5);
+  await h.renderOnce();
+  const { x, y } = find(h.captureCharFrame(), "DP-1 · 1920×1080");
+  await h.mockMouse.scroll(x, y, "down");
+  await h.renderOnce();
+  h.mockInput.pressEnter();
+  await h.renderOnce();
+  expect(s.calls).toEqual(["start:HDMI-A-1"]);
+  await s.actions.voice!.leaveVoice();
+});
+
+test("with a saved monitor that is still connected it streams right away (no picker)", async () => {
+  const s = setup();
+  s.store.dispatch({ type: "settings/set", patch: { streamMonitor: "HDMI-A-1" } });
+  const h = await render(s);
+  await joinVoice(s);
+  h.mockInput.pressKey("S");
+  await Bun.sleep(5);
+  await h.renderOnce();
+  expect(h.captureCharFrame()).not.toContain("¿Qué pantalla transmitir?");
+  expect(s.calls).toEqual(["start:HDMI-A-1"]);
+  await s.actions.voice!.leaveVoice();
+});
+
+test("S outside a call only shows a notice", async () => {
+  const s = setup();
+  const h = await render(s);
+  h.mockInput.pressKey("S");
+  await Bun.sleep(5);
+  await h.renderOnce();
+  expect(s.calls).toEqual(["start:"]);
+  expect(Object.values(s.store.getState().notices).map((n) => n.text)).toContain("entrá a un canal de voz para transmitir");
+  expect(h.captureCharFrame()).not.toContain("¿Qué pantalla transmitir?");
+});
+
+test("someone else streaming shows 📺 en vivo next to their name (from self_stream)", async () => {
+  const s = setup();
+  const h = await render(s);
+  expect(h.captureCharFrame()).toMatch(/○ Ragnar\s+📺 en vivo/);
+  s.store.dispatch({ type: "gw", t: "VOICE_STATE_UPDATE", d: { guild_id: DEMO.guild, user_id: "900000000000000101", channel_id: DEMO.voice, self_stream: false } });
+  await h.renderOnce();
+  expect(h.captureCharFrame()).not.toContain("📺 en vivo");
 });
 
 test("a stream error shows in the voice bar", async () => {

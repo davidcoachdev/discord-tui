@@ -36,6 +36,8 @@ import { EmojiPicker, PICKER_ROWS } from "./components/EmojiPicker";
 import { moveInList } from "./list-window";
 import { StatusBar, VoiceBar } from "./components/StatusBar";
 import { StatusMenu } from "./components/StatusMenu";
+import { MonitorPicker } from "./components/MonitorPicker";
+import type { Monitor } from "../golive/capture";
 import { validateOutgoing } from "./composer-state";
 import { displayName, truncate } from "./format";
 import { rankSwitcherItems } from "./fuzzy";
@@ -125,6 +127,8 @@ export function App(props: {
   const [pendingG, setPendingG] = createSignal(false);
   const [helpOpen, setHelpOpen] = createSignal(false);
   const [statusMenuOpen, setStatusMenuOpen] = createSignal(false);
+  /** Monitores para elegir qué transmitir (null = cerrado). */
+  const [monitorChoices, setMonitorChoices] = createSignal<Monitor[] | null>(null);
   const [switcherOpen, setSwitcherOpen] = createSignal(false);
   const [switcherQuery, setSwitcherQuery] = createSignal("");
   const [switcherIndex, setSwitcherIndex] = createSignal(0);
@@ -139,6 +143,23 @@ export function App(props: {
   };
 
   let hintTimer: ReturnType<typeof setTimeout> | null = null;
+  /**
+   * Botón o tecla de Go Live: en vivo (o iniciando) lo corta; si no, transmite el monitor guardado, o pregunta
+   * cuál si hay más de uno y no hay uno guardado que siga conectado.
+   */
+  async function streamPress(): Promise<void> {
+    const voice = props.actions.voice;
+    if (!voice?.startStream) return;
+    const state = props.store.getState();
+    const status = state.voice.stream.status;
+    if (status === "live" || status === "starting") return void (await voice.stopStream?.());
+    if (state.voice.status !== "connected") return void (await voice.startStream());
+    const monitors = (await voice.listMonitors?.().catch(() => [])) ?? [];
+    const saved = state.settings.streamMonitor;
+    if (monitors.length > 1 && !(saved && monitors.some((m) => m.name === saved))) return void setMonitorChoices(monitors);
+    await voice.startStream(saved && monitors.some((m) => m.name === saved) ? saved : monitors[0]?.name);
+  }
+
   function flash(text: string): void {
     setHint(text);
     if (hintTimer !== null) clearTimeout(hintTimer);
@@ -709,7 +730,7 @@ export function App(props: {
         return;
       }
       props.onActivity?.();
-      if (settingsOpen() || statusMenuOpen()) return;
+      if (settingsOpen() || statusMenuOpen() || monitorChoices() !== null) return;
 
       if (helpOpen()) {
         if (key.name === "escape" || key.name === "q" || (key.name === "?" && !key.ctrl && !key.meta)) return void setHelpOpen(false);
@@ -952,6 +973,9 @@ export function App(props: {
         case "e":
           startEdit();
           return;
+        case "s":
+          if (key.shift) void streamPress();
+          return;
         case "d":
           if (key.shift) {
             props.actions.voice?.toggleDeaf();
@@ -1006,6 +1030,7 @@ export function App(props: {
       if (key.sequence === "?") setHelpOpen(true);
       if (key.sequence === "R") retryFirstFailed();
       if (key.sequence === "D") props.actions.voice?.toggleDeaf();
+      if (key.sequence === "S") void streamPress();
       if (key.sequence === "M") props.actions.voice?.toggleInputMode();
       if (key.sequence === "G") {
         if (focused === "messages") toBottom();
@@ -1166,7 +1191,7 @@ export function App(props: {
           if (id !== null) setAttachments((previous) => ({ ...previous, [id]: (previous[id] ?? []).filter((_, i) => i !== index) }));
         }}
       />
-      <VoiceBar store={props.store} theme={theme()} actions={props.actions} />
+      <VoiceBar store={props.store} theme={theme()} actions={props.actions} onStream={() => void streamPress()} />
       <StatusBar
         store={props.store}
         theme={theme()}
@@ -1207,6 +1232,20 @@ export function App(props: {
           }}
           onClose={() => setStatusMenuOpen(false)}
         />
+      </Show>
+      <Show when={monitorChoices()}>
+        {(monitors: () => Monitor[]) => (
+          <MonitorPicker
+            monitors={monitors()}
+            current={props.store.getState().settings.streamMonitor}
+            theme={theme()}
+            onPick={(name) => {
+              setMonitorChoices(null);
+              void props.actions.voice?.startStream?.(name);
+            }}
+            onClose={() => setMonitorChoices(null)}
+          />
+        )}
       </Show>
       <Show when={helpOpen()}>
         <HelpOverlay onClose={() => setHelpOpen(false)} theme={theme()} scroll={helpScroll()} height={dims().height} />
