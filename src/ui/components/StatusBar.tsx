@@ -137,8 +137,8 @@ export function VoiceBar(props: {
           <text fg={voice().selfSpeaking ? props.theme.speaking : props.theme.faint}>
             {voice().selfSpeaking ? " · ● vos" : " · ○ vos"}
           </text>
-          <text fg={props.theme.warn}>{voice().selfMute && !voice().selfDeaf ? " [mute]" : ""}</text>
-          <text fg={props.theme.error}>{voice().selfDeaf ? " [deaf]" : ""}</text>
+          <text fg={props.theme.warn}>{voice().selfMute && !voice().selfDeaf ? " 🔇" : ""}</text>
+          <text fg={props.theme.error}>{voice().selfDeaf ? " 🙉" : ""}</text>
           <text fg={props.theme.speaking} wrapMode="none">{speakingNames() ? ` · ${speakingNames()}` : ""}</text>
           <text fg={props.theme.warn} wrapMode="none">{voice().pttWarning ? ` · ${voice().pttWarning}` : ""}</text>
           <text fg={props.theme.warn} wrapMode="none">{voice().micError ? ` · sin mic: ${voice().micError}` : ""}</text>

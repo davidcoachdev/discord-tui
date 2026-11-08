@@ -228,18 +228,28 @@ export function ChannelList(props: {
                           onMouseOut={() => setHovered((h) => (h === `p-${p.userId}` ? null : h))}
                         >
                           <text fg={p.speaking ? props.theme.speaking : props.theme.faint}>{p.speaking ? "●" : "○"}</text>
-                          <text
-                            flexGrow={1}
-                            wrapMode="none"
-                            fg={p.speaking ? props.theme.speaking : p.me ? props.theme.fg : props.theme.dim}
-                          >
-                            {` ${truncate(p.name, inner - row.depth * 2 - 12 - (p.streaming ? 6 : 0))}`}
-                          </text>
-                          <text fg={props.theme.accent}>{p.volume !== 100 ? `${p.volume}% ` : ""}</text>
-                          <text fg={p.deafened ? props.theme.error : props.theme.warn}>
-                            {p.deafened ? "[deaf]" : p.muted ? "[mute]" : ""}
-                          </text>
-                          <text fg={props.theme.error} wrapMode="none" flexShrink={0}>{p.streaming ? " 📺 en vivo" : ""}</text>
+                          {(() => {
+                            // Íconos compactos como Discord: 🔇 mic apagado, 🙉 ensordecido, 📺 transmitiendo.
+                            const badges = (): string =>
+                              `${p.volume !== 100 ? ` ${p.volume}%` : ""}${p.streaming ? " 📺" : ""}${p.deafened ? " 🙉" : p.muted ? " 🔇" : ""}`;
+                            const room = (): number => Math.max(4, inner - row.depth * 2 - 4 - cellWidth(badges()));
+                            return (
+                              <>
+                                <text
+                                  flexGrow={1}
+                                  wrapMode="none"
+                                  fg={p.speaking ? props.theme.speaking : p.me ? props.theme.fg : props.theme.dim}
+                                >
+                                  {` ${truncate(p.name, room())}`}
+                                </text>
+                                <text fg={props.theme.accent} wrapMode="none" flexShrink={0}>{p.volume !== 100 ? ` ${p.volume}%` : ""}</text>
+                                <text fg={props.theme.error} wrapMode="none" flexShrink={0}>{p.streaming ? " 📺" : ""}</text>
+                                <text fg={p.deafened ? props.theme.error : props.theme.warn} wrapMode="none" flexShrink={0}>
+                                  {p.deafened ? " 🙉" : p.muted ? " 🔇" : ""}
+                                </text>
+                              </>
+                            );
+                          })()}
                         </box>
                         <Show when={chosen() && !p.me}>
                           <box flexDirection="row" width="100%" paddingLeft={row.depth * 2 + 5}>
