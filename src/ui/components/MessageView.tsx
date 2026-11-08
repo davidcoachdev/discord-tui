@@ -38,6 +38,7 @@ export function MessageView(props: {
   onAction?(action: MessageAction, messageId: string): void;
   onReact?(messageId: string, emoji: { id: string | null; name: string }): void;
   onOpen?(url: string): void;
+  onVote?(messageId: string, answerId: number): void;
   onLoadOlder?(): void;
   onFocus?(): void;
   onVoiceToggle?(channelId: string): void;
@@ -219,6 +220,7 @@ export function MessageView(props: {
                   onAction={props.onAction ? (action) => props.onAction?.(action, message.id) : undefined}
                   onReact={(emoji) => props.onReact?.(message.id, emoji)}
                   onOpen={(url) => props.onOpen?.(url)}
+                  onVote={(answerId) => props.onVote?.(message.id, answerId)}
                 />
               </>
             )}

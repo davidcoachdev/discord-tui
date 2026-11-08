@@ -105,7 +105,7 @@ test("k selects messages upwards and asks for older history at the top", async (
   const s = setup();
   const { mockInput, renderOnce } = await render(s);
   await renderOnce();
-  for (let i = 0; i < 12; i += 1) mockInput.pressKey("k");
+  for (let i = 0; i < 40; i += 1) mockInput.pressKey("k");
   await renderOnce();
   expect(s.calls).toContain(`older:${DEMO.general}`);
 });

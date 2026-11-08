@@ -3,23 +3,24 @@ import { createResource, createSignal, For, Show, type JSX } from "solid-js";
 
 export type MessageAction = "reply" | "edit" | "delete" | "react";
 
-import { attachmentView, sizedUrl } from "../../images/cdn";
+import { attachmentView, sizedUrl, stickerView } from "../../images/cdn";
 import { imageCache } from "../../images/cache";
 import { IMAGE_MODE } from "../../images/mode";
 import { parseMarkdown, plainText } from "../../markdown/parse";
-import type { ApiEmbed, AppState, Message } from "../../store/types";
+import type { ApiEmbed, ApiPoll, AppState, Message } from "../../store/types";
 import { clockTime, displayName, hashIndex, memberColor, truncate } from "../format";
 import { roleHex, type Theme } from "../theme";
 import { Button, type Click } from "./Button";
 import { Markdown, type MdContext } from "./Markdown";
+import { PollBox } from "./PollBox";
 
 function authorColor(state: AppState, theme: Theme, userId: string, guildId: string | null): string {
   return roleHex(memberColor(state, userId, guildId)) ?? theme.names[hashIndex(userId, theme.names.length)]!;
 }
 
-function InlineImage(props: { url: string; cols: number; rows: number; label: string; theme: Theme }): JSX.Element {
+function InlineImage(props: { url: string; cols: number; rows: number; label: string; theme: Theme; raw?: boolean }): JSX.Element {
   const [bytes] = createResource(
-    () => sizedUrl(props.url, props.cols, props.rows),
+    () => (props.raw ? props.url : sizedUrl(props.url, props.cols, props.rows)),
     (url) => imageCache.get(url),
   );
   return (
@@ -102,6 +103,7 @@ export function MessageItem(props: {
   onAction?(action: MessageAction): void;
   onReact?(emoji: { id: string | null; name: string }): void;
   onOpen?(url: string): void;
+  onVote?(answerId: number): void;
 }): JSX.Element {
   const theme = (): Theme => props.theme;
   const [hover, setHover] = createSignal(false);
@@ -175,6 +177,19 @@ export function MessageItem(props: {
             );
           }}
         </For>
+        <For each={props.message.stickers ?? []}>
+          {(sticker) => {
+            const view = stickerView(sticker, props.images ? IMAGE_MODE : "links");
+            return view.kind === "image" ? (
+              <InlineImage url={view.url} cols={view.cols} rows={view.rows} label={view.label} theme={props.theme} raw />
+            ) : (
+              <text fg={theme().dim} wrapMode="none">{view.label}</text>
+            );
+          }}
+        </For>
+        <Show when={props.message.poll}>
+          {(poll: () => ApiPoll) => <PollBox poll={poll()} theme={props.theme} onVote={props.onVote} />}
+        </Show>
         <For each={props.message.embeds.filter((embed) => embed.title || embed.description || embed.image || embed.thumbnail)}>
           {(embed) => <EmbedView embed={embed} ctx={ctx()} images={props.images === true} onOpen={props.onOpen} />}
         </For>
