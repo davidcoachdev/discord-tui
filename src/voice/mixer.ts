@@ -32,6 +32,11 @@ export interface Mixer {
   setPlayback(playback: { write(pcm: Uint8Array): void }): void;
   /** Milisegundos desde el último frame con audio de alguien (para renovar la salida en un silencio). */
   idleMs(): number;
+  /**
+   * Suma un sonido corto (frames de 20 ms) a los próximos slots, por la misma salida que la llamada. Suena
+   * aunque estés ensordecido (los avisos de mute/deafen tienen que oírse).
+   */
+  play(frames: Uint8Array[]): void;
 }
 
 export function createMixer(deps: {
@@ -62,6 +67,20 @@ export function createMixer(deps: {
   const continuous = deps.continuous === true;
   const preroll = deps.prerollFrames ?? 4;
   const SILENCE = new Uint8Array(FRAME_BYTES);
+  /** Sonidos sueltos en curso: cada uno con su próximo frame. */
+  let oneShots: { frames: Uint8Array[]; next: number }[] = [];
+
+  function popOneShots(): Uint8Array[] {
+    if (oneShots.length === 0) return [];
+    const out: Uint8Array[] = [];
+    for (const shot of oneShots) {
+      const frame = shot.frames[shot.next];
+      shot.next += 1;
+      if (frame) out.push(frame);
+    }
+    oneShots = oneShots.filter((shot) => shot.next < shot.frames.length);
+    return out;
+  }
 
   function cushion(): void {
     if (!continuous || muted) return;
@@ -76,7 +95,16 @@ export function createMixer(deps: {
       const gain = deps.gainFor?.(userId);
       frames.push(gain !== undefined && gain !== 100 ? applyGain(frame, gain) : frame);
     }
-    if (muted) return;
+    const cues = popOneShots();
+    if (muted) {
+      // Ensordecido: no se escucha a nadie, pero los sonidos de la app sí.
+      if (cues.length > 0) playback.write(mixFrames(cues));
+      return;
+    }
+    if (cues.length > 0) {
+      frames.push(...cues);
+      lastAudioAt = now();
+    }
     if (frames.length === 0) {
       if (continuous) playback.write(SILENCE);
       return;
@@ -138,6 +166,12 @@ export function createMixer(deps: {
     },
     idleMs(): number {
       return now() - lastAudioAt;
+    },
+    play(frames: Uint8Array[]): void {
+      if (frames.length === 0) return;
+      // Ensordecido, pw-cat estaba sin datos: un colchón corto antes del sonido para que no arranque cortado.
+      if (muted && oneShots.length === 0) for (let i = 0; i < 2; i += 1) playback.write(SILENCE);
+      oneShots.push({ frames, next: 0 });
     },
   };
 }
