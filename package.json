@@ -26,6 +26,7 @@
     "@snazzah/davey": "0.1.12",
     "discord-api-types": "0.38.57",
     "opusscript": "0.1.1",
+    "sharp": "0.35.5",
     "solid-js": "1.9.18"
   },
   "devDependencies": {
