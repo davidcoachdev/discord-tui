@@ -99,7 +99,7 @@ export interface Message {
   mentionIds: string[];
   mentionsMe: boolean;
   referenced: { id: string; authorId: string; content: string } | null;
-  reactions: { emoji: { id: string | null; name: string }; count: number; me: boolean }[];
+  reactions: { emoji: { id: string | null; name: string; animated?: boolean }; count: number; me: boolean }[];
   nonce: string | null;
   poll?: ApiPoll | null;
   stickers?: StickerItem[];

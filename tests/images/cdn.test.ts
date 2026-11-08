@@ -5,7 +5,8 @@ import { createImageCache } from "../../src/images/cache";
 
 test("emojiUrl", () => {
   expect(emojiUrl("4", false)).toBe("https://cdn.discordapp.com/emojis/4.webp?size=48&quality=lossless");
-  expect(emojiUrl("5", true)).toContain("&animated=true");
+  // Animated WebP does not decode in OpenTUI 0.8.2; the GIF does (first frame).
+  expect(emojiUrl("5", true)).toBe("https://cdn.discordapp.com/emojis/5.gif?size=48");
 });
 
 test("only discord CDN hosts over https are allowed", () => {

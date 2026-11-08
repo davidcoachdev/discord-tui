@@ -54,4 +54,5 @@ export function createImageCache(deps: { fetch: typeof fetch; maxBytes?: number 
   };
 }
 
-export const imageCache = createImageCache({ fetch });
+// `globalThis.fetch` se lee en cada pedido (no al importar) para que los tests lo reemplacen y nunca salgan a la red.
+export const imageCache = createImageCache({ fetch: ((input, init) => globalThis.fetch(input, init)) as typeof fetch });

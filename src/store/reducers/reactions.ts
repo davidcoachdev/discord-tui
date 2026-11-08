@@ -22,7 +22,7 @@ export function applyReaction(state: AppState, t: string, d: any): AppState {
     const key = emojiKey(d.emoji);
     reactions = reactions.filter((item: any) => emojiKey(item.emoji) !== key);
   } else {
-    const emoji = { id: d.emoji?.id ?? null, name: d.emoji?.name ?? "" };
+    const emoji = { id: d.emoji?.id ?? null, name: d.emoji?.name ?? "", ...(d.emoji?.animated === true ? { animated: true } : {}) };
     const key = emojiKey(emoji);
     const index = reactions.findIndex((item: any) => emojiKey(item.emoji) === key);
 
