@@ -307,6 +307,77 @@ Spike del 2026-11-08, sin la cuenta (todo contra fakes locales). Scripts en `scr
 
 **🧍 Paso de Gon:** ya no hay script aparte (`golive-spike.ts` se borró): se prueba desde la app, `docs/PRUEBAS-GON.md` sección 6.
 
+## Ver transmisiones (spike)
+
+Spike del 2026-11-08, sin la cuenta (todo local: fakes, loopback y video sintético). Scripts en `scripts/spike-watch/`.
+Veredicto: **se puede**, con esfuerzo razonable. Lo único que no se puede verificar acá es el descifrado DAVE de video de
+OTRA persona (hace falta un grupo MLS de dos miembros reales): es un 🧍 Paso de Gon.
+
+**¿La librería sabe mirar?** No. `@dank074/discord-video-stream` 7.0.0 solo transmite: `WebRtcWrapper.ts` arma los tracks
+`SendRecv` pero nunca lee `onMessage`, la SDP remota que arma `handleProtocolAck` es `a=inactive` en audio y video, y no hay
+depacketizer ni `decrypt` (solo `encrypt`/`encryptOpus`). `@lng2004/node-datachannel` 0.33.2 no expone depacketizers
+(solo packetizers, `RtcpReceivingSession`, `RtcpNackResponder`, `RtcpSrReporter`, `PacingHandler`). Sí reusamos su
+`StreamConnection` (WS, heartbeat, resume y todo el MLS/DAVE) subclaseándola (`src/watch/viewer.ts`).
+
+**Protocolo del que mira** (docs.discord.food, Gateway Events y Voice Connections, consultado el 2026-11-08):
+- Gateway op 20 `WATCH_STREAM {stream_key}` (hay que estar en ese canal de voz) → `STREAM_CREATE {stream_key, rtc_server_id,
+  rtc_channel_id, region, viewer_ids, paused}` + `STREAM_SERVER_UPDATE {stream_key, endpoint, token}` (`endpoint: null` = se
+  está reasignando el server), o `STREAM_DELETE {stream_key, reason, unavailable?}`. Razones: `user_requested`,
+  `stream_ended`, `stream_full`, `unauthorized`, `safety_guild_rate_limited`, `parse_failed`, `invalid_channel`.
+- Para dejar de mirar: op 19 `STREAM_DELETE {stream_key}` (si no sos el dueño, solo te desconecta).
+- WS `wss://{endpoint}/?v=8`, identify con `server_id = rtc_server_id`, el `session_id` de NUESTRA voz, `video: true`.
+  El grupo MLS/DAVE es `rtc_server_id - 1` (igual que al transmitir). "Solo el dueño del stream manda media."
+- El server manda op 12 VIDEO `{user_id, audio_ssrc, video_ssrc, streams:[{ssrc, rtx_ssrc, rid, quality, max_resolution,
+  max_framerate, active}]}` (RTX = ssrc + 1 si no viene). El que mira pide el video con op 15 MEDIA_SINK_WANTS
+  `{any: 100, "<ssrc>": 100}`. El audio del stream es Opus con el flag de speaking `SOUNDSHARE` (1 << 1).
+
+**(a) op 20 y los STREAM_* por nuestro gateway:** es lo mismo que el op 18 del emisor; nuestro gateway ya deja mandar
+cualquier op y recibir cualquier dispatch. Probado con el gateway falso (`tests/watch/watch.test.ts`).
+
+**(b) conexión al server de stream como espectador y recibir el video** (`rtp-routing.ts`, `loopback.ts`):
+- Gotcha central: con dos m-lines (audio mid 0 + video mid 1, como la librería), **libdatachannel tira el RTP de un SSRC que
+  no está en la SDP remota** (0 paquetes; con `a=sendonly` igual). Con `a=ssrc:` en la SDP remota llegan todos (120/120), y
+  con un solo m-line también. Como el SSRC llega después (op 12), se **renegocia solo localmente**: `setLocalDescription()`
+  (oferta nueva, mismas credenciales ICE/DTLS) + `setRemoteDescription(answer con a=ssrc)`; la conexión sigue `connected` y el
+  server de Discord no se entera (la SDP "del server" la armamos nosotros, como hace la librería). Probado: 120/120.
+- El op 1 se manda una sola vez; las ofertas de las renegociaciones no salen por el WS.
+- El fake de stream (`tests/fakes/fake-stream-server.ts`) ahora tiene modo `relay`: el primero que manda un op 12 activo
+  transmite y su RTP se reenvía a los demás con un op 12 como el de Discord. Para que conecte de verdad: contesta con los
+  candidatos ya juntados y fuerza el rol DTLS (`a=setup:active` en la oferta), porque la librería escribe `a=setup:passive`
+  en la SDP del server. **Hasta hoy el emisor contra el fake nunca llegaba a `connected`** (los tests solo miraban ops).
+- Punta a punta local (`bun scripts/spike-watch/loopback.ts 6 0`): nuestro emisor (shim + `playStream`, lavfi 1280×720 30 fps,
+  x264) → relay → nuestro espectador: 3514 paquetes, 179 access units en 6 s (30 fps), 0 descartadas, primer cuadro
+  decodificado a ~1,1 s.
+- Pérdidas: sin NACK (libdatachannel 0.33 no trae NACK requester); si falta un paquete se descarta el cuadro y se pide un
+  keyframe (PLI con `Track.requestKeyframe()` vía `RtcpReceivingSession`). **Gotcha:** `requestKeyframe()` con el track
+  todavía no abierto tira `std::runtime_error` desde el hilo de libdatachannel y **aborta el proceso** (core dump): solo con
+  `isOpen()`.
+
+**(c) DAVE de video** (`dave-video.ts`): `davey.encrypt(VIDEO, H264, frame)` **normaliza los start codes a 4 bytes**
+(`00 00 01` → `00 00 00 01`) y deja los encabezados de NAL en claro; el frame cifrado termina en `0xFAFA`. Así que el que mira
+tiene que rearmar la access unit Annex-B con start codes de 4 bytes (como WebRTC) antes de `decrypt(userId, VIDEO, au)`.
+`decrypt` de otro usuario necesita su decryptor en el grupo MLS: con los vectores de davey (un solo miembro local) da
+`NoDecryptorForUser`, así que **el descifrado real queda [sin verificar]**; es la misma API que usa `@discordjs/voice` para
+el audio que ya escuchamos. En claro (DAVE versión 0 o en transición) pasa si `canPassthrough(userId)`.
+
+**(d) decodificar con node-av** (`decode-bench.ts`, libx264 ultrafast, `-bf 0`, keyframe cada 2 s, 3 Mbps, 10 s, esta PC):
+- 720p30 → 640×360 RGBA, mostrando 1 de cada 2 (15 fps): 1,09 ms por cuadro, **4,5 % de un núcleo**.
+- 1080p30 → 640×360: 1,72 ms/cuadro, 8,8 %. 720p30 → 1200×674 (1 de 3): 1,67 ms, 6,4 %.
+- En el loopback: decode + escala ~1 ms por access unit. H264 no deja saltear cuadros al decodificar (saltear rompe las
+  referencias: "non-existing PPS"); se decodifican todos y se escalan solo los que se muestran.
+- `CodecContext` + `SoftwareScaleContext` (SWS_FAST_BILINEAR) + `Frame.toBuffer(out)` (copia empaquetada). libav escribe a
+  stderr: `Log.setLevel(AV_LOG_QUIET)` o ensucia la TUI. Se agregaron como dependencias directas, con la MISMA versión que ya
+  estaba instalada por la librería: `node-av` 6.2.0 y `@lng2004/node-datachannel` 0.33.2-20260825 (`bun add --exact`; no
+  baja nada nuevo).
+
+**(e) dibujar en la TUI** (`render-bench.tsx`, renderer de test): `NativeImagePool.publishRgba` + cambiar `source` 0,10 ms
+(640×360) / 0,23 ms (1200×674), `renderOnce` ~0,23 ms. La subida a la terminal: OpenTUI usa el protocolo de kitty, por
+archivo temporal (`t=f`, `/opentui-kitty-…`) o directo (`t=d`, base64, `o=z`) según lo que detecte. 640×360 RGBA son 900 KB
+por cuadro: a 12 fps ~11 MB/s. **[sin verificar]** si Ghostty lo aguanta sin parpadeo (🧍 Paso de Gon); por eso 12 fps y una
+caja chica por defecto.
+
+**Estimado del MVP:** 1–2 días (hecho en este mismo branch, ver "Ver transmisiones").
+
 ## Salida de audio de la llamada (2026-11-08, Gon no escuchaba)
 
 - Diagnóstico: la voz llegaba bien (miles de paquetes, 0 errores) y el pw-cat de la app estaba conectado y "running", pero sin `outputDevice` elegido sale por la salida predeterminada del sistema, que en ese momento era un dispositivo Bluetooth (`AE01`, vía EasyEffects) y no los auriculares puestos. El cliente oficial usa su propia salida configurada.
