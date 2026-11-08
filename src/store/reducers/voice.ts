@@ -139,6 +139,8 @@ export function reduceVoiceAction(state: AppState, action: any): AppState {
         privacyCode: null,
         micError: null,
         stream: { status: "idle", monitor: null, error: null },
+        // El aviso de por qué se cortó lo deja el watcher (notice); la vista se cierra.
+        watch: { status: "idle", userId: null, error: null },
       });
     case "voice/moved":
       return withVoice(state, { channelId: action.channelId, speaking: {} });
@@ -164,6 +166,8 @@ export function reduceVoiceAction(state: AppState, action: any): AppState {
       return withVoice(state, { micError: action.error });
     case "voice/stream":
       return withVoice(state, { stream: { ...state.voice.stream, ...action.patch } });
+    case "voice/watch":
+      return withVoice(state, { watch: { ...state.voice.watch, ...action.patch } });
     default:
       return state;
   }

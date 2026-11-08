@@ -24,6 +24,7 @@ export function emptyVoice(): VoiceSlice {
     pttWarning: null,
     micError: null,
     stream: { status: "idle", monitor: null, error: null },
+    watch: { status: "idle", userId: null, error: null },
   };
 }
 

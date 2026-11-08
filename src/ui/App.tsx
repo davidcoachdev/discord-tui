@@ -15,6 +15,7 @@ import {
   selectNextUnread,
   selectVisibleChannelList,
   selectVoiceParticipants,
+  selectWatchableStreamers,
 } from "../store/selectors";
 import type { Store } from "../store/store";
 import type { ApiPoll, PendingAttachment } from "../store/types";
@@ -29,6 +30,7 @@ import { GUILD_WIDTH, GuildList } from "./components/GuildList";
 import { HelpOverlay } from "./components/HelpOverlay";
 import { MEMBER_WIDTH, MemberList } from "./components/MemberList";
 import { MessageView } from "./components/MessageView";
+import { StreamViewer } from "./components/StreamViewer";
 import type { MessageAction } from "./components/MessageItem";
 import { Button } from "./components/Button";
 import { Notices } from "./components/Notices";
@@ -175,6 +177,24 @@ export function App(props: {
     if (monitors.length > 1 && !(saved && monitors.some((m) => m.name === saved))) return void setMonitorChoices(monitors);
     await voice.startStream(saved && monitors.some((m) => m.name === saved) ? saved : monitors[0]?.name);
   }
+
+  /**
+   * `w` o `▶ ver`: con un participante que transmite elegido en la lista, mirarlo (o dejar de verlo); si no, dejar
+   * de ver lo que estés mirando, o mirar al primero que transmita en tu canal.
+   */
+  function watchPress(): void {
+    const voice = props.actions.voice;
+    if (!voice?.toggleWatch) return;
+    const state = props.store.getState();
+    const streamers = selectWatchableStreamers(state);
+    const chosen = participant();
+    if (chosen !== null && streamers.includes(chosen)) return void voice.toggleWatch(chosen);
+    if (state.voice.watch.status !== "idle") return void voice.stopWatching?.();
+    if (state.voice.status !== "connected") return flash("entrá al canal de voz de quien transmite para verlo");
+    if (streamers.length === 0) return flash("nadie está transmitiendo en tu canal de voz");
+    void voice.watchStream?.(streamers[0]!);
+  }
+  const watching = useSelector(props.store, (s) => s.voice.watch.status !== "idle");
 
   function flash(text: string): void {
     setHint(text);
@@ -945,8 +965,12 @@ export function App(props: {
           props.onQuit();
           return;
         case "escape":
+          if (watching()) return void props.actions.voice?.stopWatching?.();
           toBottom();
           setHint(null);
+          return;
+        case "w":
+          if (!key.ctrl && !key.meta && !key.shift) watchPress();
           return;
         case "i":
           if (!isTextChannel()) {
@@ -1104,7 +1128,18 @@ export function App(props: {
           selectedParticipant={focus() === "channels" ? participant() : null}
           onParticipant={(_channelId, userId) => setParticipant(userId)}
           onVolume={(userId, delta) => nudgeVolume(delta, userId)}
+          onWatch={(userId) => void props.actions.voice?.toggleWatch?.(userId)}
         />
+        <Show when={watching()}>
+          <StreamViewer
+            store={props.store}
+            theme={theme()}
+            voice={props.actions.voice}
+            focused={focus() === "messages"}
+            titleWidth={Math.max(10, Math.min(60, dims().width - GUILD_WIDTH - CHANNEL_WIDTH - (showMembers() ? MEMBER_WIDTH : 0) - 6))}
+          />
+        </Show>
+        <Show when={!watching()}>
         <MessageView
           store={props.store}
           theme={theme()}
@@ -1138,7 +1173,9 @@ export function App(props: {
           onOpenPost={(id) => goToChannel(id)}
           titleWidth={Math.max(10, Math.min(60, dims().width - GUILD_WIDTH - CHANNEL_WIDTH - (showMembers() ? MEMBER_WIDTH : 0) - 6))}
           onLoadArchived={(id) => void props.actions.loadArchivedPosts?.(id).catch(() => {})}
+          onWatch={(userId) => void props.actions.voice?.toggleWatch?.(userId)}
         />
+        </Show>
         <Show when={showMembers()}>
           <MemberList
             store={props.store}

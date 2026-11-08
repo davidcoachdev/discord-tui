@@ -8,6 +8,7 @@ import { seedThreads } from "./demo/threads";
 import { seedPresence } from "./demo/presence";
 import { seedEmoji } from "./demo/emoji";
 import { demoStreamActions, seedGoLive } from "./demo/golive";
+import { demoWatchActions } from "./demo/watch";
 
 /**
  * Estado de demostración, sin red ni cuenta: sirve para mirar la UI (`bun run demo`)
@@ -281,6 +282,7 @@ export function demoActions(store: Store): Actions {
       store.dispatch({ type: "voice/outputLabel", label: name ? labels[name] ?? name : "AE01" });
     },
     ...demoStreamActions(store, ME),
+    ...demoWatchActions(store),
   };
   let n = 2000;
   return {

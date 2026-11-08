@@ -3,7 +3,7 @@ import { createEffect, createMemo, createSignal, For, on, Show, type JSX } from 
 
 import { toMessage } from "../../store/reducers/messages";
 import { privateChannelName } from "../../store/reducers/ready";
-import { FORUM_TYPES, isMessageChannelType, selectOutbox, selectTyping } from "../../store/selectors";
+import { FORUM_TYPES, isMessageChannelType, selectOutbox, selectTyping, selectWatchableStreamers } from "../../store/selectors";
 import type { Store } from "../../store/store";
 import type { AppState, Message, OutboxItem } from "../../store/types";
 import { selectUnreadView, unreadSince } from "../../store/unread";
@@ -53,6 +53,8 @@ export function MessageView(props: {
   onLoadOlder?(): void;
   onFocus?(): void;
   onVoiceToggle?(channelId: string): void;
+  /** `▶ ver <nombre>`: mirar la transmisión de alguien de tu canal de voz. */
+  onWatch?(userId: string): void;
   /** Barra "↑ N+ mensajes nuevos": cargar hasta el primero sin leer y saltar ahí. */
   onJumpUnread?(): void;
   /** Chip "↓ ir al final": soltar la selección (la vista baja sola). */
@@ -71,6 +73,20 @@ export function MessageView(props: {
     if (!channel || channel.type !== 2 || !channel.guildId) return 0;
     return Object.values(s.voice.states[channel.guildId] ?? {}).filter((v) => v.channelId === id).length;
   });
+  // Quiénes transmiten en este canal de voz, si estás adentro (para `▶ ver`).
+  const streamers = useSelector(
+    props.store,
+    (s) =>
+      s.voice.channelId !== null && s.voice.channelId === s.ui.selectedChannelId
+        ? selectWatchableStreamers(s).slice(0, 3).map((id) => ({ id, name: displayName(s, id, s.voice.guildId) }))
+        : [],
+    jsonEqual,
+  );
+  const watchButtons = (): JSX.Element => (
+    <For each={props.onWatch ? streamers() : []}>
+      {(st) => <Button label={`▶ ver ${truncate(st.name, 16)}`} theme={props.theme} active onPress={() => props.onWatch?.(st.id)} />}
+    </For>
+  );
   // Solo lo que la vista usa: las ráfagas de presencia, typing o voz no re-renderizan los mensajes.
   const view = useSelector(
     props.store,
@@ -264,6 +280,7 @@ export function MessageView(props: {
                 onPress={() => props.onVoiceToggle?.(channelId()!)}
               />
               <text fg={props.theme.faint}>o apretá v</text>
+              <box flexDirection="row" columnGap={1}>{watchButtons()}</box>
             </Show>
           </box>
           </Show>
@@ -271,12 +288,13 @@ export function MessageView(props: {
       >
         <Show when={isVoiceChannel()}>
           <box width="100%" flexDirection="row" paddingLeft={1} paddingRight={1} flexShrink={0} backgroundColor={props.theme.panel} columnGap={1}>
-            <text fg={voiceHere() ? props.theme.speaking : props.theme.header} wrapMode="none">
+            <text fg={voiceHere() ? props.theme.speaking : props.theme.header} wrapMode="none" flexShrink={0}>
               {`🔊 ${voiceHere() ? "estás en la llamada" : "llamada de voz"}`}
             </text>
             <text fg={props.theme.dim} wrapMode="none" flexGrow={1}>
               {voiceCount() === 0 ? "· no hay nadie" : `· ${voiceCount()} ${voiceCount() === 1 ? "persona" : "personas"}`}
             </text>
+            {watchButtons()}
             <Button
               label={voiceHere() ? "✕ Salir de la llamada" : "🔊 Entrar a voz"}
               theme={props.theme}
