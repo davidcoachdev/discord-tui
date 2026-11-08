@@ -13,7 +13,6 @@
 | B2 | Alta | rate limits | Un 429 global avisado solo por headers se trata como límite de ruta |
 | B3 | Baja | READY | Se ignora el `merged_members` del READY (solo tu member); se depende del supplemental |
 | B4 | Alta | voz | Si un moderador te mueve de canal, la sesión de voz sigue en el canal viejo |
-| B22 | Alta | read state | `read_state` y `user_guild_settings` llegan versionados y no se parsean: todo queda sin leer y los mutes se ignoran |
 | B5 | Alta | HTTP | Sin timeout: un request colgado bloquea la cola de esa ruta para siempre |
 | B6 | Media | navegación | `selectGuild` pide el historial del primer canal en cada `j`/`k` de guilds |
 | B7 | Media | memoria | `applyPage` no poda `byId`: los mensajes viejos nunca se liberan |
@@ -31,6 +30,7 @@
 | B19 | Baja | notificaciones | Grupos DM titulados "(DM)"; el mute de DMs depende de un shape dudoso |
 | B20 | Baja | UX | `l` en el foco de mensajes no hace nada; `Esc` salta al fondo desde cualquier foco |
 | B21 | Media | unread | El ack manda `token: null` y `last_viewed: 0` siempre |
+| B22 | Alta | read state | `read_state` y `user_guild_settings` llegan versionados y no se parsean: todo queda sin leer y los mutes se ignoran |
 
 ---
 
@@ -161,55 +161,6 @@ Nada de eso está implementado: el único incremento de `mentionCount` viene del
 - si `author.id === me.id` → `readState[channel] = { lastAckedId: id, mentionCount: 0 }`;
 - si no, y `mentionsMe` (o DM no silenciado) → `mentionCount + 1`;
 - el ack real sigue reseteando.
-
----
-
-## B21 — El ack no guarda el token ni calcula `last_viewed`
-
-**Dónde:** `src/rest/routes.ts:35-37` (`postAck`), `src/actions/ack.ts:35`.
-
-**Qué pasa:** el body del ack es siempre `{ token: null, last_viewed: 0 }` y se ignora la respuesta. La doc de [ack tokens](https://docs.discord.food/topics/read-state#ack-tokens) dice que el cliente debe guardar el `token` que devuelve el servidor y mandarlo en el próximo ack (y resetearlo a `null` al cambiar de cuenta). Además `last_viewed` son los días desde la época de Discord **al momento de ver el canal**; mandar `0` explícito lo pisa (si se omite, el server conserva el valor actual).
-
-**Por qué importa:** cada ack se identifica como cliente nuevo, y `last_viewed = 0` puede romper el estado de "visto" que usan otros dispositivos / el mobile. Discord igual guarda el read state, pero no es el protocolo correcto.
-
-**Cómo verificar:** `postAck` no devuelve ni usa el `token` de la respuesta; no hay ningún `lastViewed` calculado con `Date.now()` y la época.
-
-**Arreglo propuesto:** que `postAck` devuelva `{ token }` y el scheduler guarde el token por canal (o global); mandar `last_viewed` calculado (`Math.floor((Date.now() - 1420070400000) / 86400000)`) solo si cambió, y `flags` calculado (IS_GUILD_CHANNEL / IS_THREAD) antes de ackear.
-
----
-
-## B22 — `read_state` y `user_guild_settings` versionados no se parsean
-
-**Dónde:** `src/store/reducers/ready.ts:155-174` (los lee con `asList`), `src/gateway/identify.ts:4` (`GATEWAY_CAPABILITIES = 1734653`).
-
-**Qué pasa:** `1734653` tiene prendidos `VERSIONED_READ_STATES` (1<<2 = 4) y `VERSIONED_USER_GUILD_SETTINGS` (1<<3 = 8). Según la [tabla de capabilities](https://docs.discord.food/gateway/using-gateway#list-of-capabilities), con esas flags `read_state` y `user_guild_settings` del READY ya no son arrays: son una [versioned structure](https://docs.discord.food/gateway/gateway-events#versioned-structure) `{ entries: [...], partial: boolean, version: integer }`.
-
-`asList` no conoce ese shape: al ver el objeto itera sus claves y arma basura:
-
-```ts
-asList({ entries: [...], partial: false, version: 3 }, "id")
-// => [{id:"entries"}, {id:"partial"}, {id:"version"}]   // pierde todos los entries
-```
-
-**Por qué importa (alto):**
-- **Read states perdidos:** `readState` queda con tres entradas basura; ningún canal tiene `lastAckedId` → `isChannelUnread` da true para todo canal con `lastMessageId`. Es exactamente el patrón de "todos los canales con puntito" que se ve al abrir la app.
-- **Mutes y notification settings perdidos:** `guildSettings.mutedGuilds/mutedChannels` quedan vacíos → notificás guilds/canales silenciados.
-- `mention_count` de READY también se pierde (se suma a lo de B8).
-
-**Cómo verificar:** `(1734653 & 4) === 4` y `(1734653 & 8) === 8` (bits de ambas capabilities); un READY sintético con `read_state: { entries: [...], partial: false, version: 1 }` deja `state.readState` sin las entradas reales. Es el patrón de "todos los canales con puntito" de la captura.
-
-**Arreglo propuesto:** helper para versioned:
-
-```ts
-function entriesOf(value: unknown): any[] {
-  if (Array.isArray(value)) return value;
-  const record = value as { entries?: unknown } | null;
-  if (record && Array.isArray(record.entries)) return record.entries;
-  return asList(value, "id"); // fallback para mapas viejos
-}
-```
-
-y usarlo en `read_state`, `user_guild_settings` (y revisar `guild_join_requests`, `notification_settings` si vienen versionados). Idealmente, un test que aplique el shape real.
 
 ---
 
@@ -364,6 +315,55 @@ Es decir, descarta la entrada 0 y el usuario vuelve a sonar al 100 %.
 **Por qué importa:** choca con la expectativa vim (`l` = entrar) y con "Esc cancela".
 
 **Arreglo propuesto:** en `messages`, `l` podría abrir el hilo/enfocar el composer; `Esc` solo debería hacer `toBottom` cuando el foco es `messages`.
+
+---
+
+## B21 — El ack no guarda el token ni calcula `last_viewed`
+
+**Dónde:** `src/rest/routes.ts:35-37` (`postAck`), `src/actions/ack.ts:35`.
+
+**Qué pasa:** el body del ack es siempre `{ token: null, last_viewed: 0 }` y se ignora la respuesta. La doc de [ack tokens](https://docs.discord.food/topics/read-state#ack-tokens) dice que el cliente debe guardar el `token` que devuelve el servidor y mandarlo en el próximo ack (y resetearlo a `null` al cambiar de cuenta). Además `last_viewed` son los días desde la época de Discord **al momento de ver el canal**; mandar `0` explícito lo pisa (si se omite, el server conserva el valor actual).
+
+**Por qué importa:** cada ack se identifica como cliente nuevo, y `last_viewed = 0` puede romper el estado de "visto" que usan otros dispositivos / el mobile. Discord igual guarda el read state, pero no es el protocolo correcto.
+
+**Cómo verificar:** `postAck` no devuelve ni usa el `token` de la respuesta; no hay ningún `lastViewed` calculado con `Date.now()` y la época.
+
+**Arreglo propuesto:** que `postAck` devuelva `{ token }` y el scheduler guarde el token por canal (o global); mandar `last_viewed` calculado (`Math.floor((Date.now() - 1420070400000) / 86400000)`) solo si cambió, y `flags` calculado (IS_GUILD_CHANNEL / IS_THREAD) antes de ackear.
+
+---
+
+## B22 — `read_state` y `user_guild_settings` versionados no se parsean
+
+**Dónde:** `src/store/reducers/ready.ts:155-174` (los lee con `asList`), `src/gateway/identify.ts:4` (`GATEWAY_CAPABILITIES = 1734653`).
+
+**Qué pasa:** `1734653` tiene prendidos `VERSIONED_READ_STATES` (1<<2 = 4) y `VERSIONED_USER_GUILD_SETTINGS` (1<<3 = 8). Según la [tabla de capabilities](https://docs.discord.food/gateway/using-gateway#list-of-capabilities), con esas flags `read_state` y `user_guild_settings` del READY ya no son arrays: son una [versioned structure](https://docs.discord.food/gateway/gateway-events#versioned-structure) `{ entries: [...], partial: boolean, version: integer }`.
+
+`asList` no conoce ese shape: al ver el objeto itera sus claves y arma basura:
+
+```ts
+asList({ entries: [...], partial: false, version: 3 }, "id")
+// => [{id:"entries"}, {id:"partial"}, {id:"version"}]   // pierde todos los entries
+```
+
+**Por qué importa (alto):**
+- **Read states perdidos:** `readState` queda con tres entradas basura; ningún canal tiene `lastAckedId` → `isChannelUnread` da true para todo canal con `lastMessageId`. Es exactamente el patrón de "todos los canales con puntito" que se ve al abrir la app.
+- **Mutes y notification settings perdidos:** `guildSettings.mutedGuilds/mutedChannels` quedan vacíos → notificás guilds/canales silenciados.
+- `mention_count` de READY también se pierde (se suma a lo de B8).
+
+**Cómo verificar:** `(1734653 & 4) === 4` y `(1734653 & 8) === 8` (bits de ambas capabilities); un READY sintético con `read_state: { entries: [...], partial: false, version: 1 }` deja `state.readState` sin las entradas reales. Es el patrón de "todos los canales con puntito" de la captura.
+
+**Arreglo propuesto:** helper para versioned:
+
+```ts
+function entriesOf(value: unknown): any[] {
+  if (Array.isArray(value)) return value;
+  const record = value as { entries?: unknown } | null;
+  if (record && Array.isArray(record.entries)) return record.entries;
+  return asList(value, "id"); // fallback para mapas viejos
+}
+```
+
+y usarlo en `read_state`, `user_guild_settings` (y revisar `guild_join_requests`, `notification_settings` si vienen versionados). Idealmente, un test que aplique el shape real.
 
 ---
 
