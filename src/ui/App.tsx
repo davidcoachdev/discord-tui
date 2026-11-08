@@ -14,6 +14,7 @@ import {
 } from "../store/selectors";
 import type { Store } from "../store/store";
 import type { ApiPoll, PendingAttachment } from "../store/types";
+import { selectUnreadView } from "../store/unread";
 import { readClipboardImage, readClipboardText } from "../uploads/clipboard";
 import { readAttachmentFromPath } from "../uploads/file";
 import { listAudioDevices } from "../voice/devices";
@@ -107,6 +108,11 @@ export function App(props: {
   const [switcherQuery, setSwitcherQuery] = createSignal("");
   const [switcherIndex, setSwitcherIndex] = createSignal(0);
   const [participant, setParticipant] = createSignal<string | null>(null);
+  const [bottomTick, setBottomTick] = createSignal(0);
+  const toBottom = (): void => {
+    setSelectedId(null);
+    setBottomTick((n) => n + 1);
+  };
 
   let hintTimer: ReturnType<typeof setTimeout> | null = null;
   function flash(text: string): void {
@@ -289,6 +295,38 @@ export function App(props: {
   function messageIds(): string[] {
     const id = channelId();
     return id === null ? [] : selectMessages(props.store.getState(), id).map((message) => message.id);
+  }
+
+  /** gn o la barra "↑ N+ mensajes nuevos": trae historial (solo por esta acción) hasta el primero sin leer y lo selecciona. */
+  async function jumpToUnread(): Promise<void> {
+    const id = channelId();
+    if (id === null) return;
+    // 9 páginas de 50 + la primera: lo que entra en los 500 mensajes que guarda el canal.
+    for (let page = 0; page < 9; page += 1) {
+      const state = props.store.getState();
+      if (state.ui.selectedChannelId !== id || !selectUnreadView(state, id).missing) break;
+      const oldest = state.messages[id]?.ids[0];
+      try {
+        await props.actions.loadOlder(id);
+      } catch {
+        break;
+      }
+      if (props.store.getState().messages[id]?.ids[0] === oldest) break;
+    }
+    const state = props.store.getState();
+    if (state.ui.selectedChannelId !== id) return;
+    const view = selectUnreadView(state, id);
+    if (view.firstUnreadId !== null) {
+      setSelectedId(view.firstUnreadId);
+      props.actions.focus("messages");
+    } else if (view.missing) {
+      const oldest = state.messages[id]?.ids[0];
+      if (oldest) setSelectedId(oldest);
+      props.actions.focus("messages");
+      flash("hay más mensajes nuevos de los que entran: te dejo en el más viejo cargado");
+    } else {
+      flash("no hay mensajes nuevos en este canal");
+    }
   }
 
   function moveMessage(delta: number): void {
@@ -736,6 +774,9 @@ export function App(props: {
           case "m":
             props.actions.toggleMembers();
             return;
+          case "n":
+            void jumpToUnread();
+            return;
           case "u": {
             const next = selectNextUnread(props.store.getState(), channelId());
             if (next) goToChannel(next);
@@ -764,7 +805,7 @@ export function App(props: {
       switch (key.name) {
         case "g":
           if (key.shift) {
-            if (focused === "messages") setSelectedId(null);
+            if (focused === "messages") toBottom();
             else if (focused === "channels") jumpChannel(true);
             else jumpGuild(true);
             return;
@@ -778,7 +819,7 @@ export function App(props: {
           props.onQuit();
           return;
         case "escape":
-          setSelectedId(null);
+          toBottom();
           setHint(null);
           return;
         case "i":
@@ -874,7 +915,7 @@ export function App(props: {
       if (key.sequence === "D") props.actions.voice?.toggleDeaf();
       if (key.sequence === "M") props.actions.voice?.toggleInputMode();
       if (key.sequence === "G") {
-        if (focused === "messages") setSelectedId(null);
+        if (focused === "messages") toBottom();
         else if (focused === "channels") jumpChannel(true);
         else jumpGuild(true);
       }
@@ -953,6 +994,9 @@ export function App(props: {
             if (id !== null) void props.actions.loadOlder(id).catch(() => {});
           }}
           onFocus={() => props.actions.focus("messages")}
+          onJumpUnread={() => void jumpToUnread()}
+          onJumpBottom={() => setSelectedId(null)}
+          bottomTick={bottomTick()}
           onVoiceToggle={(id) => void props.actions.voice?.toggleVoice(id)}
         />
         <Show when={showMembers()}>

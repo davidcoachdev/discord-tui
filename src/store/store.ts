@@ -45,7 +45,7 @@ export function emptyState(): AppState {
     subscribedChannels: {},
     voice: emptyVoice(),
     outbox: {},
-    ui: { selectedGuildId: null, selectedChannelId: null, focus: "guilds", membersVisible: true, collapsedCategories: [] },
+    ui: { selectedGuildId: null, selectedChannelId: null, focus: "guilds", membersVisible: true, collapsedCategories: [], unreadMarker: null },
     settings: { ...DEFAULT_SETTINGS },
     notices: {},
   };

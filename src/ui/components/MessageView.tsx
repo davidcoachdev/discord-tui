@@ -1,11 +1,13 @@
 import type { ScrollBoxRenderable } from "@opentui/core";
-import { createEffect, createMemo, For, on, Show, type JSX } from "solid-js";
+import { createEffect, createMemo, createSignal, For, on, Show, type JSX } from "solid-js";
 
 import { toMessage } from "../../store/reducers/messages";
 import { privateChannelName } from "../../store/reducers/ready";
 import { selectOutbox, selectTyping } from "../../store/selectors";
 import type { Store } from "../../store/store";
 import type { AppState, Message, OutboxItem } from "../../store/types";
+import { selectUnreadView, unreadSince } from "../../store/unread";
+import { compareSnowflakes } from "../../util/snowflake";
 import { dayLabel, displayName, sameDay, truncate, typingText } from "../format";
 import { jsonEqual, shallowEqual, useSelector } from "../store-bridge";
 import type { Theme } from "../theme";
@@ -42,6 +44,12 @@ export function MessageView(props: {
   onLoadOlder?(): void;
   onFocus?(): void;
   onVoiceToggle?(channelId: string): void;
+  /** Barra "↑ N+ mensajes nuevos": cargar hasta el primero sin leer y saltar ahí. */
+  onJumpUnread?(): void;
+  /** Chip "↓ ir al final": soltar la selección (la vista baja sola). */
+  onJumpBottom?(): void;
+  /** Cada vez que cambia, la vista baja al final (Esc, G). */
+  bottomTick?: number;
 }): JSX.Element {
   const voiceHere = useSelector(props.store, (s) => s.voice.channelId !== null && s.voice.channelId === s.ui.selectedChannelId);
   const voiceCount = useSelector(props.store, (s) => {
@@ -92,38 +100,90 @@ export function MessageView(props: {
   );
 
   const title = useSelector(props.store, channelTitle);
+  // Dónde iba la lectura al abrir el canal (spec: divisor "mensajes nuevos", como Discord).
+  const unread = useSelector(props.store, (s) => selectUnreadView(s, s.ui.selectedChannelId), jsonEqual);
   let scroll: ScrollBoxRenderable | undefined;
+  const live = (): ScrollBoxRenderable | undefined => (scroll && !scroll.isDestroyed ? scroll : undefined);
+
+  // "↓ ir al final": aparece si estás lejos del final y llegaron mensajes que no viste.
+  const [atBottom, setAtBottom] = createSignal(true);
+  const [seenNewest, setSeenNewest] = createSignal<string | null>(null);
+  const newest = (): string | null => slice()?.ids.at(-1) ?? null;
+  const away = (): boolean => (props.selectedId ?? null) !== null || !atBottom();
+  createEffect(() => {
+    const id = newest();
+    if (!away()) setSeenNewest(id);
+  });
+  const showBottomChip = (): boolean => {
+    const id = newest();
+    const seen = seenNewest();
+    return away() && id !== null && seen !== null && compareSnowflakes(id, seen) > 0;
+  };
+
+  function measureBottom(): void {
+    const el = live();
+    if (!el) return;
+    const state = el._scrollState();
+    const bottom = state.offset[1] >= state.max[1];
+    setAtBottom(bottom);
+    if (bottom && (props.selectedId ?? null) === null) el.stickyScroll = true;
+  }
+
+  function scrollToBottom(): void {
+    const el = live();
+    if (!el) return;
+    el.stickyScroll = true;
+    el.scrollTo(Infinity);
+    setAtBottom(true);
+  }
 
   createEffect(
     on(
       () => props.selectedId,
       (id) => {
-        if (!scroll) return;
+        const el = live();
+        if (!el) return;
         if (id) {
-          scroll.stickyScroll = false;
+          el.stickyScroll = false;
           try {
-            scroll.scrollChildIntoView(`msg-${id}`);
+            el.scrollChildIntoView(`msg-${id}`);
           } catch {
             // todavía no está en el layout
           }
         } else {
-          scroll.stickyScroll = true;
-          scroll.scrollTo(Infinity);
+          scrollToBottom();
         }
       },
     ),
   );
 
+  createEffect(on(() => props.bottomTick, () => scrollToBottom(), { defer: true }));
+
+  // Al abrir un canal (y cuando llegan sus mensajes): al final, o al primer no leído si queda arriba.
+  let positionedFor: string | null = null;
   createEffect(
-    on(channelId, () => {
-      if (!scroll) return;
-      scroll.stickyScroll = true;
-      scroll.scrollTo(Infinity);
+    on([channelId, () => slice() !== undefined], ([id, loaded]) => {
+      const el = live();
+      if (!el || id === null || positionedFor === id) return;
+      scrollToBottom();
+      if (!loaded) return;
+      positionedFor = id;
+      // Del store y no de las señales: en este punto alguna puede no haberse enterado todavía.
+      const state = props.store.getState();
+      setSeenNewest(state.messages[id]?.ids.at(-1) ?? null);
+      if (selectUnreadView(state, id).firstUnreadId === null) return;
+      el.stickyScroll = false;
+      // Después del layout: recién ahí el divisor existe y tiene posición.
+      el.afterLayout(() => {
+        if (el.isDestroyed || channelId() !== id) return;
+        el.scrollChildIntoView("unread-divider", { align: "start" });
+        el.afterLayout(measureBottom);
+      });
     }),
   );
 
   const isGrouped = (message: Message, index: number): boolean => {
-    if (index === 0) return false;
+    if (index === 0 || message.id === unread().firstUnreadId) return false;
     const previous = messages()[index - 1];
     if (!previous || previous.authorId !== message.authorId || message.referenced !== null) return false;
     if (!sameDay(previous.timestamp, message.timestamp)) return false;
@@ -177,8 +237,18 @@ export function MessageView(props: {
           </box>
         }
       >
+        <Show when={unread().missing}>
+          <box width="100%" paddingLeft={1} flexShrink={0} onMouseDown={() => props.onJumpUnread?.()}>
+            <text fg={props.theme.error} wrapMode="word">
+              {`↑ ${unread().count}+ mensajes nuevos${unreadSince(unread().afterId ?? "0")} · click o gn para saltar`}
+            </text>
+          </box>
+        </Show>
         <scrollbox
-          ref={(el: ScrollBoxRenderable) => (scroll = el)}
+          ref={(el: ScrollBoxRenderable) => {
+            scroll = el;
+            el.verticalScrollBar.on("change", measureBottom);
+          }}
           width="100%"
           flexGrow={1}
           stickyScroll
@@ -206,6 +276,11 @@ export function MessageView(props: {
                 <Show when={daySeparator(message, index())}>
                   <box width="100%" justifyContent="center" flexDirection="row" marginTop={1}>
                     <text fg={props.theme.dim}>{`──── ${daySeparator(message, index())} ────`}</text>
+                  </box>
+                </Show>
+                <Show when={unread().firstUnreadId === message.id}>
+                  <box id="unread-divider" width="100%" justifyContent="center" flexDirection="row" marginTop={1}>
+                    <text fg={props.theme.error}>──── mensajes nuevos ────</text>
                   </box>
                 </Show>
                 <MessageItem
@@ -237,6 +312,19 @@ export function MessageView(props: {
             )}
           </For>
         </scrollbox>
+        <Show when={showBottomChip()}>
+          <box height={1} width="100%" flexShrink={0} flexDirection="row" justifyContent="flex-end" paddingRight={1}>
+            <Button
+              label="↓ ir al final"
+              theme={props.theme}
+              active
+              onPress={() => {
+                scrollToBottom();
+                props.onJumpBottom?.();
+              }}
+            />
+          </box>
+        </Show>
       </Show>
       <box height={1} width="100%" paddingLeft={1}>
         <text fg={props.theme.dim} wrapMode="none">{typing() ?? ""}</text>
