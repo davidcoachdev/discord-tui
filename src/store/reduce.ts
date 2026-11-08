@@ -24,6 +24,13 @@ import {
   applyTypingSweep,
   clearTypingFor,
 } from "./reducers/members";
+import {
+  applyChannelDelete,
+  applyChannelUpsert,
+  applyGuildMemberUpdate,
+  applyRecipient,
+  ensureDmForMessage,
+} from "./reducers/channels";
 import { applyReadyVoiceStates, applySupplementalMembers, applyVoiceStateUpdate, reduceVoiceAction } from "./reducers/voice";
 
 export function reduce(state: AppState, action: Action): AppState {
@@ -35,7 +42,7 @@ export function reduce(state: AppState, action: Action): AppState {
         case "READY_SUPPLEMENTAL":
           return applySupplementalMembers(applyReadyVoiceStates(applyReadySupplemental(state, action.d), action.d), action.d);
         case "MESSAGE_CREATE": {
-          let next = applyMessageCreate(state, action.d);
+          let next = applyMessageCreate(ensureDmForMessage(state, action.d), action.d);
           if (typeof action.d?.author?.id === "string" && typeof action.d?.channel_id === "string") {
             next = clearTypingFor(next, action.d.channel_id, action.d.author.id);
           }
@@ -69,6 +76,16 @@ export function reduce(state: AppState, action: Action): AppState {
           return applyTypingStart(state, action.d);
         case "VOICE_STATE_UPDATE":
           return applyVoiceStateUpdate(state, action.d);
+        case "CHANNEL_CREATE":
+        case "CHANNEL_UPDATE":
+          return applyChannelUpsert(state, action.d);
+        case "CHANNEL_DELETE":
+          return applyChannelDelete(state, action.d);
+        case "CHANNEL_RECIPIENT_ADD":
+        case "CHANNEL_RECIPIENT_REMOVE":
+          return applyRecipient(state, action.t, action.d);
+        case "GUILD_MEMBER_UPDATE":
+          return applyGuildMemberUpdate(state, action.d);
         default:
           return state;
       }

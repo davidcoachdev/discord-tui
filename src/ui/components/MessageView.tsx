@@ -2,6 +2,7 @@ import type { ScrollBoxRenderable } from "@opentui/core";
 import { createEffect, createMemo, For, on, Show, type JSX } from "solid-js";
 
 import { toMessage } from "../../store/reducers/messages";
+import { privateChannelName } from "../../store/reducers/ready";
 import { selectOutbox, selectTyping } from "../../store/selectors";
 import type { Store } from "../../store/store";
 import type { AppState, Message, OutboxItem } from "../../store/types";
@@ -17,7 +18,11 @@ export function channelTitle(state: AppState): string {
   const id = state.ui.selectedChannelId;
   const channel = id ? state.channels[id] : undefined;
   if (!channel) return "Mensajes";
-  if (channel.guildId === null) return channel.type === 3 ? `👥 ${channel.name}` : `@ ${channel.name}`;
+  if (channel.guildId === null) {
+    const name = privateChannelName(state.users, channel.recipientIds ?? [], channel.type, channel.ownName ?? null);
+    if (channel.type === 3) return `👥 ${name} · ${(channel.recipientIds?.length ?? 0) + 1} personas`;
+    return `@ ${name}`;
+  }
   const guild = state.guilds[channel.guildId]?.name;
   const icon = channel.type === 2 ? "🔊" : "#";
   return `${icon} ${channel.name}${guild ? `  ·  ${guild}` : ""}`;

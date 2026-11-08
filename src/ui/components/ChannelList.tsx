@@ -7,7 +7,7 @@ import type { Store } from "../../store/store";
 import type { AppState } from "../../store/types";
 import { cellWidth, displayName, truncate } from "../format";
 import { jsonEqual, useSelector } from "../store-bridge";
-import type { Theme } from "../theme";
+import { presenceColor, type Theme } from "../theme";
 
 export const CHANNEL_WIDTH = 32;
 
@@ -142,7 +142,7 @@ export function ChannelList(props: {
             }
             const isSel = (): boolean => selected() === row.id;
             const badge = row.mentions > 0 ? ` ${row.mentions > 99 ? "99+" : row.mentions} ` : "";
-            const lead = `${"  ".repeat(row.depth)}${icon(row.kind)} `;
+            const lead = `${"  ".repeat(row.depth)}${row.kind === "dm" ? "" : `${icon(row.kind)} `}`;
             const name = truncate(row.name, inner - 1 - cellWidth(lead) - cellWidth(badge));
             const bright = row.unread && !row.muted;
             const participants = (): ParticipantView[] => view().participants[row.id] ?? [];
@@ -159,6 +159,9 @@ export function ChannelList(props: {
                   onMouseOut={() => setHovered((h) => (h === row.id ? null : h))}
                 >
                   <text fg={props.theme.accent}>{isSel() ? "▌" : " "}</text>
+                  <Show when={row.kind === "dm"}>
+                    <text fg={presenceColor(props.theme, row.status)}>{row.status === "offline" || !row.status ? "○ " : "● "}</text>
+                  </Show>
                   <text
                     flexGrow={1}
                     wrapMode="none"

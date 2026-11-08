@@ -14,7 +14,7 @@ function asList(value: unknown, idKey: string): any[] {
   return [];
 }
 
-function toUser(raw: any): UserState {
+export function toUser(raw: any): UserState {
   return {
     id: raw.id,
     username: raw.username ?? raw.id,
@@ -43,7 +43,7 @@ function toOverwrite(raw: any): OverwriteState {
   };
 }
 
-function toChannel(raw: any, guildId: string | null): ChannelState {
+export function toChannel(raw: any, guildId: string | null): ChannelState {
   return {
     id: raw.id,
     guildId,
@@ -53,6 +53,30 @@ function toChannel(raw: any, guildId: string | null): ChannelState {
     parentId: raw.parent_id ?? null,
     permissionOverwrites: Array.isArray(raw.permission_overwrites) ? raw.permission_overwrites.map(toOverwrite) : [],
     lastMessageId: raw.last_message_id ?? null,
+  };
+}
+
+/** Nombre de un DM o grupo: el puesto a mano, o los participantes (global name antes que username). */
+export function privateChannelName(users: Record<string, UserState>, recipientIds: string[], type: number, ownName: string | null): string {
+  if (ownName) return ownName;
+  const names = recipientIds.map((id) => users[id]?.globalName ?? users[id]?.username ?? "alguien");
+  if (type === 3) return names.join(", ") || "grupo sin nadie";
+  return names[0] ?? "DM";
+}
+
+/** DM o grupo desde READY, READY_SUPPLEMENTAL o CHANNEL_CREATE (con `recipients` o con `recipient_ids`). */
+export function toPrivateChannel(raw: any, users: Record<string, UserState>): ChannelState {
+  const recipientIds: string[] = Array.isArray(raw.recipient_ids)
+    ? raw.recipient_ids.filter((id: unknown): id is string => typeof id === "string")
+    : asList(raw.recipients, "id").map((recipient) => recipient.id).filter((id): id is string => typeof id === "string");
+  const ownName = typeof raw.name === "string" && raw.name.length > 0 ? raw.name : null;
+  const type = typeof raw.type === "number" ? raw.type : 1;
+  return {
+    ...toChannel(raw, null),
+    type,
+    recipientIds,
+    ownName,
+    name: privateChannelName(users, recipientIds, type, ownName),
   };
 }
 
@@ -114,14 +138,9 @@ export function applyReady(state: AppState, d: any): AppState {
   }
 
   const privateChannelIds: string[] = [];
-  for (const rawChannel of d.private_channels ?? []) {
-    const recipients = asList(rawChannel.recipients, "id");
-    for (const recipient of recipients) rememberUser(recipient);
-    const name =
-      rawChannel.type === 3
-        ? recipients.map((recipient) => recipient.global_name ?? recipient.username ?? "?").join(", ") || "grupo"
-        : recipients[0]?.global_name ?? recipients[0]?.username ?? "DM";
-    channels[rawChannel.id] = { ...toChannel(rawChannel, null), name };
+  for (const rawChannel of asList(d.private_channels, "id")) {
+    for (const recipient of asList(rawChannel.recipients, "id")) rememberUser(recipient);
+    channels[rawChannel.id] = toPrivateChannel(rawChannel, users);
     privateChannelIds.push(rawChannel.id);
   }
 
@@ -172,25 +191,21 @@ export function applyReadySupplemental(state: AppState, d: any): AppState {
   const channels = { ...state.channels };
   const privateChannelIds = [...state.privateChannelIds];
   for (const raw of asList(d.lazy_private_channels, "id")) {
-    const recipients: any[] = Array.isArray(raw.recipients)
-      ? raw.recipients
-      : Array.isArray(raw.recipient_ids)
-        ? raw.recipient_ids.map((recipientId: string) => users[recipientId] ?? { id: recipientId })
-        : [];
-    for (const recipient of recipients) {
-      if (recipient?.id) users[recipient.id] = toUser(recipient);
-    }
-    const name =
-      raw.type === 3
-        ? recipients.map((recipient) => recipient.global_name ?? recipient.username ?? "?").join(", ") || "grupo"
-        : recipients[0]?.global_name ?? recipients[0]?.username ?? "DM";
-    channels[raw.id] = { ...toChannel(raw, null), name };
+    for (const recipient of asList(raw.recipients, "id")) if (recipient?.id) users[recipient.id] = toUser(recipient);
+    channels[raw.id] = toPrivateChannel(raw, users);
     if (!privateChannelIds.includes(raw.id)) privateChannelIds.push(raw.id);
   }
 
   const presences = { ...state.presences };
-  for (const raw of asList(d.presences, "user_id")) {
-    if (raw?.user_id) presences[raw.user_id] = { status: raw.status ?? "offline", activities: raw.activities ?? [] };
+  const rawPresences = [
+    ...asList(d.presences, "user_id"),
+    // `merged_presences.friends`: la presencia de los amigos (los puntitos de los DMs).
+    ...asList(d.merged_presences?.friends, "user_id"),
+    ...(Array.isArray(d.merged_presences?.guilds) ? d.merged_presences.guilds.flat() : []),
+  ];
+  for (const raw of rawPresences) {
+    const userId = raw?.user_id ?? raw?.user?.id;
+    if (userId) presences[userId] = { status: raw.status ?? "offline", activities: raw.activities ?? [] };
   }
 
   return { ...next, users, channels, privateChannelIds, presences };

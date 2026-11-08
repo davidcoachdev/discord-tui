@@ -1,7 +1,7 @@
 import { TextAttributes } from "@opentui/core";
 import { For, Show, type JSX } from "solid-js";
 
-import { selectMemberRows } from "../../store/selectors";
+import { selectDmMemberRows, selectMemberRows } from "../../store/selectors";
 import type { Store } from "../../store/store";
 import { displayName, hashIndex, memberColor, truncate } from "../format";
 import { jsonEqual, useSelector } from "../store-bridge";
@@ -17,8 +17,10 @@ export function MemberList(props: { store: Store; theme: Theme; onMember?(userId
       const fromChannel = channelId ? s.channels[channelId]?.guildId : null;
       const selected = s.ui.selectedGuildId;
       const guildId = fromChannel ?? (selected && selected !== "@dms" ? selected : null);
-      const rows = guildId
-        ? selectMemberRows(s, guildId)
+      const inDm = channelId !== null && s.channels[channelId]?.guildId === null;
+      const base = inDm ? selectDmMemberRows(s, channelId!) : guildId ? selectMemberRows(s, guildId) : [];
+      const rows = base.length > 0
+        ? base
             .slice(0, 200)
             .map((row) =>
               row.kind === "group"

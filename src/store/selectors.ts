@@ -1,6 +1,7 @@
 import { compareSnowflakes } from "../util/snowflake";
 import { canViewChannel } from "./permissions";
 import { toMessage } from "./reducers/messages";
+import { privateChannelName } from "./reducers/ready";
 import type { ApiMessage, AppState, ChannelState, Message } from "./types";
 
 export interface ChannelRow {
@@ -11,6 +12,8 @@ export interface ChannelRow {
   mentions: number;
   muted: boolean;
   depth: 0 | 1;
+  /** DM 1 a 1: presencia del otro. */
+  status?: string;
 }
 
 export interface GuildRow {
@@ -47,9 +50,12 @@ export function isChannelMuted(state: AppState, guildId: string | null, channelI
 
 function toRow(state: AppState, channel: ChannelState, depth: 0 | 1): ChannelRow {
   const kind = kindOf(channel);
+  const isPrivate = channel.guildId === null && channel.recipientIds !== undefined;
+  const other = channel.type === 1 ? channel.recipientIds?.[0] : undefined;
   return {
     id: channel.id,
-    name: channel.name,
+    name: isPrivate ? privateChannelName(state.users, channel.recipientIds ?? [], channel.type, channel.ownName ?? null) : channel.name,
+    ...(other !== undefined ? { status: state.presences[other]?.status ?? "offline" } : {}),
     kind: kind ?? "text",
     unread: isChannelUnread(state, channel.id),
     mentions: state.readState[channel.id]?.mentionCount ?? 0,
@@ -64,9 +70,12 @@ function byPosition(a: ChannelState, b: ChannelState): number {
 
 export function selectChannelList(state: AppState, guildId: string | "@dms"): ChannelRow[] {
   if (guildId === "@dms") {
+    // Como Discord: el que tuvo actividad más reciente arriba.
+    const activity = (channel: ChannelState): string => channel.lastMessageId ?? channel.id;
     return state.privateChannelIds
       .map((id) => state.channels[id])
       .filter((channel): channel is ChannelState => channel !== undefined)
+      .sort((a, b) => compareSnowflakes(activity(b), activity(a)))
       .map((channel) => toRow(state, channel, 0));
   }
 
@@ -210,4 +219,16 @@ export function selectMemberRows(state: AppState, guildId: string): MemberRow[] 
   if (offline.length > 0) rows.push({ kind: "group", label: "Desconectados", count: offline.length });
   for (const id of offline) rows.push({ kind: "member", userId: id, status: "offline" });
   return rows;
+}
+
+/** Panel de miembros en un DM o grupo: los participantes y uno mismo, con presencia. */
+export function selectDmMemberRows(state: AppState, channelId: string): MemberRow[] {
+  const channel = state.channels[channelId];
+  if (!channel || channel.guildId !== null) return [];
+  const ids = [...(channel.recipientIds ?? []), ...(state.me ? [state.me.id] : [])];
+  const statusOf = (id: string): string => state.presences[id]?.status ?? (id === state.me?.id ? "online" : "offline");
+  return [
+    { kind: "group", label: channel.type === 3 ? "Miembros" : "En este chat", count: ids.length },
+    ...ids.map((userId) => ({ kind: "member" as const, userId, status: statusOf(userId) })),
+  ];
 }

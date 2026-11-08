@@ -78,3 +78,11 @@ Datos que el agente resuelve y documenta mientras construye. Sin tokens ni ids r
 - **Funciona con la cuenta de usuario y DAVE**: entra en ~2 s, se ve el código de privacidad, se escucha a los demás y se ve quién habla. El plan A (`@discordjs/voice` + adapter) queda confirmado; no hace falta la rama B.
 - **opusscript 0.1.1 rompe con varias instancias.** Su wrapper JS arma los buffers de PCM con `HEAPU16.subarray(punteroEnBytes, …)`, o sea en `2 × puntero`, memoria que nunca reservó (el C++ espera un byte por cada elemento u16). Desde la 5.ª instancia viva esa zona pisa el estado de otro códec y el decoder aborta (`Aborted()` en opus_decoder.c); en una llamada hay un decoder por persona, así que rompía con el 3.º/4.º que hablaba. Reproducido con opusscript puro (`N=4 decoders + 1 encoder → aborta en el primer decode del 4.º`). Arreglo: `src/voice/opus-wasm.ts` usa el mismo módulo WASM con buffers bien reservados (encode idéntico byte a byte al original; probado con 90 decoders vivos). Además el receptor no reintenta crear un decoder en cada paquete si falla (antes llenaba la consola) y los códecs se liberan al salir.
 - **Participantes de voz:** en cuentas de usuario el READY trae los guilds `lazy` sin `voice_states`; llegan en `READY_SUPPLEMENTAL.guilds[].voice_states` (mismo orden que READY) junto con `merged_members`. Antes solo se veía a uno mismo.
+
+## DMs (2026-11-07)
+
+- READY de usuario manda `private_channels` con `recipient_ids` (los usuarios van deduplicados en `users`), no con `recipients`: antes todos los DMs se llamaban "DM". `toPrivateChannel` (src/store/reducers/ready.ts) acepta las dos formas; los grupos usan su `name` si lo tienen.
+- La lista se ordena por `last_message_id` (actividad) como el cliente oficial; un mensaje nuevo sube el DM.
+- `CHANNEL_CREATE` agrega DMs nuevos; además, el primer mensaje de alguien que no estaba en la lista crea el DM (`ensureDmForMessage`). `CHANNEL_UPDATE`/`DELETE`, `CHANNEL_RECIPIENT_ADD`/`REMOVE` y `GUILD_MEMBER_UPDATE` ahora se aplican.
+- Presencia de los DMs: `READY_SUPPLEMENTAL.merged_presences.friends`.
+- Bug arreglado de paso: un autor de mensaje sin `global_name` pisaba el nombre ya conocido (los DMs mostraban el username).

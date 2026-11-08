@@ -72,9 +72,11 @@ export function App(props: {
   const dims = useTerminalDimensions();
   const focus = useSelector(props.store, (state) => state.ui.focus);
   const membersVisible = useSelector(props.store, (state) => state.ui.membersVisible);
+  // Miembros en servidores y también en DMs y grupos (los participantes), como Discord.
   const inGuild = useSelector(props.store, (state) => {
     const channelId = state.ui.selectedChannelId;
-    return channelId !== null && state.channels[channelId]?.guildId != null;
+    if (channelId !== null && state.channels[channelId]) return true;
+    return state.ui.selectedGuildId !== null && state.ui.selectedGuildId !== "@dms";
   });
   const inlineImages = useSelector(props.store, (state) => state.settings.inlineImages);
   const textChannel = useSelector(props.store, (state) => {
@@ -316,8 +318,11 @@ export function App(props: {
   function focusChannels(): void {
     props.actions.focus("channels");
     const state = props.store.getState();
-    if (state.ui.selectedGuildId === null || state.ui.selectedChannelId !== null) return;
-    const first = selectChannelList(state, state.ui.selectedGuildId).find((row) => isOpenable(row.kind));
+    if (state.ui.selectedGuildId === null) return;
+    const rows = selectChannelList(state, state.ui.selectedGuildId);
+    // Si el canal elegido es de otro servidor (o de los DMs), se elige el primero de esta lista.
+    if (state.ui.selectedChannelId !== null && rows.some((row) => row.id === state.ui.selectedChannelId)) return;
+    const first = rows.find((row) => isOpenable(row.kind));
     if (first) props.store.dispatch({ type: "ui/selectChannel", id: first.id });
   }
 

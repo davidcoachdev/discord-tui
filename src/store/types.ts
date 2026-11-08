@@ -39,6 +39,10 @@ export interface ChannelState {
   parentId: string | null;
   permissionOverwrites: OverwriteState[];
   lastMessageId: string | null;
+  /** DMs y grupos: quiénes están (sin uno mismo). */
+  recipientIds?: string[];
+  /** Grupos: nombre puesto a mano (si no, se arma con los participantes). */
+  ownName?: string | null;
 }
 
 export interface GuildState {

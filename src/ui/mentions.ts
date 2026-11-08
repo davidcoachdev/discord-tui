@@ -31,7 +31,8 @@ export function mentionCandidates(s: AppState, channelId: string, query: string)
   const authorIds = slice
     ? [...slice.ids].reverse().map((id) => slice.byId[id]?.author?.id).filter((id): id is string => id !== undefined)
     : [];
-  const ids = [...new Set([...authorIds, ...Object.keys(members)])].filter((id) => id !== s.me?.id);
+  const recipients = s.channels[channelId]?.recipientIds ?? [];
+  const ids = [...new Set([...authorIds, ...recipients, ...Object.keys(members)])].filter((id) => id !== s.me?.id);
 
   const ranked: { candidate: MentionCandidate; score: number }[] = [];
   for (const userId of ids) {

@@ -7,17 +7,25 @@ const RING_SIZE = 500;
 function rememberAuthor(state: AppState, raw: any): AppState {
   const author = raw?.author;
   if (!author || typeof author.id !== "string") return state;
-  const users = {
-    ...state.users,
-    [author.id]: {
-      id: author.id,
-      username: author.username ?? author.id,
-      globalName: author.global_name ?? null,
-      avatar: author.avatar ?? null,
-      bot: author.bot === true,
-    },
+  const previous = state.users[author.id];
+  // Solo se pisan los campos que vienen: un autor sin `global_name` no borra el nombre que ya teníamos.
+  const next = {
+    id: author.id,
+    username: author.username ?? previous?.username ?? author.id,
+    globalName: author.global_name !== undefined ? author.global_name : previous?.globalName ?? null,
+    avatar: author.avatar !== undefined ? author.avatar : previous?.avatar ?? null,
+    bot: author.bot !== undefined ? author.bot === true : previous?.bot ?? false,
   };
-  return { ...state, users };
+  if (
+    previous &&
+    previous.username === next.username &&
+    previous.globalName === next.globalName &&
+    previous.avatar === next.avatar &&
+    previous.bot === next.bot
+  ) {
+    return state;
+  }
+  return { ...state, users: { ...state.users, [author.id]: next } };
 }
 
 function emptySlice(): MessageSlice {

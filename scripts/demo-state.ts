@@ -1,5 +1,6 @@
 import type { Actions } from "../src/actions";
 import type { VoiceActions } from "../src/actions/voice";
+import { selectChannelList } from "../src/store/selectors";
 import { createStore, emptyState, type Store } from "../src/store/store";
 
 /**
@@ -119,15 +120,27 @@ export function buildDemoStore(): Store {
         { id: G2, properties: { name: "Gentleman Programming", owner_id: U(3) }, roles: [], channels: [ch("920000000000000200", "general", 0, 0)] },
         { id: G3, properties: { name: "Midjourney", owner_id: U(3) }, roles: [], channels: [ch("920000000000000300", "anuncios", 0, 0)] },
       ],
+      // Como lo manda Discord a una cuenta de usuario: `recipient_ids`, los usuarios van en `users`.
       private_channels: [
-        { id: DEMO.dm, type: 1, recipients: [user(U(2), "cinlo", "CinLo💜")], last_message_id: null },
-        { id: "920000000000000101", type: 3, recipients: [user(U(1), "ragnar", "Ragnar"), user(U(3), "djromoro", "djromoro")], last_message_id: null },
+        { id: DEMO.dm, type: 1, recipient_ids: [U(2)], last_message_id: "939000000000000500" },
+        { id: "920000000000000101", type: 3, recipient_ids: [U(1), U(3)], name: null, last_message_id: "939000000000000400" },
+        { id: "920000000000000102", type: 1, recipient_ids: [U(5)], last_message_id: "939000000000000300" },
+        { id: "920000000000000103", type: 3, recipient_ids: [U(1), U(2), U(4)], name: "Los del ajedrez", last_message_id: "939000000000000600" },
+        { id: "920000000000000104", type: 1, recipient_ids: [U(6)], last_message_id: "939000000000000100" },
       ],
-      read_state: [{ id: "920000000000000006", last_message_id: "1", mention_count: 2 }],
+      read_state: [
+        { id: "920000000000000006", last_message_id: "1", mention_count: 2 },
+        { id: DEMO.dm, last_message_id: "1", mention_count: 1 },
+      ],
       user_guild_settings: [],
     },
   });
   store.dispatch({ type: "connection", status: "ready" });
+  store.dispatch({
+    type: "gw",
+    t: "READY_SUPPLEMENTAL",
+    d: { merged_presences: { friends: [{ user_id: U(2), status: "online" }, { user_id: U(5), status: "idle" }, { user_id: U(6), status: "dnd" }], guilds: [] } },
+  });
 
   store.dispatch({
     type: "gw",
@@ -183,6 +196,16 @@ export function buildDemoStore(): Store {
   ];
   store.dispatch({ type: "messages/page", channelId: general, messages: messages as never, mode: "latest" });
   store.dispatch({ type: "gw", t: "TYPING_START", d: { channel_id: general, user_id: U(2), timestamp: Math.floor(Date.now() / 1000) + 3600 } });
+  store.dispatch({
+    type: "messages/page",
+    channelId: DEMO.dm,
+    messages: [
+      { ...msg(50, DEMO.dm, U(2), "che, ¿te sumás a la llamada de las 22?", 25), guild_id: undefined },
+      { ...msg(51, DEMO.dm, ME, "dale, ahí entro desde discord-tui 😎", 20), guild_id: undefined },
+      { ...msg(52, DEMO.dm, U(2), "jaja ¿en serio en la terminal?", 2), guild_id: undefined },
+    ] as never,
+    mode: "latest",
+  });
   store.dispatch({ type: "ui/selectGuild", id: G1 });
   store.dispatch({ type: "ui/selectChannel", id: general });
   store.dispatch({ type: "ui/focus", focus: "messages" });
@@ -235,6 +258,9 @@ export function demoActions(store: Store): Actions {
   return {
     selectGuild: (id) => {
       store.dispatch({ type: "ui/selectGuild", id });
+      // Como las acciones reales: abre el primer canal de texto o DM.
+      const first = selectChannelList(store.getState(), id).find((row) => row.kind === "text" || row.kind === "dm" || row.kind === "group_dm");
+      if (first) store.dispatch({ type: "ui/selectChannel", id: first.id });
     },
     openChannel: async (id) => {
       store.dispatch({ type: "ui/selectChannel", id });

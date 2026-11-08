@@ -316,3 +316,18 @@ test("hovering a server, a channel or a message highlights it", async () => {
     await h.renderOnce();
   }
 });
+
+test("direct messages: ordered by activity with presence, click opens the chat and the panel shows its people", async () => {
+  const s = setup();
+  const h = await render(s);
+  await click(h, "✉ Mensajes");
+  const frame = h.captureCharFrame();
+  const order = ["Los del ajedrez", "CinLo💜", "Ragnar, djromoro", "PmmR", "zero"].map((name) => frame.indexOf(name));
+  expect(order.every((at, i) => at > -1 && (i === 0 || at > order[i - 1]!))).toBe(true);
+  await click(h, "● CinLo💜");
+  const opened = h.captureCharFrame();
+  expect(opened).toContain("@ CinLo💜");
+  expect(opened).toContain("jaja ¿en serio en la terminal?");
+  expect(opened).toContain("EN ESTE CHAT — 2");
+  expect(opened).toContain("i para escribirle a @CinLo💜");
+});
