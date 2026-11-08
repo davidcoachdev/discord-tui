@@ -224,9 +224,55 @@ Ejemplo: `dnd` = `5a 07 0a 05 0a 03 64 6e 64` = `WgcKBQoDZG5k`.
 - Los canales de voz (tipo 2) tienen su propio chat ("Text in Voice"): es el mismo `GET/POST /channels/{id}/messages` con el id del canal de voz, y los `MESSAGE_CREATE` llegan con ese `channel_id`. `isMessageChannelType` ya no excluye el tipo 2, así que abrir, leer, escribir, typing, ack, reacciones y adjuntos funcionan igual que en un canal de texto.
 - Click (o Enter en la lista) en un canal 🔊 entra a la llamada y abre su chat, como Discord; con Ctrl-k se puede leer el chat sin entrar. Arriba del chat hay una franja con el estado de la llamada y el botón entrar/salir.
 
-## Transmitir pantalla (spike)
+## Transmitir pantalla (Go Live)
 
-Spike del 2026-11-08, sin la cuenta (todo contra fakes locales). Scripts en `scripts/spike-golive/`. Fuera del alcance de la v1 (spec, no-objetivos); esto es solo factibilidad.
+Producto desde el 2026-11-08 (`src/golive/`). Sin probar todavía contra Discord: todo verificado contra fakes y la captura real
+de esta máquina a `/dev/null`; el primer stream real es el 🧍 Paso de Gon (`docs/PRUEBAS-GON.md`, sección 6).
+
+**Qué hace:** botón `📺 transmitir` en la barra de voz o `S` → si hay más de un monitor y no hay uno guardado en settings que siga
+conectado, un picker → `⏳ iniciando…` → `🔴 EN VIVO · detener` (+ `👁 N` espectadores). Una transmisión a la vez, solo video
+(sin audio del sistema), 720p30 por defecto (1080p30 en settings, puede necesitar Nitro **[sin verificar]**).
+
+**Protocolo** (`src/golive/shim.ts`, `golive.ts`): el `Streamer` de `@dank074/discord-video-stream` 7.0.0 sobre NUESTRO gateway;
+solo pasan los ops 18 `STREAM_CREATE {type, guild_id, channel_id, preferred_region:null}`, 22 `STREAM_SET_PAUSED {stream_key,
+paused:false}` y 19 `STREAM_DELETE {stream_key}`; el op 4 queda bloqueado (la voz es de `@discordjs/voice`). Se le inyecta un
+`VoiceConnection` dormido con el `session_id` de nuestro VOICE_STATE_UPDATE propio (se guarda por guild; se borra al salir y con
+cada sesión nueva del gateway), nunca `joinVoice()`. La librería abre UN solo WS: el del stream (`server_id = rtc_server_id`).
+De los dispatches, la librería ve solo `STREAM_*`; nosotros además usamos `STREAM_CREATE`/`STREAM_UPDATE` `viewer_ids` (cantidad
+de espectadores) y `STREAM_DELETE` con `reason` (`unauthorized` = sin permiso de video, `stream_full`, …; lista **[sin verificar]**).
+Los demás que transmiten salen de `self_stream` del VOICE_STATE_UPDATE (READY/READY_SUPPLEMENTAL y updates): `📺 en vivo` en la
+lista de participantes. **[sin verificar]** si Discord manda un VOICE_SERVER_UPDATE extra al crear el stream (nuestro adapter de
+voz se lo pasaría a `@discordjs/voice`).
+
+**Se corta solo** si: salís de la voz o cambiás de canal (las acciones de voz cortan el stream antes de salir), la voz da error, el
+gateway queda `disconnected` o vuelve con sesión nueva (`identified`; un resume no corta), llega un STREAM_DELETE nuestro, el WS
+del stream cierra con código no reanudable (4004/4006/4011/4014/4016/4017/4022…), Discord no contesta en 15 s, o se muere la
+captura. Siempre manda el op 19 si mandó el 18. Mensajes en castellano en `src/golive/errors.ts`.
+
+**Captura** (`src/golive/capture.ts`): `wf-recorder` (wlr-screencopy, sin portal) → si no, `grim` en loop (un proceso por frame,
+~10 fps; avisa que va trabado y sugiere instalar wf-recorder) → si no, error "instalá wf-recorder: sudo pacman -S wf-recorder".
+Monitores de `hyprctl monitors -j` (hace falta `HYPRLAND_INSTANCE_SIGNATURE` en el env limpio); sin hyprctl, uno predeterminado.
+- `wf-recorder -y -o MON -c rawvideo -m nut -x yuv420p -r 30 -f pipe:1` → stdin de ffmpeg directo (Bun conecta los procesos sin
+  pasar por JS). Gotchas (2026-11-08, wf-recorder 0.6.0): con `-f /dev/stdout` falla "avio_open failed" (los pipes de Bun no se
+  reabren por path); con `-F scale=…` sobre video crudo saca solo el encabezado NUT, así que achica ffmpeg.
+- ffmpeg: `scale` a la caja 1280×720 (o 1920×1080) sin agrandar y manteniendo aspecto, `fps=30`, `-bf 0`, `-g 60 -keyint_min 60
+  -force_key_frames expr:gte(t,n_forced*2)` y `-forced-idr 1` (también en NVENC, que el preset de la librería no trae), 2500k/3500k
+  (720p) o 4500k/6000k (1080p), `-flush_packets 1`, NUT por stdout → `playStream(…, {type:"go-live", format:"nut"})`. Encoder:
+  se prueba una vez con 1 frame sintético (lavfi) `h264_nvenc` → `h264_vaapi` (si hay `/dev/dri/renderD128`) → `libx264
+  ultrafast zerolatency`. Con ffmpeg real y fuente sintética, ffprobe ve keyframes en 0, 2 y 4 s (test).
+- Medido acá (2 s, todo descartado): wf-recorder+NVENC 574 KB NUT, +x264 334 KB, grim+NVENC 2,6 MB; el demux de la librería lo
+  lee como H264 1280×720 30 fps. Después de `stop()` no queda ningún proceso (`pgrep` vacío; también hay test con procesos reales).
+- Todo con env limpio (`spawnClean`), sin token; nada a disco.
+
+**Bun:** el import de la librería es a pedido (arrastra node-av y sharp); antes se pone `DEBUG_LEVEL=OFF` porque su logger
+(`debug-level`) escribe INFO a stderr y ensucia la TUI. El `Streamer`, la conexión y la captura quedan referenciados mientras dura
+el stream (el GC de Bun junta Tracks sin referencia). `zeromq` nunca se importa bajo Bun.
+
+**Fuera de alcance:** mirar streams de otros (solo el badge), audio del sistema, la miniatura (`setStreamPreview`, pediría el token).
+
+### Spike (2026-11-08)
+
+Spike del 2026-11-08, sin la cuenta (todo contra fakes locales). Scripts en `scripts/spike-golive/`. Lo que sigue es el registro del spike; el producto está arriba.
 
 **Librería candidata:** `@dank074/discord-video-stream` 7.0.0 (npm, publicada 2026-09-13; repo `Discord-RE/Discord-video-stream`, último push 2026-11-03, 324 ★, consultado con `gh api` el 2026-11-08). Licencia ISC. Desde el issue #196 (2025-11) usa **WebRTC** (libdatachannel vía `@lng2004/node-datachannel`) en vez de UDP propio, y desde #195 implementa **DAVE** con `@snazzah/davey`.
 
@@ -235,7 +281,7 @@ Spike del 2026-11-08, sin la cuenta (todo contra fakes locales). Scripts en `scr
 - Cargan: `@snazzah/davey`, `@lng2004/node-datachannel`, `sharp` 0.35.5, `node-av` 6.2.0 (prebuild de 168 MB con libav adentro), y el paquete entero.
 - **`zeromq` 6.8.0 tira abajo Bun** al importarlo: `panic(main thread): unsupported uv function: uv_async_init` (oven-sh/bun#18546). No afecta: la librería solo lo importa si `!isBun() && !isDeno()` (`src/media/newApi.ts`, control de volumen en vivo con `azmq`). En Bun no hay control de volumen en vivo y no hace falta un ffmpeg con libzmq.
 
-**2. Se puede usar sin el Client selfbot y sin abrir otra conexión de voz** (`scripts/spike-golive/streamer-shim.ts` + `shim-fake.ts`, 14/14 OK):
+**2. Se puede usar sin el Client selfbot y sin abrir otra conexión de voz** (hoy `src/golive/shim.ts` + `tests/golive/shim.test.ts`, que reemplazaron a `streamer-shim.ts` y `shim-fake.ts`):
 - `Streamer` (`src/client/Streamer.ts`) le pide al client solo `on("raw", {t,d})`, `ws.broadcast({op,d})`, `user.id`; `token` y `guilds.fetch` solo para `setStreamPreview` (miniatura, opcional). El shim lo arma sobre nuestro `Gateway` y deja pasar solo los ops 18/19/22.
 - **No hay que llamar a `joinVoice()`**: abriría una 2.ª conexión de voz (al llegar VOICE_SERVER_UPDATE) y mandaría un op 4 con `self_deaf: true`. `createStream()` solo lee de `voiceConnection` `guildId`, `channelId`, `session_id`, `type`, `botId`. El shim inyecta un `VoiceConnection` "dormido" con el `session_id` de **nuestra** voz (el del VOICE_STATE_UPDATE propio) sin `setTokens()`, así que nunca conecta. La voz sigue siendo la de `@discordjs/voice`; la librería abre solo el WS del stream.
 - Flujo verificado contra el fake: op 18 `STREAM_CREATE {type, guild_id, channel_id, preferred_region:null}` + op 22 `STREAM_SET_PAUSED {stream_key, paused:false}` → el gateway manda `STREAM_CREATE {stream_key, rtc_server_id}` y `STREAM_SERVER_UPDATE {stream_key, endpoint, token}` → WS `wss://{endpoint}/?v=8` → identify con `server_id = rtc_server_id`, nuestro `session_id`, `video: true`, `streams: [{type:"screen", rid:"100"}]`, `max_dave_protocol_version` → op 1 `protocol: "webrtc"` con SDP de libdatachannel → op 4 con `sdp` → key package MLS (binario 26) → op 12 VIDEO. Al cortar, op 19 `STREAM_DELETE {stream_key}`. `stream_key` = `guild:{guild}:{canal}:{user}` (`call:{canal}:{user}` en DMs). El canal DAVE del stream es `rtc_server_id - 1` (`StreamConnection.daveChannelId`).
@@ -259,4 +305,4 @@ Spike del 2026-11-08, sin la cuenta (todo contra fakes locales). Scripts en `scr
 
 **Riesgo de cuenta:** la librería lo dice (README: "Using any kind of automation programs on your account can result in your account getting permanently banned"). El identify del stream no es idéntico al del cliente oficial (campos de `streams`, sin op 20 PLATFORM) **[sin verificar]** si Discord lo mira. Sin Nitro, el cliente oficial limita Go Live a 720p30 **[sin verificar]** (no consultado hoy): transmitir a 720p30 como máximo **[nuestra]**. Hace falta el permiso "Video" en el canal.
 
-**🧍 Paso de Gon (primer test real):** `sudo pacman -S wf-recorder` (opcional; sin él usa grim a ~10 fps), entrar con la TUI cerrada y correr `bun scripts/spike-golive/golive-spike.ts <guild_id> <channel_id> DP-1` con un amigo ya en ese canal de voz; el amigo hace click en "LIVE" y cuenta si ve la pantalla, con qué fluidez, y si el código de privacidad del stream aparece. El script dura 60 s, no guarda nada y solo imprime estados.
+**🧍 Paso de Gon:** ya no hay script aparte (`golive-spike.ts` se borró): se prueba desde la app, `docs/PRUEBAS-GON.md` sección 6.
