@@ -268,7 +268,8 @@ Monitores de `hyprctl monitors -j` (hace falta `HYPRLAND_INSTANCE_SIGNATURE` en 
 (`debug-level`) escribe INFO a stderr y ensucia la TUI. El `Streamer`, la conexión y la captura quedan referenciados mientras dura
 el stream (el GC de Bun junta Tracks sin referencia). `zeromq` nunca se importa bajo Bun.
 
-**Fuera de alcance:** mirar streams de otros (solo el badge), audio del sistema, la miniatura (`setStreamPreview`, pediría el token).
+**Fuera de alcance:** audio del sistema, la miniatura (`setStreamPreview`, pediría el token). Mirar streams de otros: ver "Ver
+transmisiones".
 
 ### Spike (2026-11-08)
 
@@ -306,6 +307,44 @@ Spike del 2026-11-08, sin la cuenta (todo contra fakes locales). Scripts en `scr
 **Riesgo de cuenta:** la librería lo dice (README: "Using any kind of automation programs on your account can result in your account getting permanently banned"). El identify del stream no es idéntico al del cliente oficial (campos de `streams`, sin op 20 PLATFORM) **[sin verificar]** si Discord lo mira. Sin Nitro, el cliente oficial limita Go Live a 720p30 **[sin verificar]** (no consultado hoy): transmitir a 720p30 como máximo **[nuestra]**. Hace falta el permiso "Video" en el canal.
 
 **🧍 Paso de Gon:** ya no hay script aparte (`golive-spike.ts` se borró): se prueba desde la app, `docs/PRUEBAS-GON.md` sección 6.
+
+## Ver transmisiones
+
+Producto desde el 2026-11-08 (`src/watch/`), sin probar contra Discord: todo verificado contra fakes, un loopback local (nuestro
+emisor → server falso → nuestro espectador) y video sintético. La primera vez real es el 🧍 Paso de Gon (`docs/PRUEBAS-GON.md`,
+sección 7). Medidas y gotchas en "Ver transmisiones (spike)" abajo.
+
+**Qué hace:** estando conectado a un canal de voz, debajo de cada participante que transmite (📺) aparece `▶ ver` (en la lista de
+canales y en la franja del chat del canal de voz: `▶ ver <nombre>`), y `w` mira al participante elegido o al primero que
+transmita. La transmisión reemplaza el panel de mensajes: `📺 <nombre> · en vivo · N fps`, `✕ dejar de ver`, `Esc` o `w` la
+cierran. Una a la vez. **Sin audio de la transmisión** (el track de audio se recibe y se descarta; falta Opus + DAVE + mezclarlo al
+mixer de la llamada).
+
+**Protocolo** (`src/watch/watch.ts`, `viewer.ts`): op 20 `{stream_key}` (`guild:{guild}:{canal}:{quien transmite}`) → con
+`STREAM_CREATE` (`rtc_server_id`) + `STREAM_SERVER_UPDATE` (`endpoint`, `token`) se abre UN WS al server del stream con el
+`session_id` de nuestra voz; para dejar de ver, op 19 `{stream_key}` (salvo que Discord ya la haya borrado o la sesión del gateway
+sea nueva). `endpoint: null` = se suelta la conexión y se espera el próximo server. La conexión es la `StreamConnection` de
+`@dank074/discord-video-stream` 7.0.0 subclaseada (su MLS/DAVE, heartbeat y resume) con nuestra SDP: `a=sendonly`, y al llegar el
+op 12 VIDEO del que transmite se renegocia solo localmente con sus `a=ssrc:` y se manda op 15 `{any:100, <ssrc>:100}`. El que
+mira no manda op 12 ni speaking.
+
+**Video** (`h264.ts`, `decode.ts`): RTP (sin SRTP, de libdatachannel) → depacketizer H264 propio (NAL simple, STAP-A, FU-A;
+reordena dentro del cuadro; si falta un paquete descarta el cuadro, pide keyframe con PLI y espera el próximo IDR; sin NACK) →
+access unit Annex-B con start codes de 4 bytes → `davey.decrypt(quien transmite, VIDEO, au)` si termina en `0xFAFA` (en claro solo
+sin DAVE o con passthrough) → node-av (libavcodec en el proceso, 2 hilos por slice, `AV_LOG_QUIET`) → RGBA achicado a la caja
+(10×20 px por celda, tope 960×540) → `NativeImagePool` + `source` del `<image>` (como los GIFs). Se decodifican todas las access
+units, se escalan como mucho 12 por segundo; con más de 30 en cola se tira todo y se pide keyframe. Sin la vista montada no se
+decodifica nada; al volver, keyframe. Solo H264: si el op 4 dice otro `video_codec` (VP8/VP9/AV1/H265) se corta con aviso.
+
+**Se corta solo** si: salís de la voz o cambiás de canal, el que transmite corta (`STREAM_DELETE` o su `self_stream: false` / se
+va del canal), el gateway queda `disconnected` o vuelve con sesión nueva, el WS del stream cierra con un código no reanudable,
+Discord no contesta en 15 s, o `STREAM_DELETE` con razón (`unauthorized` → "no tenés permiso para ver esta transmisión",
+`stream_full` → "la transmisión está llena", …). Los errores quedan en el panel con `✕ cerrar`; los cortes normales, como aviso.
+
+**[sin verificar]:** el descifrado DAVE de video de otra persona (ver spike); que el server de Discord acepte nuestra oferta de
+espectador (es la misma forma que la del emisor, que tampoco se probó todavía); si Discord manda el op 12 del que transmite sin
+pedirlo o hace falta el op 15 antes; cuánto tarda el primer keyframe (el cliente oficial responde al PLI); cómo se ve y cuánto
+aguanta Ghostty a ~12 fps.
 
 ## Ver transmisiones (spike)
 
@@ -376,7 +415,7 @@ archivo temporal (`t=f`, `/opentui-kitty-…`) o directo (`t=d`, base64, `o=z`) 
 por cuadro: a 12 fps ~11 MB/s. **[sin verificar]** si Ghostty lo aguanta sin parpadeo (🧍 Paso de Gon); por eso 12 fps y una
 caja chica por defecto.
 
-**Estimado del MVP:** 1–2 días (hecho en este mismo branch, ver "Ver transmisiones").
+**Estimado del MVP:** 1–2 días; quedó hecho (sección "Ver transmisiones", arriba).
 
 ## Salida de audio de la llamada (2026-11-08, Gon no escuchaba)
 
