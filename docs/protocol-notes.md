@@ -344,3 +344,27 @@ Medido con OpenTUI 0.8.2 (`node_modules/@opentui/core`), sharp 0.35.5 y Bun 1.4.
 - Que `media.discordapp.net` devuelva el GIF animado (y no un WebP o un cuadro) cuando se le piden `width`/`height` en un adjunto `.gif` (`sizedUrl`). Si devuelve WebP animado, igual anima por sharp.
 - Qué variante GIF traen de verdad los embeds gifv de Giphy/Tenor (el caso "miniatura `.gif`" sale de suponer, no de un payload real).
 - Cómo se ve en Ghostty: cada cuadro se re-sube por el protocolo de kitty; si parpadea habrá que bajar los fps.
+
+## Avatares
+
+Medido con OpenTUI 0.8.2, sharp 0.35.5 y Bun 1.4.3, 2026-11-08, solo con tests y la demo. Nada probado en Ghostty contra la cuenta real (**🧍 Paso de Gon**: ver avatares en mensajes, miembros, voz y DMs, y uno animado).
+
+**URLs** (`src/images/avatar.ts`, docs.discord.food → CDN):
+- Propio: `https://cdn.discordapp.com/avatars/{user_id}/{hash}.{ext}?size=32`. Hash `a_…` = animado: `.gif` con `animateImages`, `.png` (primer cuadro) sin.
+- De server (`member.avatar`, gana sobre el propio): `/guilds/{guild_id}/users/{user_id}/avatars/{hash}.{ext}?size=32`. `MemberState.avatar` se llena desde READY, READY_SUPPLEMENTAL (`merged_members`), GUILD_MEMBER_LIST_UPDATE, GUILD_MEMBER_UPDATE y los `voice_states[].member`, solo si el campo vino.
+- Sin avatar: `https://cdn.discordapp.com/embed/avatars/{n}.png` con n = `(id >> 22) % 6` (nombres nuevos) o `discriminator % 5` si la cuenta tiene un discriminador distinto de `"0"` (`UserState.discriminator`, solo se guarda en ese caso: bots viejos).
+- Ids que no son snowflake o hashes con caracteres raros caen al avatar por defecto (no se arma ninguna ruta con eso). Todo pasa por la allowlist de `cache.ts`, GET pelado sin Authorization.
+
+**Cómo se ve.** `Avatar.tsx`: caja de **2×1 celdas** (≈ un cuadrado, la celda mide ~1:2). sharp decodifica a 32×32 RGBA (`fit: fill`) y se recorta en **círculo** con borde suavizado de 1 px tocando el alfa; se muestra con `AnimatedImage` (un cuadro = imagen quieta; varios = el scheduler compartido de los GIFs). Sin sharp, los bytes tal cual en un `<image>`. Mientras carga, con imágenes apagadas o si falla: la inicial (`G ` o un emoji de 2 celdas) con `modeFg` sobre `theme.names[hash(userId)]`. El mismo ancho en los tres estados: no salta nada.
+
+**Dónde.** Antes del nombre en el encabezado de los mensajes no agrupados; en la lista de miembros después del punto de presencia (`● G  Gon`); en los participantes de voz después del ● de hablando (el anillo sigue siendo el punto); en los DM 1 a 1 después del punto de presencia; en el popup de `@`. Los anchos de truncado restan las 3 celdas (avatar + espacio). De paso: un `<text>` vacío en OpenTUI ocupa 1 celda, así que el badge de menciones vacío y los íconos de voz vacíos ahora no se montan (antes se comían una celda y el `…` del nombre quedaba cortado).
+
+**Rendimiento.**
+- Lazy: el avatar pide la imagen la primera vez que se dibuja y `onScreen` confirma que está en la terminal y en el viewport de su scrollbox. Medido: un scrollbox con 30 filas y 5 visibles llama `renderBefore` solo en esas 5 (las de afuera no se dibujan). Pedida la imagen, el gancho se saca.
+- Cola de 6 bajadas a la vez (`src/images/queue.ts`); al tocarle el turno, si ninguna fila que la pidió sigue montada, no se baja. Test: 300 avatares a la vez → como mucho 6 en vuelo; una lista de 119 miembros pide solo los de pantalla (el test pide entre 10 y 50).
+- LRU propio de **8 MB** de lo decodificado (un avatar quieto son 4 KB); sin LRU de bytes crudos. Pedidos de la misma URL se juntan. Una URL que falló no se vuelve a pedir por 60 s (las filas de la lista de miembros se re-montan con cada cambio). `peek` sincrónico: una fila que se vuelve a montar muestra la imagen sin parpadear.
+- Cada avatar tiene su propia señal: cargar uno no vuelve a dibujar la lista de mensajes.
+
+**Setting** `showAvatars` (default sí), en Settings → Apariencia debajo de "animar GIFs y emojis". Con no, todo vuelve al layout de antes.
+
+**Sin verificar.** Cómo se ve el 2×1 en Ghostty (si el círculo queda chico o desalineado con el texto); que `?size=32` del CDN devuelva el GIF animado para hashes `a_`; payloads reales con `member.avatar` en GUILD_MEMBER_LIST_UPDATE.
