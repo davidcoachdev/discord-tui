@@ -16,6 +16,7 @@
     "voice-spike": "bun scripts/voice-spike.ts"
   },
   "dependencies": {
+    "@dank074/discord-video-stream": "7.0.0",
     "@discordjs/opus": "0.11.0",
     "@discordjs/voice": "0.19.2",
     "@opentui/core": "0.8.2",
