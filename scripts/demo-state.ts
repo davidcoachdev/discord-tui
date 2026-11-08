@@ -281,6 +281,7 @@ export function demoActions(store: Store): Actions {
       store.dispatch({ type: "gw", t: "MESSAGE_DELETE", d: { id: messageId, channel_id: channelId } });
     },
     toggleReaction: async () => {},
+    setStatus: (status) => store.dispatch({ type: "settings/set", patch: { status } }),
     voice,
   };
 }

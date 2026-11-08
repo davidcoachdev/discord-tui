@@ -14,6 +14,8 @@ import { selectChannelList } from "../store/selectors";
 import type { Store } from "../store/store";
 import type { Focus, PendingAttachment } from "../store/types";
 import { HttpError } from "../rest/errors";
+import type { OwnStatus } from "../settings/settings";
+import type { IdlePresence } from "./presence";
 
 export interface Actions {
   selectGuild(id: string | "@dms"): void;
@@ -33,6 +35,8 @@ export interface Actions {
   voice?: VoiceActions;
   /** Abre un link o adjunto en el navegador (solo https). */
   openUrl?(url: string): void;
+  /** Estado propio elegido a mano: se guarda en settings y se manda por op 3. */
+  setStatus?(status: OwnStatus): void;
 }
 
 export interface ActionsDeps {
@@ -43,6 +47,7 @@ export interface ActionsDeps {
   voice?: VoiceActions;
   now?: () => number;
   openUrl?: (url: string) => boolean;
+  presence?: Pick<IdlePresence, "statusChanged">;
 }
 
 function noticeText(action: string, error: unknown): string {
@@ -170,6 +175,10 @@ export function createActions(deps: ActionsDeps): Actions {
       if (!(deps.openUrl ?? openUrl)(url)) {
         deps.store.dispatch({ type: "notice/push", key: "open-url", level: "warn", text: "no pude abrir el link" });
       }
+    },
+    setStatus(status: OwnStatus): void {
+      deps.store.dispatch({ type: "settings/set", patch: { status } });
+      deps.presence?.statusChanged();
     },
     retry: sendActions.retry,
     edit,

@@ -94,3 +94,88 @@ describe("createIdlePresence", () => {
     presence.stop();
   });
 });
+
+describe("manual status", () => {
+  function setup(initial: "online" | "idle" | "dnd" | "invisible") {
+    let now = 0;
+    const timers: Array<() => void> = [];
+    const gateway = fakeGateway();
+    const settings = { idleAfterMinutes: 1 as number | null, status: initial };
+    const presence = createIdlePresence({
+      gateway: gateway as never,
+      settings: () => settings,
+      now: () => now,
+      setTimer: ((fn: () => void) => {
+        timers.push(fn);
+        return 0 as never;
+      }) as never,
+      clearTimer: (() => {}) as never,
+    });
+    const fire = (at: number) => {
+      now = at;
+      for (const fn of timers.splice(0)) fn();
+    };
+    return { gateway, settings, presence, fire };
+  }
+
+  test("dnd and invisible are never overridden by inactivity or activity", () => {
+    for (const status of ["dnd", "invisible"] as const) {
+      const { gateway, presence, fire } = setup(status);
+      presence.activity();
+      fire(60_000);
+      presence.activity();
+      fire(120_000);
+      expect(gateway.sent).toHaveLength(0);
+      expect(presence.current()).toEqual({ status, since: 0, activities: [], afk: false });
+      presence.stop();
+    }
+  });
+
+  test("changing the status sends one op 3 with the documented shape and stops the automatic idle", () => {
+    const { gateway, settings, presence, fire } = setup("online");
+    presence.activity();
+    settings.status = "dnd";
+    presence.statusChanged();
+    expect(gateway.sent).toEqual([{ op: 3, d: { status: "dnd", since: 0, activities: [], afk: false } }]);
+    expect(Object.keys(gateway.sent[0]!.d as object).sort()).toEqual(Object.keys(DOCUMENTED_OP3).sort());
+    fire(60_000);
+    presence.activity();
+    expect(gateway.sent).toHaveLength(1);
+    presence.stop();
+  });
+
+  test("auto idle, then a manual idle, then back to online", () => {
+    const { gateway, settings, presence, fire } = setup("online");
+    presence.activity();
+    fire(60_000);
+    expect(gateway.sent.at(-1)?.d).toMatchObject({ status: "idle", since: 60_000 });
+    settings.status = "idle";
+    presence.statusChanged();
+    // Ya estaba "idle" por inactividad: no hace falta otro op 3, y la actividad no lo saca.
+    expect(gateway.sent).toHaveLength(1);
+    presence.activity();
+    expect(gateway.sent).toHaveLength(1);
+    expect(presence.current().status).toBe("idle");
+    settings.status = "online";
+    presence.statusChanged();
+    expect(gateway.sent.at(-1)?.d).toEqual({ status: "online", since: 0, activities: [], afk: false });
+    presence.stop();
+  });
+
+  test("nothing is sent while the gateway is not ready; the resume sends the pending change", () => {
+    let ready = false;
+    const gateway = fakeGateway();
+    const settings = { idleAfterMinutes: null, status: "online" as "online" | "dnd" };
+    const presence = createIdlePresence({ gateway: gateway as never, settings: () => settings, ready: () => ready });
+    settings.status = "dnd";
+    presence.statusChanged();
+    expect(gateway.sent).toHaveLength(0);
+    ready = true;
+    presence.sessionStarted("resumed");
+    expect(gateway.sent).toEqual([{ op: 3, d: { status: "dnd", since: 0, activities: [], afk: false } }]);
+    presence.sessionStarted("identified");
+    presence.sessionStarted("resumed");
+    expect(gateway.sent).toHaveLength(1);
+    presence.stop();
+  });
+});

@@ -8,6 +8,9 @@ const VERSION = 1;
 export type InputMode = "voice_activity" | "push_to_talk";
 export type VadSensitivity = "auto" | number;
 export type ThemeName = "dark" | "light";
+/** Estado propio elegido a mano (el "ausente" automático por inactividad no se guarda acá). */
+export type OwnStatus = "online" | "idle" | "dnd" | "invisible";
+export const OWN_STATUSES: OwnStatus[] = ["online", "idle", "dnd", "invisible"];
 
 export interface Settings {
   version: typeof VERSION;
@@ -19,6 +22,7 @@ export interface Settings {
   theme: ThemeName;
   idleAfterMinutes: number | null;
   inlineImages: boolean;
+  status: OwnStatus;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -31,6 +35,7 @@ export const DEFAULT_SETTINGS: Settings = {
   theme: "dark",
   idleAfterMinutes: 10,
   inlineImages: true,
+  status: "online",
 };
 
 const MIN_SENSITIVITY = -60;
@@ -97,6 +102,7 @@ export function normalizeSettings(raw: unknown): Settings {
     theme: record.theme === "light" || record.theme === "dark" ? record.theme : DEFAULT_SETTINGS.theme,
     idleAfterMinutes: parseIdle(record.idleAfterMinutes),
     inlineImages: typeof record.inlineImages === "boolean" ? record.inlineImages : DEFAULT_SETTINGS.inlineImages,
+    status: OWN_STATUSES.includes(record.status as OwnStatus) ? (record.status as OwnStatus) : DEFAULT_SETTINGS.status,
   };
 }
 
