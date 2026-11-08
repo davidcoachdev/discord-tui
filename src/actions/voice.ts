@@ -37,6 +37,12 @@ export function createVoiceActions(deps: {
   session: VoiceSession;
   media: VoiceMedia;
   kittyKeyboard?: () => boolean;
+  /**
+   * Renovación de la salida para el desfase de relojes: el reloj de la PC (que marca el ritmo del mixer) y el
+   * de la placa de audio se separan ~50–100 ppm, así que en una llamada larga el colchón de pw-cat se agota
+   * (chasquidos) o crece (más delay). Cada `minUptimeMs`, en un silencio de `quietMs`, se abre un pw-cat nuevo.
+   */
+  refresh?: { checkMs?: number; minUptimeMs?: number; quietMs?: number; now?: () => number };
 }): VoiceActions {
   const { store, session } = deps;
   let capture: AudioCapture | null = null;
@@ -50,6 +56,10 @@ export function createVoiceActions(deps: {
   let codeTimer: ReturnType<typeof setInterval> | null = null;
   let stats: { stop(): void } | null = null;
   let mediaStarted = false;
+  let refreshTimer: ReturnType<typeof setInterval> | null = null;
+  let playbackSince = 0;
+  let refreshing = false;
+  const clock = deps.refresh?.now ?? Date.now;
   let queue: Promise<void> = Promise.resolve();
   let media = 0;
 
@@ -67,7 +77,34 @@ export function createVoiceActions(deps: {
     return ptt;
   }
 
+  async function refreshPlayback(generation: number): Promise<void> {
+    if (refreshing || !mixer || !playback) return;
+    if (clock() - playbackSince < (deps.refresh?.minUptimeMs ?? 5 * 60_000)) return;
+    if (mixer.idleMs() < (deps.refresh?.quietMs ?? 2_000)) return;
+    refreshing = true;
+    try {
+      const fresh = await deps.media.startPlayback({ target: settings().outputDevice ?? undefined });
+      if (generation !== media || !mixer) {
+        await fresh.stop();
+        return;
+      }
+      const old = playback;
+      playback = fresh;
+      mixer.setPlayback(fresh);
+      playbackSince = clock();
+      log.info("voice.output", { state: "refreshed" });
+      await old?.stop();
+    } catch (error) {
+      log.warn("voice.output", { state: "refresh-failed", error_name: error instanceof Error ? error.name : "unknown" });
+      playbackSince = clock();
+    } finally {
+      refreshing = false;
+    }
+  }
+
   function clearTimers(): void {
+    if (refreshTimer !== null) clearInterval(refreshTimer);
+    refreshTimer = null;
     if (codeTimer !== null) clearInterval(codeTimer);
     codeTimer = null;
     stats?.stop();
@@ -93,6 +130,7 @@ export function createVoiceActions(deps: {
       });
       mixer.setMuted(voice().selfDeaf);
       mixer.start();
+      playbackSince = clock();
       rx = createReceiver({
         session,
         mixer,
@@ -135,6 +173,8 @@ export function createVoiceActions(deps: {
       log,
       read: () => ({ ...(rx?.stats() ?? { packets: 0, decodeErrors: 0 }), state: voice().status }),
     });
+    refreshTimer = setInterval(() => void refreshPlayback(generation), deps.refresh?.checkMs ?? 10_000);
+    refreshTimer.unref?.();
     codeTimer = setInterval(() => {
       store.dispatch({ type: "voice/privacyCode", code: session.privacyCode() });
     }, 1_000);

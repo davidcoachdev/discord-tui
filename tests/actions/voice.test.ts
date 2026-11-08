@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 
 import { createVoiceActions, type VoiceMedia } from "../../src/actions/voice";
 import { createStore, emptyState } from "../../src/store/store";
@@ -162,4 +162,69 @@ test("privacy code is polled into the store while connected", async () => {
   await Bun.sleep(1_100);
   expect(store.getState().voice.privacyCode).toBe("123451234512345");
   await voice.leaveVoice();
+});
+
+describe("output refresh for clock drift in long calls", () => {
+  function refreshSetup(refresh: { checkMs: number; minUptimeMs: number; quietMs: number }) {
+    const store = createStore(emptyState());
+    store.dispatch({
+      type: "gw",
+      t: "READY",
+      d: { user: { id: ME, username: "gon" }, guilds: [{ id: GUILD, name: "g", roles: [], channels: [{ id: VOICE_A, type: 2, name: "Voz" }] }] },
+    });
+    const statusListeners = new Set<(s: VoiceStatus, e?: string) => void>();
+    const session: VoiceSession = {
+      async join() {
+        statusListeners.forEach((fn) => fn("connected"));
+      },
+      setFlags() {},
+      async leave() {
+        statusListeners.forEach((fn) => fn("idle"));
+      },
+      onStatus(fn) {
+        statusListeners.add(fn);
+        return () => statusListeners.delete(fn);
+      },
+      sendOpus() {},
+      setSpeaking() {},
+      onSpeaking: () => () => {},
+      onOpus: () => () => {},
+      privacyCode: () => null,
+    };
+    let opened = 0;
+    let stopped = 0;
+    const voice = createVoiceActions({
+      store,
+      session,
+      refresh,
+      media: {
+        startCapture: async () => ({ onFrame: () => () => {}, stop: async () => {} }),
+        startPlayback: async () => {
+          opened += 1;
+          return { write() {}, stop: async () => void (stopped += 1), dropped: () => 0 };
+        },
+        createCodec: () => ({ encode: (p) => p, decode: (o) => o }),
+        createVad: () => ({ push: () => null, isOpen: false, thresholdDb: -45, levelDb: -96 }),
+      },
+    });
+    return { voice, counts: () => ({ opened, stopped }) };
+  }
+
+  test("after the minimum uptime, during silence, a fresh pw-cat replaces the old one", async () => {
+    const { voice, counts } = refreshSetup({ checkMs: 20, minUptimeMs: 40, quietMs: 0 });
+    await voice.toggleVoice(VOICE_A);
+    await Bun.sleep(200);
+    expect(counts().opened).toBeGreaterThanOrEqual(2);
+    expect(counts().stopped).toBe(counts().opened - 1);
+    await voice.leaveVoice();
+    expect(counts().stopped).toBe(counts().opened);
+  });
+
+  test("no refresh while someone talked recently", async () => {
+    const { voice, counts } = refreshSetup({ checkMs: 20, minUptimeMs: 40, quietMs: 60_000 });
+    await voice.toggleVoice(VOICE_A);
+    await Bun.sleep(150);
+    expect(counts().opened).toBe(1);
+    await voice.leaveVoice();
+  });
 });

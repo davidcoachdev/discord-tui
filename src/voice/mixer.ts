@@ -28,6 +28,10 @@ export interface Mixer {
   stop(): void;
   setMuted(m: boolean): void;
   activeUsers(): string[];
+  /** Cambia la salida (pw-cat nuevo) sin cortar el reloj del mixer; le pone su colchón. */
+  setPlayback(playback: { write(pcm: Uint8Array): void }): void;
+  /** Milisegundos desde el último frame con audio de alguien (para renovar la salida en un silencio). */
+  idleMs(): number;
 }
 
 export function createMixer(deps: {
@@ -49,6 +53,8 @@ export function createMixer(deps: {
   const clearTimer =
     deps.clearTimer ?? ((h: unknown): void => clearInterval(h as ReturnType<typeof setInterval>));
   const buffers = new Map<string, JitterBuffer>();
+  let playback = deps.playback;
+  let lastAudioAt = now();
   let muted = false;
   let timer: unknown = null;
   let clock = 0;
@@ -59,7 +65,7 @@ export function createMixer(deps: {
 
   function cushion(): void {
     if (!continuous || muted) return;
-    for (let i = 0; i < preroll; i += 1) deps.playback.write(SILENCE);
+    for (let i = 0; i < preroll; i += 1) playback.write(SILENCE);
   }
 
   function mixSlot(): void {
@@ -72,10 +78,11 @@ export function createMixer(deps: {
     }
     if (muted) return;
     if (frames.length === 0) {
-      if (continuous) deps.playback.write(SILENCE);
+      if (continuous) playback.write(SILENCE);
       return;
     }
-    deps.playback.write(mixFrames(frames));
+    lastAudioAt = now();
+    playback.write(mixFrames(frames));
   }
 
   function tick(): void {
@@ -124,6 +131,13 @@ export function createMixer(deps: {
     },
     activeUsers(): string[] {
       return [...buffers.keys()];
+    },
+    setPlayback(next): void {
+      playback = next;
+      cushion();
+    },
+    idleMs(): number {
+      return now() - lastAudioAt;
     },
   };
 }

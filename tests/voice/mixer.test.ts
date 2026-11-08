@@ -207,3 +207,33 @@ describe("continuous mode (keeps pw-cat fed)", () => {
     expect(jb.pop()).not.toBeNull();
   });
 });
+
+test("setPlayback moves the stream to a new output with its own cushion; idleMs counts from the last real audio", () => {
+  let t = 0;
+  let tick: (() => void) | null = null;
+  const first: Uint8Array[] = [];
+  const second: Uint8Array[] = [];
+  const mixer = createMixer({
+    playback: { write: (p) => void first.push(p) },
+    now: () => t,
+    setTimer: (fn) => ((tick = fn), 1),
+    clearTimer: () => {},
+    continuous: true,
+    prerollFrames: 3,
+  });
+  mixer.start();
+  const jb = mixer.buffer("a");
+  for (let i = 0; i < 3; i += 1) jb.push(pcmOf(100));
+  t += 20;
+  tick!();
+  expect(mixer.idleMs()).toBe(0);
+  t += 1000;
+  expect(mixer.idleMs()).toBe(1000);
+  mixer.setPlayback({ write: (p) => void second.push(p) });
+  expect(second).toHaveLength(3);
+  const before = first.length;
+  t += 20;
+  tick!();
+  expect(first).toHaveLength(before);
+  expect(second.length).toBeGreaterThan(3);
+});
