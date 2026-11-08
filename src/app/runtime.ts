@@ -13,6 +13,7 @@ import type { Settings } from "../settings/settings";
 import { selectMessages } from "../store/selectors";
 import { createStore, type Store } from "../store/store";
 import { createVoiceActions, type VoiceMedia } from "../actions/voice";
+import { createGoLive, type GoLive } from "../golive/golive";
 import { createVoiceAdapterCreator } from "../voice/adapter";
 import { startCapture, startPlayback } from "../voice/audio-io";
 import { createOpusCodec } from "../voice/opus";
@@ -33,6 +34,8 @@ export interface RuntimeDeps {
   voiceSession?: VoiceSession;
   voiceMedia?: VoiceMedia;
   kittyKeyboard?: () => boolean;
+  /** Go Live; por defecto el real (src/golive), atado a este gateway. */
+  goLive?: (deps: { store: Store; gateway: ReturnType<typeof createGateway> }) => GoLive;
 }
 
 const defaultMedia: VoiceMedia = {
@@ -81,11 +84,13 @@ export function createRuntime(deps: RuntimeDeps): Runtime {
       meId: () => store.getState().me?.id ?? deps.me.id,
       canSignal: () => gateway.status === "ready",
     });
+  const stream = (deps.goLive ?? ((d) => createGoLive(d)))({ store, gateway });
   const voice = createVoiceActions({
     store,
     session: voiceSession,
     media: deps.voiceMedia ?? defaultMedia,
     kittyKeyboard: deps.kittyKeyboard,
+    stream,
   });
   const statusSync = createStatusSync({ store, rest, presence: idle });
   const actions = createActions({ store, rest, gateway, voice, fetch: deps.fetch, presence: idle, statusSync });
@@ -188,6 +193,9 @@ export function createRuntime(deps: RuntimeDeps): Runtime {
       if (store.getState().voice.channelId !== null) {
         await Promise.race([voice.leaveVoice(), new Promise((resolve) => setTimeout(resolve, 1_500))]);
       }
+      // Por si quedó algo de la captura: no deja procesos huérfanos al salir.
+      stream.dispose();
+      await Promise.race([stream.stop(), new Promise((resolve) => setTimeout(resolve, 2_000))]);
       detachSettings();
       gateway.close();
     },

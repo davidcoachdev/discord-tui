@@ -23,6 +23,7 @@ export function emptyVoice(): VoiceSlice {
     privacyCode: null,
     pttWarning: null,
     micError: null,
+    stream: { status: "idle", monitor: null, error: null },
   };
 }
 

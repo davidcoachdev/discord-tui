@@ -10,6 +10,8 @@ const ALLOWED = [
   "WAYLAND_DISPLAY",
   "PIPEWIRE_RUNTIME_DIR",
   "PULSE_SERVER",
+  // `hyprctl` lo necesita para hablar con Hyprland (lista de monitores para Go Live); no es secreto.
+  "HYPRLAND_INSTANCE_SIGNATURE",
 ];
 
 export function cleanEnv(src: Record<string, string | undefined> = process.env): Record<string, string> {
@@ -21,10 +23,19 @@ export function cleanEnv(src: Record<string, string | undefined> = process.env):
   return out;
 }
 
-export function spawnClean(cmd: string[], opts?: { stdin?: "pipe" | "ignore"; stdout?: "pipe" | "ignore" }): Subprocess {
+export function spawnClean(
+  cmd: string[],
+  opts?: {
+    /** Un ReadableStream (p. ej. el stdout de otro proceso) lo conecta directo, sin pasar por JS. */
+    stdin?: "pipe" | "ignore" | ReadableStream<Uint8Array>;
+    stdout?: "pipe" | "ignore";
+    stderr?: "pipe" | "ignore" | "inherit";
+  },
+): Subprocess {
   return Bun.spawn(cmd, {
     env: cleanEnv(),
     stdin: opts?.stdin ?? "ignore",
     stdout: opts?.stdout ?? "pipe",
+    ...(opts?.stderr ? { stderr: opts.stderr } : {}),
   });
 }

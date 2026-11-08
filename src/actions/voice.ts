@@ -1,4 +1,6 @@
 import { log } from "../log/logger";
+import type { GoLive } from "../golive/golive";
+import type { Monitor } from "../golive/capture";
 import type { Store } from "../store/store";
 import type { AudioCapture, AudioPlayback } from "../voice/audio-io";
 import { createMixer, type Mixer } from "../voice/mixer";
@@ -26,6 +28,12 @@ export interface VoiceActions {
   pttKey(e: PttKey): void;
   /** Nivel del mic en vivo (para la barra): dBFS y umbral. */
   micLevel(): { levelDb: number; thresholdDb: number } | null;
+  /** Go Live: transmitir un monitor (por defecto el de settings). Solo estando en un canal de voz. */
+  startStream?(monitor?: string | null): Promise<void>;
+  stopStream?(): Promise<void>;
+  toggleStream?(): Promise<void>;
+  /** Monitores que se pueden transmitir (Hyprland; si no, uno: el predeterminado). */
+  listMonitors?(): Promise<Monitor[]>;
 }
 
 function errorText(error: unknown): string {
@@ -37,6 +45,8 @@ export function createVoiceActions(deps: {
   session: VoiceSession;
   media: VoiceMedia;
   kittyKeyboard?: () => boolean;
+  /** Go Live atado a esta voz (src/golive). */
+  stream?: GoLive;
   /**
    * Renovación de la salida para el desfase de relojes: el reloj de la PC (que marca el ritmo del mixer) y el
    * de la placa de audio se separan ~50–100 ppm, así que en una llamada larga el colchón de pw-cat se agota
@@ -242,6 +252,7 @@ export function createVoiceActions(deps: {
   });
 
   async function leaveVoice(error?: string): Promise<void> {
+    await deps.stream?.stop();
     await stopMedia();
     await session.leave();
     store.dispatch({ type: "voice/left", error: error ?? null });
@@ -281,6 +292,7 @@ export function createVoiceActions(deps: {
         return;
       }
       if (state.voice.channelId !== null) {
+        await deps.stream?.stop();
         await stopMedia();
         await session.leave();
       }
@@ -334,5 +346,14 @@ export function createVoiceActions(deps: {
     micLevel() {
       return vad ? { levelDb: vad.levelDb, thresholdDb: vad.thresholdDb } : null;
     },
+
+    ...(deps.stream
+      ? {
+          startStream: (monitor?: string | null) => deps.stream!.start(monitor),
+          stopStream: () => deps.stream!.stop(),
+          toggleStream: () => deps.stream!.toggle(),
+          listMonitors: () => deps.stream!.listMonitors(),
+        }
+      : {}),
   };
 }

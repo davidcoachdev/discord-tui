@@ -11,6 +11,9 @@ export type ThemeName = "dark" | "light";
 /** Estado propio elegido a mano (el "ausente" automático por inactividad no se guarda acá). */
 export type OwnStatus = "online" | "idle" | "dnd" | "invisible";
 export const OWN_STATUSES: OwnStatus[] = ["online", "idle", "dnd", "invisible"];
+/** Calidad de Go Live. Sin Nitro el cliente oficial limita a 720p30; 1080p30 puede necesitar Nitro. */
+export type StreamQuality = "720p30" | "1080p30";
+export const STREAM_QUALITIES: StreamQuality[] = ["720p30", "1080p30"];
 
 export interface Settings {
   version: typeof VERSION;
@@ -23,6 +26,9 @@ export interface Settings {
   idleAfterMinutes: number | null;
   inlineImages: boolean;
   status: OwnStatus;
+  /** Monitor a transmitir (nombre de `hyprctl monitors`); null = preguntar si hay más de uno. */
+  streamMonitor: string | null;
+  streamQuality: StreamQuality;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -36,6 +42,8 @@ export const DEFAULT_SETTINGS: Settings = {
   idleAfterMinutes: 10,
   inlineImages: true,
   status: "online",
+  streamMonitor: null,
+  streamQuality: "720p30",
 };
 
 const MIN_SENSITIVITY = -60;
@@ -103,6 +111,10 @@ export function normalizeSettings(raw: unknown): Settings {
     idleAfterMinutes: parseIdle(record.idleAfterMinutes),
     inlineImages: typeof record.inlineImages === "boolean" ? record.inlineImages : DEFAULT_SETTINGS.inlineImages,
     status: OWN_STATUSES.includes(record.status as OwnStatus) ? (record.status as OwnStatus) : DEFAULT_SETTINGS.status,
+    streamMonitor: parseDevice(record.streamMonitor),
+    streamQuality: STREAM_QUALITIES.includes(record.streamQuality as StreamQuality)
+      ? (record.streamQuality as StreamQuality)
+      : DEFAULT_SETTINGS.streamQuality,
   };
 }
 
