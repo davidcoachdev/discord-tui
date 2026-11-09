@@ -37,7 +37,7 @@ lo único que corrés es `bun run dev` (o `bun run demo` para mirar sin conectar
 - [ ] `i`, `@` + parte de un nombre → aparece el cartel de menciones; `Tab` elige; Enter → en el teléfono es una mención real (azul).
 - [ ] Sobre un mensaje tuyo: `e`, cambiá el texto, Enter → "(editado)". `dd`, `y` → se borra.
 - [ ] `+`, escribí `fire`, Enter → reacción 🔥; repetilo → se va.
-- [ ] Captura al portapapeles (Print de Omarchy), en el canal `Ctrl-v` → aparece `📎 captura-….png`; Enter → llega. `a`, un path a un archivo chico, Enter, Enter → llega.
+- [ ] Captura al portapapeles (Print de Omarchy), en el canal `Ctrl-v` → aparece `📎 captura-….png`; Enter → llega. Lo mismo con `Ctrl+Shift+V` (pegado de Ghostty). Copiá 2 archivos en el gestor de archivos (Ctrl-c) → `Ctrl-v` en el canal → aparecen los dos `📎`; Enter → llegan. Arrastrar/pegar una ruta `file://…` también adjunta. `a`, un path a un archivo chico, Enter, Enter → llega.
 - [ ] Wifi cortado, mandá "sin red" → queda `✗ no se envió · R reintenta`. Volvé el wifi, `R` → llega una sola vez.
 - [ ] Abrí un canal con no leídos, esperá 2 s → en el teléfono deja de figurar no leído.
 - [ ] [2ª] Mientras escribís, la otra cuenta ve "está escribiendo…"; una mención desde la otra cuenta (estando vos en otro canal) dispara la notificación de escritorio.

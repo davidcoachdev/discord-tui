@@ -27,7 +27,7 @@ export const SPEC_KEYS: KeyEntry[] = [
   { key: "+", desc: "reaccionar con emoji", group: "Mensajes" },
   { key: "1-9", desc: "votar en la encuesta seleccionada", group: "Mensajes" },
   { key: "R", desc: "reintentar el envío fallido", group: "Mensajes" },
-  { key: "Ctrl-v", desc: "pegar imagen del portapapeles", group: "Mensajes" },
+  { key: "Ctrl-v", desc: "pegar del portapapeles: archivos copiados, imagen o texto (Ctrl+Shift+V también)", group: "Mensajes" },
   { key: "a", desc: "adjuntar archivo por path (en un foro: traer posts archivados)", group: "Mensajes" },
   { key: "x", desc: "quitar el último adjunto", group: "Mensajes" },
   // En modo insert (escribiendo). Ctrl-k acá borra hasta el fin de línea; en modo normal abre el switcher.

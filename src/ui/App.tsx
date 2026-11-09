@@ -21,7 +21,7 @@ import {
 import type { Store } from "../store/store";
 import type { ApiPoll, PendingAttachment } from "../store/types";
 import { selectUnreadView } from "../store/unread";
-import { readClipboardImage, readClipboardText } from "../uploads/clipboard";
+import { filePathsFromPastedText, readClipboardFiles, readClipboardImage, readClipboardText } from "../uploads/clipboard";
 import { readAttachmentFromPath } from "../uploads/file";
 import { listAudioDevices } from "../voice/devices";
 import { startCapture, startPlayback } from "../voice/audio-io";
@@ -79,13 +79,16 @@ function isOpenable(kind: string): boolean {
 
 const defaultSettingsDeps: SettingsDeps = { listAudioDevices, startCapture, startPlayback };
 
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+
 export interface AppDeps {
+  readClipboardFiles?: typeof readClipboardFiles;
   readClipboardImage: typeof readClipboardImage;
   readClipboardText: typeof readClipboardText;
   readAttachmentFromPath: typeof readAttachmentFromPath;
 }
 
-const defaultAppDeps: AppDeps = { readClipboardImage, readClipboardText, readAttachmentFromPath };
+const defaultAppDeps: AppDeps = { readClipboardFiles, readClipboardImage, readClipboardText, readAttachmentFromPath };
 
 export function App(props: {
   store: Store;
@@ -672,9 +675,33 @@ export function App(props: {
     setPickerQuery("");
   }
 
+  /** Adjunta archivos por ruta (pegados o copiados desde un gestor de archivos); avisa los que no se pudieron. */
+  async function attachPaths(paths: string[]): Promise<number> {
+    let added = 0;
+    const failed: string[] = [];
+    for (const path of paths) {
+      try {
+        addAttachment(await deps().readAttachmentFromPath(path));
+        added += 1;
+      } catch (error) {
+        failed.push(`${path.split("/").pop()}: ${error instanceof Error ? error.message : "error"}`);
+      }
+    }
+    if (failed.length > 0) flash(`no se pudo adjuntar ${failed.join(", ")}`);
+    if (added > 0) setInsert(true);
+    return added;
+  }
+
+  /** Ctrl-v / 📋: archivos copiados → imagen → texto, en ese orden. */
   async function pasteFromClipboard(): Promise<void> {
+    const files = (await deps().readClipboardFiles?.()) ?? [];
+    if (files.length > 0 && (await attachPaths(files)) > 0) return;
     const image = await deps().readClipboardImage();
     if (image) {
+      if (image.bytes.byteLength > MAX_UPLOAD_BYTES) {
+        flash("la imagen del portapapeles pesa más de 10 MiB");
+        return;
+      }
       addAttachment({ filename: image.filename, mime: image.mime, bytes: image.bytes });
       setInsert(true);
       return;
@@ -770,6 +797,13 @@ export function App(props: {
 
   usePaste((event: PasteEvent) => {
     const text = new TextDecoder().decode(event.bytes);
+    // Pegado de la terminal (Ctrl+Shift+V): si son rutas de archivos se adjuntan; si viene vacío (la terminal
+    // no puede pegar imágenes como texto) se mira si el portapapeles tiene una imagen.
+    if (attachPrompt() === null && !switcherOpen() && isTextChannel()) {
+      const paths = filePathsFromPastedText(text);
+      if (paths.length > 0) return void attachPaths(paths);
+      if (text.trim().length === 0) return void pasteFromClipboard();
+    }
     if (attachPrompt() !== null) {
       setAttachPrompt((previous) => (previous ?? "") + text.replace(/\n/g, ""));
       return;

@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { readClipboardImage, readClipboardText } from "../../src/uploads/clipboard";
+import { filePathsFromPastedText, filePathsFromUriList, readClipboardFiles, readClipboardImage, readClipboardText } from "../../src/uploads/clipboard";
 
 type FakeProc = { stdout: ReadableStream<Uint8Array> | null; exited: Promise<number> };
 
@@ -88,4 +88,32 @@ test("readClipboardText returns the text or null", async () => {
       },
     }),
   ).toBeNull();
+});
+
+test("filePathsFromUriList decodes file:// URIs and skips comments, copy/cut and remote URIs", () => {
+  expect(filePathsFromUriList("copy\nfile:///home/a/b%20c.png\r\n# comentario\nhttps://x.com/y.png\nfile:///tmp/z.txt")).toEqual([
+    "/home/a/b c.png",
+    "/tmp/z.txt",
+  ]);
+});
+
+test("filePathsFromPastedText only accepts text that is all paths", () => {
+  expect(filePathsFromPastedText("file:///tmp/a.png")).toEqual(["/tmp/a.png"]);
+  expect(filePathsFromPastedText("/tmp/a.png\n~/b.pdf\n")).toEqual(["/tmp/a.png", "~/b.pdf"]);
+  expect(filePathsFromPastedText("mirá /tmp/a.png")).toEqual([]);
+  expect(filePathsFromPastedText("/usr/bin")).toEqual([]);
+  expect(filePathsFromPastedText("")).toEqual([]);
+});
+
+test("readClipboardFiles reads text/uri-list (or gnome-copied-files) when present", async () => {
+  const calls: string[][] = [];
+  const spawn = (cmd: string[]): FakeProc => {
+    calls.push(cmd);
+    if (cmd[1] === "--list-types") return proc("x-special/gnome-copied-files\ntext/uri-list\ntext/plain\n");
+    return proc("file:///home/gon/a.png\r\nfile:///home/gon/b.pdf\r\n");
+  };
+  expect(await readClipboardFiles({ spawn })).toEqual(["/home/gon/a.png", "/home/gon/b.pdf"]);
+  expect(calls[1]).toEqual(["wl-paste", "--no-newline", "--type", "text/uri-list"]);
+  expect(await readClipboardFiles({ spawn: () => proc("image/png\n") })).toEqual([]);
+  expect(await readClipboardFiles({ spawn: () => proc("", 1) })).toEqual([]);
 });

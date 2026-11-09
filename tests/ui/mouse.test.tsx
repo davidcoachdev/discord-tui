@@ -222,6 +222,7 @@ test("wheel up at the top of the channel loads older messages", async () => {
 test("composer: click writes, 📎 asks for a path, 📋 pastes, ✕ removes an attachment", async () => {
   const s = setup();
   const h = await render(s, {
+    readClipboardFiles: async () => [],
     readClipboardImage: async () => ({ bytes: new Uint8Array(4), mime: "image/png", filename: "captura.png" }),
     readClipboardText: async () => null,
   });

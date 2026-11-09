@@ -50,6 +50,7 @@ test("@ + Tab picks a mention and it is sent as <@id>; typing notifies", async (
 test("Ctrl-v with an image in the clipboard attaches it; Enter sends it", async () => {
   const s = setup();
   const { mockInput, renderOnce, captureCharFrame } = await render(s, {
+    readClipboardFiles: async () => [],
     readClipboardImage: async () => ({ bytes: png, mime: "image/png", filename: "captura-20261107-120000.png" }),
     readClipboardText: async () => null,
   });
@@ -66,6 +67,7 @@ test("Ctrl-v with an image in the clipboard attaches it; Enter sends it", async 
 test("Ctrl-v without an image pastes the clipboard text", async () => {
   const s = setup();
   const { mockInput, renderOnce } = await render(s, {
+    readClipboardFiles: async () => [],
     readClipboardImage: async () => null,
     readClipboardText: async () => "texto pegado",
   });
@@ -76,6 +78,62 @@ test("Ctrl-v without an image pastes the clipboard text", async () => {
   mockInput.pressEnter();
   await renderOnce();
   expect(s.sent[0]!.content).toBe("texto pegado");
+});
+
+test("Ctrl-v with files copied in a file manager attaches them all (before any image)", async () => {
+  const s = setup();
+  const { mockInput, renderOnce, captureCharFrame } = await render(s, {
+    readClipboardFiles: async () => ["/home/gon/a.png", "/home/gon/informe.pdf"],
+    readClipboardImage: async () => ({ bytes: png, mime: "image/png", filename: "captura.png" }),
+    readClipboardText: async () => null,
+    readAttachmentFromPath: async (p: string) => ({ filename: p.split("/").pop()!, mime: "application/octet-stream", bytes: new Uint8Array(3) }),
+  });
+  await renderOnce();
+  mockInput.pressKey("v", { ctrl: true });
+  await Bun.sleep(5);
+  await renderOnce();
+  const frame = captureCharFrame();
+  expect(frame).toContain("a.png (3 B)");
+  expect(frame).toContain("informe.pdf (3 B)");
+  expect(frame).not.toContain("captura.png");
+  mockInput.pressEnter();
+  await renderOnce();
+  expect(s.sent[0]!.opts.attachments.map((a: any) => a.filename)).toEqual(["a.png", "informe.pdf"]);
+});
+
+test("terminal paste (Ctrl+Shift+V) of file:// paths attaches the files instead of typing them", async () => {
+  const s = setup();
+  const read: string[] = [];
+  const { mockInput, renderOnce, captureCharFrame } = await render(s, {
+    readClipboardFiles: async () => [],
+    readClipboardImage: async () => null,
+    readClipboardText: async () => null,
+    readAttachmentFromPath: async (p: string) => (read.push(p), { filename: p.split("/").pop()!, mime: "image/png", bytes: new Uint8Array(5) }),
+  });
+  await renderOnce();
+  await mockInput.pasteBracketedText("file:///home/gon/Im%C3%A1genes/foto%201.png\n");
+  await Bun.sleep(5);
+  await renderOnce();
+  expect(read).toEqual(["/home/gon/Imágenes/foto 1.png"]);
+  expect(captureCharFrame()).toContain("foto 1.png (5 B)");
+});
+
+test("an empty terminal paste falls back to the clipboard image; normal text is still typed", async () => {
+  const s = setup();
+  const { mockInput, renderOnce, captureCharFrame } = await render(s, {
+    readClipboardFiles: async () => [],
+    readClipboardImage: async () => ({ bytes: png, mime: "image/png", filename: "captura-20261108-100000.png" }),
+    readClipboardText: async () => null,
+  });
+  await renderOnce();
+  await mockInput.pasteBracketedText("");
+  await Bun.sleep(5);
+  await renderOnce();
+  expect(captureCharFrame()).toContain("📎 captura-20261108-100000.png (4 B)");
+  await mockInput.pasteBracketedText("hola /no es ruta");
+  mockInput.pressEnter();
+  await renderOnce();
+  expect(s.sent[0]!.content).toBe("hola /no es ruta");
 });
 
 test("a asks for a path and attaches the file; errors are shown", async () => {
