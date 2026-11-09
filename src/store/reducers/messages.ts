@@ -131,6 +131,8 @@ export function applyPage(
   }
   const ordered = [...ids].sort(compareSnowflakes);
   const trimmed = ordered.length > RING_SIZE ? ordered.slice(ordered.length - RING_SIZE) : ordered;
+  // Lo que quedó fuera del anillo se suelta también de byId (si no, una sesión larga acumula mensajes sin techo).
+  if (trimmed.length < ordered.length) for (const id of ordered.slice(0, ordered.length - trimmed.length)) delete byId[id];
 
   return {
     ...state,

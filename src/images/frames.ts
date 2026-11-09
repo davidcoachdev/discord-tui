@@ -19,7 +19,8 @@ export function createFrameCache(deps: {
   decode(bytes: Uint8Array, maxWidth: number, maxHeight: number): Promise<Animation | null>;
   maxBytes?: number;
 }): FrameCache {
-  const maxBytes = deps.maxBytes ?? 64 * 1024 * 1024;
+  // Cuadros ya decodificados (RGBA): es lo más pesado de la app; en pantalla entran pocas animaciones a la vez.
+  const maxBytes = deps.maxBytes ?? 24 * 1024 * 1024;
   const entries = new Map<string, Animation | null>();
   const pending = new Map<string, Promise<Animation | null>>();
   let total = 0;

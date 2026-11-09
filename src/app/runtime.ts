@@ -7,6 +7,9 @@ import { createGateway } from "../gateway/connection";
 import { createHttp } from "../rest/http";
 import { createRestClient } from "../rest/client";
 import { log } from "../log/logger";
+import { imageCache } from "../images/cache";
+import { frameCache } from "../images/frames";
+import { avatarLoader } from "../images/avatar";
 import { notify, notificationTitle, shouldNotify } from "../notify/notify";
 import { attachSettingsPersistence } from "../settings/persist";
 import type { Settings } from "../settings/settings";
@@ -201,6 +204,19 @@ export function createRuntime(deps: RuntimeDeps): Runtime {
   }, 1000);
   noticeSweep.unref?.();
 
+  // Memoria cada 60 s (solo números): para medir la app real y ver qué crece.
+  const memLog = setInterval(() => {
+    const mem = process.memoryUsage();
+    const state = store.getState();
+    let messages = 0;
+    for (const slice of Object.values(state.messages)) messages += Object.keys(slice.byId).length;
+    const mb = (n: number): number => Math.round(n / 104857.6) / 10;
+    log.info("app.mem", {
+      msg: JSON.stringify({ rss: mb(mem.rss), heap: mb(mem.heapUsed), images: mb(imageCache.bytes ?? 0), frames: mb(frameCache.bytes), avatars: mb(avatarLoader.bytes), messages, users: Object.keys(state.users).length }),
+    });
+  }, 60_000);
+  memLog.unref?.();
+
   // Ack solo del canal abierto que estás mirando, con debounce (spec 7.8).
   let lastViewed = "";
   const offAck = store.subscribe(() => {
@@ -223,6 +239,7 @@ export function createRuntime(deps: RuntimeDeps): Runtime {
     },
     async stop(): Promise<void> {
       clearInterval(noticeSweep);
+      clearInterval(memLog);
       offAck();
       detachSounds();
       idle.stop();

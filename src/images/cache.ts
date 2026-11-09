@@ -4,11 +4,14 @@ const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
 export interface ImageCache {
   get(url: string): Promise<Uint8Array | null>;
+  /** Bytes que ocupa hoy (para el log de memoria). */
+  readonly bytes?: number;
 }
 
 /** LRU de imágenes del CDN. Nunca manda Authorization ni headers de cliente: es un GET pelado. */
 export function createImageCache(deps: { fetch: typeof fetch; maxBytes?: number }): ImageCache {
-  const maxBytes = deps.maxBytes ?? 50 * 1024 * 1024;
+  // Bytes descargados (comprimidos): lo que sale se vuelve a bajar si hace falta.
+  const maxBytes = deps.maxBytes ?? 16 * 1024 * 1024;
   const entries = new Map<string, Uint8Array>();
   const pending = new Map<string, Promise<Uint8Array | null>>();
   let total = 0;
@@ -24,6 +27,9 @@ export function createImageCache(deps: { fetch: typeof fetch; maxBytes?: number 
   }
 
   return {
+    get bytes() {
+      return total;
+    },
     async get(url: string): Promise<Uint8Array | null> {
       if (!isAllowedImageHost(url)) return null;
       const hit = entries.get(url);
