@@ -8,9 +8,16 @@
  * así que hay que reconstruir los mismos bytes para descifrar.
  *
  * Pérdidas: no mandamos NACK (libdatachannel no trae un NACK requester en esta versión). Si falta un paquete, el
- * cuadro se descarta, se avisa (`onLoss`, para pedir un keyframe con PLI) y no se vuelve a decodificar hasta el
- * próximo cuadro con IDR.
+ * cuadro se descarta, se avisa (`onLoss`, para pedir un keyframe con PLI) y se espera el próximo cuadro con IDR.
+ * Los clientes de Discord casi no mandan keyframes solos: mientras se espera se repite el PLI y, si igual no llega
+ * (`KEYFRAME_PATIENCE` cuadros, ~1,5 s), se sigue con los cuadros P. El decodificador tapa la pérdida y la imagen
+ * se va arreglando sola, en vez de quedar congelada para siempre.
  */
+
+/** Cuadros sin IDR que se tiran después de una pérdida antes de seguir igual. */
+export const KEYFRAME_PATIENCE = 45;
+/** Cada cuántos cuadros tirados se vuelve a pedir el keyframe. */
+export const KEYFRAME_RETRY = 15;
 
 export interface RtpPacket {
   marker: boolean;
@@ -147,8 +154,14 @@ export class H264Depacketizer {
   private pending: Pending[] = [];
   private lastEndSeq: number | null = null;
   private needKeyframe = true;
+  /** Ya pasó un keyframe (con SPS/PPS): recién ahí se puede seguir sin esperar otro. */
+  private hadKeyframe = false;
+  private skipped = 0;
   /** Cuadros descartados por pérdida (para diagnóstico). */
   dropped = 0;
+  /** Keyframes recibidos y veces que se siguió sin keyframe (para diagnóstico). */
+  keyframes = 0;
+  concealed = 0;
 
   constructor(private readonly onLoss: () => void = () => {}) {}
 
@@ -190,10 +203,20 @@ export class H264Depacketizer {
           this.lose();
           continue;
         }
-        if (this.needKeyframe) {
-          if (!hasIdr(au)) continue;
-          this.needKeyframe = false;
+        const idr = hasIdr(au);
+        if (idr) this.keyframes++;
+        if (this.needKeyframe && !idr) {
+          this.skipped++;
+          if (this.hadKeyframe && this.skipped >= KEYFRAME_PATIENCE) {
+            this.concealed++;
+          } else {
+            if (this.skipped % KEYFRAME_RETRY === 0) this.onLoss();
+            continue;
+          }
         }
+        this.needKeyframe = false;
+        this.skipped = 0;
+        if (idr) this.hadKeyframe = true;
         out.push(au);
         continue;
       }
@@ -218,6 +241,7 @@ export class H264Depacketizer {
     this.dropped++;
     if (!this.needKeyframe) {
       this.needKeyframe = true;
+      this.skipped = 0;
       this.onLoss();
     }
   }

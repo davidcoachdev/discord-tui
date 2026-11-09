@@ -15,7 +15,7 @@ import type { Store } from "../store/store";
 import type { WatchState } from "../store/types";
 import { displayName } from "../ui/format";
 import { createH264Decoder, type DecodedFrame, type H264Decoder } from "./decode";
-import { hasIdr } from "./h264";
+import { hasIdr, KEYFRAME_PATIENCE, KEYFRAME_RETRY } from "./h264";
 import { createViewerConnection, loadViewerLib, type ViewerConnection, type ViewerEvents, type ViewerLib, type ViewerParams } from "./viewer";
 
 export interface WatchGateway {
@@ -125,6 +125,7 @@ export function createStreamWatcher(deps: {
   let chain: Promise<void> = Promise.resolve();
   let queued = 0;
   let skipUntilKeyframe = true;
+  let skippedSinceDrop = 0;
   let lastShown = -Infinity;
 
   const meId = (): string | null => store.getState().me?.id ?? null;
@@ -134,6 +135,7 @@ export function createStreamWatcher(deps: {
 
   function resetDecodeState(): void {
     skipUntilKeyframe = true;
+    skippedSinceDrop = 0;
     lastShown = -Infinity;
   }
 
@@ -171,8 +173,13 @@ export function createStreamWatcher(deps: {
       return;
     }
     if (skipUntilKeyframe) {
-      if (!hasIdr(au)) return;
+      // Después de tirar la cola: si el keyframe pedido no llega, se sigue igual (ver KEYFRAME_PATIENCE).
+      if (!hasIdr(au) && !(decoder && ++skippedSinceDrop >= KEYFRAME_PATIENCE)) {
+        if (skippedSinceDrop > 0 && skippedSinceDrop % KEYFRAME_RETRY === 0) a.conn?.requestKeyframe();
+        return;
+      }
       skipUntilKeyframe = false;
+      skippedSinceDrop = 0;
     }
     if (queued >= MAX_QUEUE) {
       // El decodificador no da abasto: se tira la cola y se pide un keyframe.

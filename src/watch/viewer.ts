@@ -130,7 +130,7 @@ export function streamerSsrcs(d: any, streamerId: string, meId: string): { audio
 export function createViewerConnection(lib: ViewerLib, p: ViewerParams, events: ViewerEvents): ViewerConnection {
   const { PeerConnection, Audio, Video, RtcpReceivingSession } = lib.nodeDataChannel;
   const stats = { packets: 0, frames: 0, dropped: 0, daveFailures: 0 };
-  const diag = { ops: new Set<number>(), op12: 0, rtpVideo: 0, rtpOther: 0, rtpOtherSsrc: new Set<number>(), passthroughDrop: 0, notReadyDrop: 0, encrypted: 0, clear: 0, lastPt: -1 };
+  const diag = { ops: new Set<number>(), op12: 0, rtpVideo: 0, rtpOther: 0, rtpOtherSsrc: new Set<number>(), passthroughDrop: 0, notReadyDrop: 0, encrypted: 0, clear: 0, lastPt: -1, pli: 0, pliOk: 0 };
   // Referencias vivas: Bun junta con el GC los Track/PeerConnection sin referencia JS (spike de Go Live).
   let pc: any = null;
   let videoTrack: any = null;
@@ -144,7 +144,10 @@ export function createViewerConnection(lib: ViewerLib, p: ViewerParams, events: 
   function keyframe(): void {
     try {
       // Con el track cerrado libdatachannel tira std::runtime_error desde su hilo y aborta el proceso entero.
-      if (videoTrack?.isOpen()) videoTrack.requestKeyframe();
+      if (videoTrack?.isOpen()) {
+        diag.pli++;
+        if (videoTrack.requestKeyframe()) diag.pliOk++;
+      }
     } catch {
       // track cerrado
     }
@@ -311,6 +314,9 @@ export function createViewerConnection(lib: ViewerLib, p: ViewerParams, events: 
         encrypted: diag.encrypted,
         daveFail: stats.daveFailures,
         drop: `${diag.notReadyDrop}/${diag.passthroughDrop}/${stats.dropped}`,
+        idr: depack.keyframes,
+        conceal: depack.concealed,
+        pli: `${diag.pliOk}/${diag.pli}`,
       };
     },
     stop() {

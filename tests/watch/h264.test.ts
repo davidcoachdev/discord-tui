@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { H264Depacketizer, assembleAccessUnit, hasIdr, parseRtp, splitAnnexB, type RtpPacket } from "../../src/watch/h264";
+import { H264Depacketizer, KEYFRAME_PATIENCE, KEYFRAME_RETRY, assembleAccessUnit, hasIdr, parseRtp, splitAnnexB, type RtpPacket } from "../../src/watch/h264";
 
 function rtp(opts: { seq: number; ts: number; marker?: boolean; pt?: number; ssrc?: number; payload: Uint8Array; ext?: boolean; pad?: number }): Uint8Array {
   const ext = opts.ext ? new Uint8Array([0xbe, 0xde, 0, 1, 0x10, 0xaa, 0, 0]) : new Uint8Array(0);
@@ -79,6 +79,27 @@ test("a lost packet drops the frame, asks for a keyframe once, and resumes on th
   const out = d.push(pkt({ seq: 5, ts: 9000, marker: true, payload: IDR }));
   expect(out).toHaveLength(1);
   expect(d.push(pkt({ seq: 6, ts: 12000, marker: true, payload: P }))).toHaveLength(1);
+});
+
+test("if the keyframe never comes it re-asks every KEYFRAME_RETRY frames and resumes after KEYFRAME_PATIENCE", () => {
+  let losses = 0;
+  const d = new H264Depacketizer(() => losses++);
+  d.push(pkt({ seq: 1, ts: 0, marker: true, payload: IDR }));
+  d.push(pkt({ seq: 3, ts: 3000, marker: true, payload: P })); // seq 2 perdido
+  let seq = 4;
+  let emitted = 0;
+  for (let i = 0; i < KEYFRAME_PATIENCE + 5; i++, seq++) emitted += d.push(pkt({ seq, ts: seq * 3000, marker: true, payload: P })).length;
+  expect(losses).toBe(1 + Math.floor((KEYFRAME_PATIENCE - 1) / KEYFRAME_RETRY));
+  expect(emitted).toBeGreaterThan(0);
+  expect(d.concealed).toBe(1);
+  expect(d.keyframes).toBe(1);
+});
+
+test("before any keyframe it never gives up waiting (no SPS/PPS to decode with)", () => {
+  const d = new H264Depacketizer();
+  let emitted = 0;
+  for (let seq = 1; seq < 200; seq++) emitted += d.push(pkt({ seq, ts: seq * 3000, marker: true, payload: P })).length;
+  expect(emitted).toBe(0);
 });
 
 test("sequence numbers wrap around 65535", () => {
