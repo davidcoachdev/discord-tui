@@ -15,12 +15,6 @@ export type SpawnLike = (cmd: string[], opts: { stdin: "pipe" | "ignore"; stdout
 
 export class AudioDeviceError extends Error {}
 
-/**
- * Los streams de PipeWire salen como "discord-tui" (sin esto se llaman "pw-cat"/"pw-record"): así eco, que
- * elige qué llamadas escuchar por `application.name`, reconoce la salida y el micrófono de la llamada.
- */
-export const APP_PROPS = ["-P", '{ application.name = "discord-tui" }'];
-
 function defaultSpawn(): SpawnLike {
   return (cmd, opts) =>
     Bun.spawn(cmd, {
@@ -61,7 +55,7 @@ export interface AudioCapture {
 
 export async function startCapture(opts?: { target?: string; spawn?: SpawnLike }): Promise<AudioCapture> {
   const spawn = opts?.spawn ?? defaultSpawn();
-  const cmd = ["pw-record", "--raw", "--format", "s16", "--rate", "48000", "--channels", "2", "--latency", "20ms", ...APP_PROPS];
+  const cmd = ["pw-record", "--raw", "--format", "s16", "--rate", "48000", "--channels", "2", "--latency", "20ms"];
   if (opts?.target) cmd.push("--target", opts.target);
   cmd.push("-");
 
@@ -121,7 +115,7 @@ export async function startPlayback(opts?: {
   queuedFrames?: number;
 }): Promise<AudioPlayback> {
   const spawn = opts?.spawn ?? defaultSpawn();
-  const cmd = ["pw-cat", "--playback", "--raw", "--format", "s16", "--rate", "48000", "--channels", "2", ...APP_PROPS];
+  const cmd = ["pw-cat", "--playback", "--raw", "--format", "s16", "--rate", "48000", "--channels", "2"];
   if (opts?.target) cmd.push("--target", opts.target);
   cmd.push("-");
 

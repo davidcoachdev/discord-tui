@@ -26,7 +26,6 @@ import { createVad } from "../voice/vad";
 import { listAudioDevices } from "../voice/devices";
 import { attachVoiceSounds, peerCue } from "../sounds/events";
 import { createSoundPlayer, type SoundPlayer } from "../sounds/player";
-import { attachVoiceFeed, type FeedWriter } from "../voice/eco-feed";
 
 export interface RuntimeDeps {
   session: Session;
@@ -50,8 +49,6 @@ export interface RuntimeDeps {
   sounds?: SoundPlayer;
   /** Notificación de escritorio; por defecto `notify-send`. */
   notify?: (title: string, body: string) => void;
-  /** Feed de la llamada para eco; por defecto `$XDG_RUNTIME_DIR/discord-tui/voz.jsonl`. */
-  voiceFeed?: FeedWriter;
 }
 
 const defaultMedia: VoiceMedia = {
@@ -127,7 +124,6 @@ export function createRuntime(deps: RuntimeDeps): Runtime {
       startPlayback: (opts) => media.startPlayback(opts),
     });
   const detachSounds = attachVoiceSounds(store, (cue) => sounds.play(cue));
-  const detachFeed = attachVoiceFeed(store, { write: deps.voiceFeed });
   const statusSync = createStatusSync({ store, rest, presence: idle });
   const actions = createActions({ store, rest, gateway, voice, fetch: deps.fetch, presence: idle, statusSync });
   store.dispatch({ type: "connection", status: gateway.status });
@@ -255,7 +251,6 @@ export function createRuntime(deps: RuntimeDeps): Runtime {
       stream.dispose();
       await Promise.race([stream.stop(), new Promise((resolve) => setTimeout(resolve, 2_000))]);
       detachSettings();
-      detachFeed();
       gateway.close();
     },
     activity(): void {

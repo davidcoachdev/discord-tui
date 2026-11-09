@@ -102,18 +102,6 @@ export function applyVoiceStateUpdate(state: AppState, d: any): AppState {
     };
   }
 
-  // El apodo en el server (para nombrar a quien habla, por ejemplo en el feed para eco).
-  let members = state.members;
-  if (d.member && typeof d.member === "object" && !members[guildId]?.[userId]) {
-    members = {
-      ...members,
-      [guildId]: {
-        ...(members[guildId] ?? {}),
-        [userId]: { userId, guildId, roles: d.member.roles ?? [], nick: d.member.nick ?? null, ...memberAvatar(d.member) },
-      },
-    };
-  }
-
   const guildStates = { ...(state.voice.states[guildId] ?? {}) };
   const member = toVoiceMember(d);
   if (member) guildStates[userId] = member;
@@ -125,7 +113,7 @@ export function applyVoiceStateUpdate(state: AppState, d: any): AppState {
     delete speaking[userId];
     voice = { ...voice, speaking };
   }
-  return { ...state, users, members, voice };
+  return { ...state, users, voice };
 }
 
 export function reduceVoiceAction(state: AppState, action: any): AppState {
