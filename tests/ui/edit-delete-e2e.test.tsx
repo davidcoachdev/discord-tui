@@ -18,7 +18,7 @@ async function setup() {
   const bodies: { method: string; path: string; body: any }[] = [];
   const fake = startFakeHttp(async (req) => {
     const path = new URL(req.url).pathname;
-    const body = req.method === "DELETE" ? null : await req.json().catch(() => null);
+    const body: any = req.method === "DELETE" ? null : await req.json().catch(() => null);
     bodies.push({ method: req.method, path, body });
     if (req.method === "POST") {
       return Response.json({ id: NEW_ID, channel_id: DEMO.general, author: { id: DEMO.me, username: "gon" }, content: body.content, timestamp: new Date().toISOString(), nonce: body.nonce });
