@@ -83,6 +83,19 @@
   .tree .name { font-weight: 700; }
   .tree .root { grid-column: 1 / -1; color: var(--dim); margin-bottom: 2px; }
 
+  /* consumo, como una tabla de top: barras de bloques, números alineados */
+  .top { display: grid; row-gap: 8px; }
+  .top-row { display: grid; grid-template-columns: 10ch 1fr 8ch 14ch; gap: 2ch; align-items: center; }
+  .top-row.head { color: var(--dim); }
+  .top-row.me { color: var(--amber); font-weight: 700; }
+  .top .num { text-align: right; }
+  .top small { color: var(--dim); font-weight: 400; font-size: inherit; }
+  .bar { height: 1.1em; background: #23211e; }
+  .bar i { display: block; height: 100%; width: var(--w); background: currentColor; }
+  .top-row:not(.me) .bar i { background: var(--dim); }
+  .fine { color: var(--dim); margin: 16px 0 0; max-width: 72ch; }
+  strong { color: var(--amber); font-weight: 700; }
+
   .keys { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 4ch; margin: 0; padding: 0; list-style: none; }
   .keys li { display: grid; grid-template-columns: 9ch 1fr; }
   kbd { font: inherit; color: var(--amber); }
@@ -106,6 +119,8 @@
     .install pre { word-break: normal; overflow-wrap: anywhere; }
     .keys { grid-template-columns: 1fr; }
     .req { grid-template-columns: 1fr; }
+    .top-row { grid-template-columns: 8ch 1fr 7ch; }
+    .top-row > :nth-child(4) { display: none; }
     .req dt { margin-top: 6px; }
     .hint { display: none; }
   }
@@ -120,7 +135,7 @@
 
   <h1>Discord en tu terminal.</h1>
   <p class="lead">Chat, voz con cifrado de punta a punta, pantalla compartida y transmisiones, sin abrir la app de
-    Discord. Lo manejás con el mouse o con teclas estilo vim.</p>
+    Discord. Lo manejás con el mouse o con teclas estilo vim. Y usa <strong>casi 4 veces menos memoria</strong>.</p>
 
   <section class="box install" aria-labelledby="t-install">
     <span class="t" id="t-install">probalo</span>
@@ -136,6 +151,17 @@
     <img src="img/zcord.gif" width="1100" height="616" alt="zcord en uso: escribir un mensaje con una mención, saltar a otro canal con Ctrl-k y entrar a una llamada de voz">
     <figcaption>Mandar un mensaje con mención, saltar con Ctrl-k y entrar a la llamada.</figcaption>
   </figure>
+
+  <h2>consumo</h2>
+  <div class="top" role="table" aria-label="Memoria y procesos: zcord contra la app de Discord">
+    <div class="top-row head" role="row"><span role="columnheader">programa</span><span role="columnheader">memoria</span><span role="columnheader" class="num"></span><span role="columnheader" class="num">procesos</span></div>
+    <div class="top-row me" role="row"><span role="cell">zcord</span><span role="cell" class="bar"><i style="--w: 26.7%"></i></span><span role="cell" class="num">217 MB</span><span role="cell" class="num">1 <small>+2 de audio</small></span></div>
+    <div class="top-row" role="row"><span role="cell">Discord</span><span role="cell" class="bar"><i style="--w: 100%"></i></span><span role="cell" class="num">814 MB</span><span role="cell" class="num">9</span></div>
+  </div>
+  <p class="fine">Medido el 8/11/2026 en Arch Linux (Ryzen 9 5900X), los dos abiertos al mismo tiempo durante 60 s, sumando
+    la memoria real (PSS) de todos sus procesos. zcord 0.2.0 estaba <em>en una llamada de voz</em> y todavía sin la
+    versión compilada; la app oficial de Discord 1.0.162 (con Vencord), sin llamada. La versión compilada de zcord baja
+    de ~100 a 55 MB en la demo. Falta comparar CPU con los dos en una llamada.</p>
 
   <h2>qué hace</h2>
   <dl class="tree">

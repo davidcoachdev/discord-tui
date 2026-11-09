@@ -23,6 +23,25 @@ salir de la terminal. Se usa con el mouse como Discord o con el teclado estilo v
 - **Todo clickeable** (sin ids que tipear), con `Ctrl-k` para saltar a cualquier canal, tu estado
   (en línea / ausente / no molestar) y listas de miembros grandes.
 
+## Consumo
+
+zcord usa **unas 3,7 veces menos memoria** que la app oficial de Discord, aun estando en una llamada.
+
+| | memoria (PSS) | procesos |
+| --- | --- | --- |
+| **zcord 0.2.0**, en una llamada de voz | **217 MB** | 1 (+2 de audio: `pw-record`, `pw-cat`) |
+| Discord 1.0.162 (con Vencord), sin llamada | 814 MB | 9 |
+
+- **Cómo se midió:** el 8/11/2026, en Arch Linux con un Ryzen 9 5900X. Los dos estaban abiertos al mismo tiempo y se
+  midieron durante 60 s, sumando el PSS (memoria real, con las páginas compartidas repartidas) de todos sus procesos.
+- **La comparación juega en contra de zcord:** estaba en una llamada y todavía no usaba la versión compilada.
+- **Versión compilada** (`bin/zcord` corre `dist/`, armado con `bun build` sin Babel en ejecución): en la demo baja
+  de 86–110 MB a **55 MB**, y en reposo usa ~0,2 % de un núcleo.
+- **CPU:** en una llamada zcord usa ~4 % de un núcleo; es el audio (mezcla, Opus y PipeWire, 50 cuadros por segundo).
+  Falta medir Discord en una llamada para comparar.
+- **Para medir vos:** `scripts/measure.sh build` (la demo) y el log `app.mem`, que escribe la app real cada 60 s
+  en `~/.local/state/discord-tui/discord-tui.log`.
+
 | Voz y transmisiones | Saltar a cualquier lado (`Ctrl-k`) |
 | --- | --- |
 | ![barra de voz con E2EE, quién habla y botones](docs/img/voz.png) | ![buscador de canales](docs/img/saltar.png) |
@@ -41,7 +60,7 @@ Requisitos:
 
 ```sh
 bun install
-bin/zcord          # la app (la primera vez: login con QR o token)
+bin/zcord          # la app compilada; se recompila sola si cambió el código (login con QR la primera vez)
 bin/zcord demo     # la UI con datos falsos, sin conectarse a Discord
 ```
 
@@ -56,6 +75,9 @@ todas las teclas.
 ```sh
 bun test                       # tests (UI con testRender, sin red)
 bun run typecheck
+ZCORD_DEV=1 bin/zcord          # correr desde src/ sin compilar
+bun scripts/build.ts           # compilar a dist/ a mano
+scripts/measure.sh build       # memoria y CPU de la demo (también: dev)
 bun scripts/screenshots.tsx    # regenera las capturas de este README desde la demo
 bun scripts/readme-gif.tsx     # regenera docs/img/zcord.gif (necesita ffmpeg)
 bun scripts/og-image.ts        # imagen para compartir la landing
