@@ -161,6 +161,8 @@ export function createStreamWatcher(deps: {
     log.info("watch.stopped", { state: isError ? "error" : "idle" });
   }
 
+  let decodedCounter: () => void = () => {};
+
   function onFrame(a: Active, au: Uint8Array): void {
     if (active !== a) return;
     if (store.getState().voice.watch.status === "connecting") setWatch({ status: "watching", error: null });
@@ -186,6 +188,7 @@ export function createStreamWatcher(deps: {
         const want = now() - lastShown >= frameGapMs;
         const frame = await dec.decode(au, want);
         if (frame && active === a) {
+          decodedCounter();
           lastShown = now();
           for (const fn of [...subscribers]) fn(frame);
         }
@@ -240,6 +243,15 @@ export function createStreamWatcher(deps: {
       },
     );
     log.info("watch.connecting");
+    // Diagnóstico mientras se mira: cada 2 s, solo números y estados (para la primera prueba real).
+    let decoded = 0;
+    const diagTimer = setInterval(() => {
+      if (active !== a || !a.conn) return clearInterval(diagTimer);
+      const d = a.conn.diag?.() ?? {};
+      log.info("watch.diag", { state: store.getState().voice.watch.status, count: decoded, msg: JSON.stringify(d).slice(0, 400) });
+    }, 2_000);
+    (diagTimer as { unref?: () => void }).unref?.();
+    decodedCounter = () => decoded++;
   }
 
   async function watchNow(userId: string): Promise<void> {

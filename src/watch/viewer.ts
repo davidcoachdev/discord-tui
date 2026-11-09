@@ -43,6 +43,8 @@ export interface ViewerConnection {
   /** Pide un keyframe (PLI): al empezar a mirar de nuevo o después de una pérdida. */
   requestKeyframe(): void;
   stats(): { packets: number; frames: number; dropped: number; daveFailures: number };
+  /** Diagnóstico (solo números y estados, nada de contenido) para el log mientras se mira. */
+  diag?(): Record<string, unknown>;
   stop(): void;
 }
 
@@ -128,6 +130,7 @@ export function streamerSsrcs(d: any, streamerId: string, meId: string): { audio
 export function createViewerConnection(lib: ViewerLib, p: ViewerParams, events: ViewerEvents): ViewerConnection {
   const { PeerConnection, Audio, Video, RtcpReceivingSession } = lib.nodeDataChannel;
   const stats = { packets: 0, frames: 0, dropped: 0, daveFailures: 0 };
+  const diag = { ops: new Set<number>(), op12: 0, rtpVideo: 0, rtpOther: 0, rtpOtherSsrc: new Set<number>(), passthroughDrop: 0, notReadyDrop: 0, encrypted: 0, clear: 0, lastPt: -1 };
   // Referencias vivas: Bun junta con el GC los Track/PeerConnection sin referencia JS (spike de Go Live).
   let pc: any = null;
   let videoTrack: any = null;
@@ -158,8 +161,14 @@ export function createViewerConnection(lib: ViewerLib, p: ViewerParams, events: 
     const pkt = parseRtp(msg);
     if (!pkt) return;
     stats.packets++;
+    diag.lastPt = pkt.payloadType;
     if (pkt.payloadType !== H264_PT) return; // RTX y demás: sin NACK no sirven
-    if (ssrcs.video && pkt.ssrc !== ssrcs.video) return;
+    if (ssrcs.video && pkt.ssrc !== ssrcs.video) {
+      diag.rtpOther++;
+      if (diag.rtpOtherSsrc.size < 4) diag.rtpOtherSsrc.add(pkt.ssrc);
+      return;
+    }
+    diag.rtpVideo++;
     for (const au of depack.push(pkt)) {
       const plain = decrypt(au);
       if (!plain) continue;
@@ -172,16 +181,24 @@ export function createViewerConnection(lib: ViewerLib, p: ViewerParams, events: 
   function decrypt(au: Uint8Array): Uint8Array | null {
     const encrypted = au.length > 2 && ((au[au.length - 2]! << 8) | au[au.length - 1]!) === DAVE_MAGIC;
     const session = conn.daveSession;
+    if (encrypted) diag.encrypted++;
+    else diag.clear++;
     if (!encrypted) {
       // Sin DAVE (o en una transición) el cuadro viene en claro; con DAVE listo, solo si el decryptor lo permite.
       if (!conn.daveReady || !session) return au;
       try {
-        return session.canPassthrough(p.streamerId) ? au : null;
+        if (session.canPassthrough(p.streamerId)) return au;
+        diag.passthroughDrop++;
+        return null;
       } catch {
+        diag.passthroughDrop++;
         return null;
       }
     }
-    if (!conn.daveReady || !session) return null;
+    if (!conn.daveReady || !session) {
+      diag.notReadyDrop++;
+      return null;
+    }
     try {
       return session.decrypt(p.streamerId, lib.davey.MediaType.VIDEO, Buffer.from(au.buffer, au.byteOffset, au.byteLength));
     } catch {
@@ -242,8 +259,10 @@ export function createViewerConnection(lib: ViewerLib, p: ViewerParams, events: 
         } catch {
           return;
         }
+        if (typeof msg.op === "number") diag.ops.add(msg.op);
         if (msg.op === 2) this.sendOpcode(15, { any: 100 });
         if (msg.op !== 12) return;
+        diag.op12++;
         const found = streamerSsrcs(msg.d, p.streamerId, p.meId);
         if (!found || found.video === ssrcs.video) return;
         ssrcs = found;
@@ -266,6 +285,34 @@ export function createViewerConnection(lib: ViewerLib, p: ViewerParams, events: 
   return {
     requestKeyframe: keyframe,
     stats: () => ({ ...stats }),
+    diag: () => {
+      let pcState = "?";
+      let trackOpen = false;
+      try {
+        pcState = pc ? `${pc.state()}/${pc.iceState?.() ?? "?"}/${pc.gatheringState?.() ?? "?"}` : "sin-pc";
+        trackOpen = videoTrack?.isOpen() === true;
+      } catch {
+        // estado no disponible
+      }
+      return {
+        ops: [...diag.ops].sort((a, b) => a - b).join(","),
+        op12: diag.op12,
+        pc: pcState,
+        track: trackOpen,
+        dave: `${conn?.daveReady ? "lista" : "no"}/v${(conn as any)?._daveProtocolVersion ?? "?"}`,
+        ssrcVideo: ssrcs.video,
+        rtp: stats.packets,
+        rtpVideo: diag.rtpVideo,
+        rtpOther: diag.rtpOther,
+        otherSsrc: [...diag.rtpOtherSsrc].join(","),
+        lastPt: diag.lastPt,
+        frames: stats.frames,
+        clear: diag.clear,
+        encrypted: diag.encrypted,
+        daveFail: stats.daveFailures,
+        drop: `${diag.notReadyDrop}/${diag.passthroughDrop}/${stats.dropped}`,
+      };
+    },
     stop() {
       if (stopped) return;
       stopped = true;
