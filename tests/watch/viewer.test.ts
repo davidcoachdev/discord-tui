@@ -7,7 +7,7 @@ import { afterAll, beforeAll, expect, test } from "bun:test";
 import { createGoLiveShim, loadGoLiveLib } from "../../src/golive/shim";
 import { createH264Decoder } from "../../src/watch/decode";
 import { hasIdr } from "../../src/watch/h264";
-import { createViewerConnection, loadViewerLib, parseRemoteInfo, streamerSsrcs, viewerRemoteSdp, type ViewerConnection } from "../../src/watch/viewer";
+import { createViewerConnection, loadViewerLib, parseRemoteInfo, pliPacket, streamerSsrcs, viewerRemoteSdp, type ViewerConnection } from "../../src/watch/viewer";
 import { fakeGateway, startFakeStreamServer, type FakeStreamServer } from "../fakes/fake-stream-server";
 
 const GUILD = "111111111111111111";
@@ -140,3 +140,7 @@ function describe_e2e() {
     expect(activeVideo.every((o) => o.d.audio_ssrc === 1000)).toBe(true);
   });
 }
+
+test("pliPacket builds an RTCP PLI (PT 206, FMT 1, length 2) with our SSRC as sender", () => {
+  expect([...pliPacket(0x01020304, 0xa0b0c0d0)]).toEqual([0x81, 206, 0, 2, 1, 2, 3, 4, 0xa0, 0xb0, 0xc0, 0xd0]);
+});

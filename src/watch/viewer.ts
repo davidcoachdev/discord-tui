@@ -77,6 +77,17 @@ interface RemoteInfo {
 }
 
 /** SDP remota "del server" hecha a mano (como la librería), pero mandando hacia nosotros y con los SSRC conocidos. */
+/** RTCP PLI (RFC 4585, PT 206 FMT 1): pide un keyframe del SSRC `media`. */
+export function pliPacket(sender: number, media: number): Buffer {
+  const b = Buffer.alloc(12);
+  b[0] = 0x81;
+  b[1] = 206;
+  b.writeUInt16BE(2, 2);
+  b.writeUInt32BE(sender >>> 0, 4);
+  b.writeUInt32BE(media >>> 0, 8);
+  return b;
+}
+
 export function viewerRemoteSdp(r: RemoteInfo, ssrcs: { audio: number | null; video: number | null; rtx: number | null }): string {
   const common = [r.ip, "a=setup:passive", "%MID%", "a=sendonly", r.ufrag, r.pwd, r.fingerprint, r.candidate, "a=rtcp-mux"];
   const audio = [
@@ -130,7 +141,8 @@ export function streamerSsrcs(d: any, streamerId: string, meId: string): { audio
 export function createViewerConnection(lib: ViewerLib, p: ViewerParams, events: ViewerEvents): ViewerConnection {
   const { PeerConnection, Audio, Video, RtcpReceivingSession } = lib.nodeDataChannel;
   const stats = { packets: 0, frames: 0, dropped: 0, daveFailures: 0 };
-  const diag = { ops: new Set<number>(), op12: 0, rtpVideo: 0, rtpOther: 0, rtpOtherSsrc: new Set<number>(), passthroughDrop: 0, notReadyDrop: 0, encrypted: 0, clear: 0, lastPt: -1, pli: 0, pliOk: 0 };
+  const diag = { ops: new Set<number>(), op12: 0, rtpVideo: 0, rtpOther: 0, rtpOtherSsrc: new Set<number>(), passthroughDrop: 0, notReadyDrop: 0, encrypted: 0, clear: 0, lastPt: -1, pli: 0, pliOk: 0, pliOwn: 0, wants: 0 };
+  let ownSsrc = 0;
   // Referencias vivas: Bun junta con el GC los Track/PeerConnection sin referencia JS (spike de Go Live).
   let pc: any = null;
   let videoTrack: any = null;
@@ -147,10 +159,42 @@ export function createViewerConnection(lib: ViewerLib, p: ViewerParams, events: 
       if (videoTrack?.isOpen()) {
         diag.pli++;
         if (videoTrack.requestKeyframe()) diag.pliOk++;
+        // El PLI de libdatachannel sale con el SSRC del que transmite también como remitente; el SFU puede
+        // descartarlo. Va otro con nuestro SSRC (op 2) como remitente. [sin verificar cuál de los dos sirve]
+        if (ownSsrc && ssrcs.video && videoTrack.sendMessageBinary(pliPacket(ownSsrc, ssrcs.video))) diag.pliOwn++;
       }
     } catch {
       // track cerrado
     }
+    refreshWants();
+  }
+
+  /**
+   * Plan B para conseguir un keyframe: bajar a 0 y volver a 100 la calidad pedida de ese video (op 15). Cuando
+   * vuelve a suscribirse, el SFU le pide un keyframe al que transmite (así arrancó bien la primera vez). Como mucho
+   * cada 3 s. [sin verificar]
+   */
+  let lastWants = 0;
+  function refreshWants(): void {
+    const video = ssrcs.video;
+    if (!conn || !video || stopped || Date.now() - lastWants < 3000) return;
+    lastWants = Date.now();
+    diag.wants++;
+    try {
+      conn.sendOpcode(15, { any: 100, [video]: 0 });
+    } catch {
+      return;
+    }
+    const t = setTimeout(() => {
+      if (!stopped && ssrcs.video === video) {
+        try {
+          conn.sendOpcode(15, { any: 100, [video]: 100 });
+        } catch {
+          // ws cerrado
+        }
+      }
+    }, 200);
+    (t as { unref?: () => void }).unref?.();
   }
 
   function applyRemote(renegotiate: boolean): void {
@@ -263,7 +307,10 @@ export function createViewerConnection(lib: ViewerLib, p: ViewerParams, events: 
           return;
         }
         if (typeof msg.op === "number") diag.ops.add(msg.op);
-        if (msg.op === 2) this.sendOpcode(15, { any: 100 });
+        if (msg.op === 2) {
+          if (typeof msg.d?.ssrc === "number") ownSsrc = msg.d.ssrc;
+          this.sendOpcode(15, { any: 100 });
+        }
         if (msg.op !== 12) return;
         diag.op12++;
         const found = streamerSsrcs(msg.d, p.streamerId, p.meId);
@@ -316,7 +363,8 @@ export function createViewerConnection(lib: ViewerLib, p: ViewerParams, events: 
         drop: `${diag.notReadyDrop}/${diag.passthroughDrop}/${stats.dropped}`,
         idr: depack.keyframes,
         conceal: depack.concealed,
-        pli: `${diag.pliOk}/${diag.pli}`,
+        pli: `${diag.pliOk}/${diag.pli}/${diag.pliOwn}`,
+        wants: diag.wants,
       };
     },
     stop() {
