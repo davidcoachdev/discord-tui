@@ -3,6 +3,7 @@ import { useKeyboard, usePaste, useRenderer, useTerminalDimensions, type JSX } f
 import { createEffect, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 
 import type { Actions } from "../actions";
+import { log } from "../log/logger";
 import { COMMON_EMOJI } from "../emoji/common";
 import { animationScheduler } from "../images/animation";
 import { userAvatarUrl } from "../images/avatar";
@@ -695,8 +696,10 @@ export function App(props: {
   /** Ctrl-v / 📋: archivos copiados → imagen → texto, en ese orden. */
   async function pasteFromClipboard(): Promise<void> {
     const files = (await deps().readClipboardFiles?.()) ?? [];
+    log.info("clipboard.paste", { msg: "files", count: files.length });
     if (files.length > 0 && (await attachPaths(files)) > 0) return;
     const image = await deps().readClipboardImage();
+    log.info("clipboard.paste", { msg: image ? `image ${image.mime}` : "no image", count: image?.bytes.byteLength ?? 0 });
     if (image) {
       if (image.bytes.byteLength > MAX_UPLOAD_BYTES) {
         flash("la imagen del portapapeles pesa más de 10 MiB");
@@ -797,6 +800,7 @@ export function App(props: {
 
   usePaste((event: PasteEvent) => {
     const text = new TextDecoder().decode(event.bytes);
+    log.info("ui.paste", { count: event.bytes.byteLength });
     // Pegado de la terminal (Ctrl+Shift+V): si son rutas de archivos se adjuntan; si viene vacío (la terminal
     // no puede pegar imágenes como texto) se mira si el portapapeles tiene una imagen.
     if (attachPrompt() === null && !switcherOpen() && isTextChannel()) {
@@ -825,6 +829,10 @@ export function App(props: {
         return;
       }
       props.onActivity?.();
+      // Diagnóstico del pegado: solo teclas con Ctrl/Alt o sin nombre (nunca lo que se escribe).
+      if (key.ctrl || key.meta || !key.name) {
+        log.info("ui.key", { msg: JSON.stringify({ name: key.name, ctrl: key.ctrl, meta: key.meta, shift: key.shift, raw: key.raw ?? key.sequence }) });
+      }
       if (settingsOpen() || statusMenuOpen() || monitorChoices() !== null || outputChoices() !== null) return;
 
       if (helpOpen()) {

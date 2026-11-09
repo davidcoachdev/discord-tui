@@ -1,3 +1,4 @@
+import { log } from "../log/logger";
 import { spawnClean } from "../proc/spawn";
 
 type SpawnFn = (cmd: string[]) => { stdout: ReadableStream<Uint8Array> | null; exited: Promise<number> };
@@ -24,9 +25,13 @@ async function run(spawn: SpawnFn, cmd: string[]): Promise<Uint8Array | null> {
     const proc = spawn(cmd);
     if (proc.stdout === null) return null;
     const [bytes, code] = await Promise.all([new Response(proc.stdout).bytes(), proc.exited]);
-    if (code !== 0 || bytes.byteLength === 0) return null;
+    if (code !== 0 || bytes.byteLength === 0) {
+      log.info("clipboard.wl_paste", { msg: cmd.slice(1).join(" "), code, count: bytes.byteLength });
+      return null;
+    }
     return bytes;
-  } catch {
+  } catch (error) {
+    log.warn("clipboard.wl_paste", { msg: cmd.slice(1).join(" "), error_name: error instanceof Error ? error.message : "error" });
     return null;
   }
 }
