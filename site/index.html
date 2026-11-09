@@ -68,6 +68,13 @@
   .copy:hover { background: var(--amber); color: var(--amber-ink); }
   .copy[data-done] { color: var(--ink); }
 
+  /* Fotos antiguas en duotono ámbar: la foto en gris se funde (multiply) sobre una placa ámbar. */
+  .plate { margin: 40px 0 0; }
+  .plate .tint { background: #d9a441; }
+  .plate img { display: block; width: 100%; height: auto; filter: grayscale(1) contrast(1.15) brightness(1.05); mix-blend-mode: multiply; }
+  .plate figcaption { margin-top: 10px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 3ch; color: var(--dim); }
+  .plate figcaption span:first-child { color: var(--ink); }
+
   .demo { padding: 14px; }
   .demo img { display: block; width: 100%; height: auto; }
   .demo figcaption { color: var(--dim); margin-top: 10px; }
@@ -96,13 +103,7 @@
   .fine { color: var(--dim); margin: 16px 0 0; max-width: 72ch; }
   strong { color: var(--amber); font-weight: 700; }
 
-  .keys { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 4ch; margin: 0; padding: 0; list-style: none; }
-  .keys li { display: grid; grid-template-columns: 9ch 1fr; }
-  kbd { font: inherit; color: var(--amber); }
 
-  .req { display: grid; grid-template-columns: 10ch 1fr; row-gap: 6px; margin: 0; }
-  .req dt { color: var(--dim); }
-  .req dd { margin: 0; }
 
   .warn { border-color: #6b5a33; }
   .warn > .t { color: var(--amber); }
@@ -117,11 +118,8 @@
     main { padding-top: 24px; }
     .tree { grid-template-columns: 4ch 9ch 1fr; }
     .install pre { word-break: normal; overflow-wrap: anywhere; }
-    .keys { grid-template-columns: 1fr; }
-    .req { grid-template-columns: 1fr; }
     .top-row { grid-template-columns: 8ch 1fr 7ch; }
     .top-row > :nth-child(4) { display: none; }
-    .req dt { margin-top: 6px; }
     .hint { display: none; }
   }
   @media (prefers-reduced-motion: reduce) { .caret { animation: none; } }
@@ -137,12 +135,18 @@
   <p class="lead">Chat, voz con cifrado de punta a punta, pantalla compartida y transmisiones, sin abrir la app de
     Discord. Lo manejás con el mouse o con teclas estilo vim. Y usa <strong>casi 4 veces menos memoria</strong>.</p>
 
+  <figure class="plate">
+    <div class="tint"><img src="img/fig1.jpg" width="1600" height="1271" alt="Fotografía antigua: una fila de operadoras de larga distancia de Bell System conectando llamadas en un conmutador; en el tablero se leen Argentina y Buenos Aires"></div>
+    <figcaption><span>fig. 1 — los canales, antes de los canales.</span> <span>Operadoras de larga distancia de Bell System; el tablero dice Argentina y Buenos Aires. Años 40.</span></figcaption>
+  </figure>
+
   <section class="box install" aria-labelledby="t-install">
     <span class="t" id="t-install">probalo</span>
 <pre id="cmd"><span class="ps">$ </span>git clone https://github.com/gonzalonicolasr/discord-tui
 <span class="ps">$ </span>cd discord-tui &amp;&amp; bun install
 <span class="ps">$ </span>bin/zcord demo</pre>
     <p class="note"><code>bin/zcord demo</code> abre la interfaz con datos de prueba, sin loguearte. <code>bin/zcord</code> entra con tu cuenta (QR la primera vez).</p>
+    <p class="note">Linux con Wayland y PipeWire, <a href="https://bun.sh">Bun</a> y Ghostty o Kitty.</p>
     <button class="copy" id="copy" type="button" aria-describedby="t-install">[ copiar ]</button>
   </section>
 
@@ -166,34 +170,17 @@
   <h2>qué hace</h2>
   <dl class="tree">
     <dt class="root">zcord/</dt>
-    <dt class="br">├──</dt><dt class="name">chat</dt><dd>servidores, canales, DMs, hilos y foros. Markdown, código, respuestas, reacciones, menciones, encuestas y embeds.</dd>
-    <dt class="br">├──</dt><dt class="name">voz</dt><dd>cifrado E2EE de Discord (DAVE) con código de privacidad, VAD o push-to-talk, volumen por persona.</dd>
-    <dt class="br">├──</dt><dt class="name">pantalla</dt><dd>compartís tu monitor con Go Live y mirás las transmisiones de los demás.</dd>
-    <dt class="br">├──</dt><dt class="name">imágenes</dt><dd>avatares, GIFs animados y emojis dibujados de verdad con el protocolo gráfico de Kitty.</dd>
-    <dt class="br">└──</dt><dt class="name">pegar</dt><dd>Ctrl-v adjunta una captura o los archivos que copiaste.</dd>
+    <dt class="br">├──</dt><dt class="name">chat</dt><dd>servidores, DMs, hilos, foros, reacciones y encuestas.</dd>
+    <dt class="br">├──</dt><dt class="name">voz</dt><dd>con el cifrado de punta a punta de Discord.</dd>
+    <dt class="br">├──</dt><dt class="name">pantalla</dt><dd>compartís la tuya y mirás la de los demás.</dd>
+    <dt class="br">├──</dt><dt class="name">imágenes</dt><dd>avatares, GIFs y emojis dibujados en la terminal.</dd>
+    <dt class="br">└──</dt><dt class="name">pegar</dt><dd>Ctrl-v manda una captura o un archivo.</dd>
   </dl>
 
-  <h2>teclas</h2>
-  <ul class="keys">
-    <li><kbd>i</kbd><span>escribir</span></li>
-    <li><kbd>j k</kbd><span>moverse</span></li>
-    <li><kbd>Ctrl-k</kbd><span>saltar a un canal</span></li>
-    <li><kbd>r</kbd><span>responder</span></li>
-    <li><kbd>e</kbd><span>editar el tuyo</span></li>
-    <li><kbd>dd</kbd><span>borrar el tuyo</span></li>
-    <li><kbd>v</kbd><span>entrar a la llamada</span></li>
-    <li><kbd>espacio</kbd><span>push-to-talk</span></li>
-    <li><kbd>S</kbd><span>compartir pantalla</span></li>
-    <li><kbd>w</kbd><span>ver una transmisión</span></li>
-    <li><kbd>?</kbd><span>todas las teclas</span></li>
-    <li><kbd>q</kbd><span>salir</span></li>
-  </ul>
-
-  <h2>requisitos</h2>
-  <dl class="req">
-    <dt>necesita</dt><dd>Linux con Wayland y PipeWire, <a href="https://bun.sh">Bun</a> y una terminal con protocolo Kitty (Ghostty o Kitty).</dd>
-    <dt>opcional</dt><dd>wl-clipboard para pegar; wf-recorder o ffmpeg para compartir pantalla.</dd>
-  </dl>
+  <figure class="plate">
+    <div class="tint"><img src="img/fig2.jpg" width="1556" height="1111" alt="Fotografía antigua: tres operadoras con un telégrafo impresor Barclay; una sostiene la cinta de papel que sale de la máquina" loading="lazy"></div>
+    <figcaption><span>fig. 2 — la terminal original.</span> <span>Operadoras del telégrafo impresor Barclay, el abuelo del teletipo. 1908.</span></figcaption>
+  </figure>
 
   <section class="box warn" aria-labelledby="t-warn">
     <span class="t" id="t-warn">antes de usarlo</span>
@@ -205,6 +192,7 @@
     <p>gon@sanluis ~ $ exit</p>
     <p>hecho por Gon en San Luis · <a href="https://gonzalorocca.com">gonzalorocca.com</a> · <a href="https://x.com/gnrocca">@gnrocca</a> · <a href="https://github.com/gonzalonicolasr/discord-tui">código</a></p>
     <p class="hint">y copia el comando · j k bajan y suben</p>
+    <p>fotos: fig. 1 National Archives (EE. UU.), sin restricciones · fig. 2 Library of Congress, dominio público · vía <a href="https://commons.wikimedia.org/">Wikimedia Commons</a></p>
   </footer>
 </main>
 
