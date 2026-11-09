@@ -26,7 +26,7 @@ function setup(opts: { inVoice?: boolean; streaming?: boolean; decodeMs?: number
     t: "READY",
     d: {
       user: { id: ME, username: "gon" },
-      users: [{ id: RAGNAR, username: "ragnar", global_name: "Ragnar" }],
+      users: [{ id: RAGNAR, username: "ramiro", global_name: "Ramiro" }],
       guilds: [{ id: GUILD, name: "g", roles: [], channels: [{ id: VOICE_A, type: 2, name: "Voz" }, { id: VOICE_B, type: 2, name: "Voz 2" }] }],
     },
   });
@@ -67,9 +67,9 @@ function setup(opts: { inVoice?: boolean; streaming?: boolean; decodeMs?: number
     store.dispatch({ type: "voice/joining", guildId: GUILD, channelId: VOICE_A });
     store.dispatch({ type: "voice/status", status: "connected" });
   }
-  const ragnar = { guild_id: GUILD, user_id: RAGNAR, channel_id: VOICE_A, self_stream: opts.streaming !== false };
-  store.dispatch({ type: "gw", t: "VOICE_STATE_UPDATE", d: ragnar });
-  gw.dispatch("VOICE_STATE_UPDATE", ragnar);
+  const ramiro = { guild_id: GUILD, user_id: RAGNAR, channel_id: VOICE_A, self_stream: opts.streaming !== false };
+  store.dispatch({ type: "gw", t: "VOICE_STATE_UPDATE", d: ramiro });
+  gw.dispatch("VOICE_STATE_UPDATE", ramiro);
   const watch = () => store.getState().voice.watch;
   const notices = () => Object.values(store.getState().notices).map((n: any) => n.text);
   const discordAnswers = () => {
@@ -149,7 +149,7 @@ describe("stops by itself", () => {
     await flush();
     s.gw.dispatch("STREAM_DELETE", { stream_key: KEY, reason: "stream_ended" });
     expect(s.watch().status).toBe("idle");
-    expect(s.notices()).toContain("Ragnar dejó de transmitir");
+    expect(s.notices()).toContain("Ramiro dejó de transmitir");
     expect(s.gw.sent.map((x) => x.op)).toEqual([20]);
     expect(s.conns[0]!.stopped).toBe(true);
   });
@@ -171,7 +171,7 @@ describe("stops by itself", () => {
     await s.watcher.watch(RAGNAR);
     s.gw.dispatch("VOICE_STATE_UPDATE", { guild_id: GUILD, user_id: RAGNAR, channel_id: VOICE_A, self_stream: false });
     expect(s.watch().status).toBe("idle");
-    expect(s.notices()).toContain("Ragnar dejó de transmitir");
+    expect(s.notices()).toContain("Ramiro dejó de transmitir");
   });
 
   test("leaving voice or moving to another channel stops watching (op 19)", async () => {

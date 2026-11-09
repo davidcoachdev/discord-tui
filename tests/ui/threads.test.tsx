@@ -140,7 +140,7 @@ test("the quick switcher finds threads and forum posts", async () => {
   await h.renderOnce();
   await h.mockInput.typeText("torneo");
   await h.renderOnce();
-  expect(h.captureCharFrame()).toContain("Mu Gondor › #💬-general › 🧵 torneo de ajedrez");
+  expect(h.captureCharFrame()).toContain("Los Andes › #💬-general › 🧵 torneo de ajedrez");
   h.mockInput.pressEnter();
   await h.renderOnce();
   expect(s.store.getState().ui.selectedChannelId).toBe(DEMO_THREADS.ajedrez);
@@ -150,7 +150,7 @@ test("the quick switcher finds threads and forum posts", async () => {
   await h.renderOnce();
   await h.mockInput.typeText("pipewire");
   await h.renderOnce();
-  expect(h.captureCharFrame()).toContain("Mu Gondor › 💬 🆘-ayuda › 🧵 no me anda");
+  expect(h.captureCharFrame()).toContain("Los Andes › 💬 🆘-ayuda › 🧵 no me anda");
 });
 
 test("at 100x30 the thread header fits in the border", async () => {

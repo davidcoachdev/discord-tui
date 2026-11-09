@@ -126,7 +126,7 @@ test("a mention picked in the middle of the text is serialized as <@id>", async 
   const t = await open();
   await t.mockInput.typeText("hola todo bien");
   t.press("left", 9); // antes de "todo"
-  await t.mockInput.typeText("@rag");
+  await t.mockInput.typeText("@ram");
   await t.renderOnce();
   expect(t.captureCharFrame()).toContain("@ mencionar");
   t.mockInput.pressTab();
@@ -139,21 +139,21 @@ test("a mention picked in the middle of the text is serialized as <@id>", async 
 
 test("deleting across a picked mention drops it (stays as plain text)", async () => {
   const t = await open();
-  await t.mockInput.typeText("hola @rag");
+  await t.mockInput.typeText("hola @ram");
   t.mockInput.pressTab();
   await t.mockInput.typeText("chau");
-  t.press("left", 6); // antes de la "r" final de "@Ragnar"
+  t.press("left", 6); // antes de la "o" final de "@Ramiro"
   t.press("backspace");
   await t.renderOnce();
-  // "@Ragn" antes del cursor vuelve a abrir el popup; al final del texto se cierra.
+  // "@Rami" antes del cursor vuelve a abrir el popup; al final del texto se cierra.
   expect(t.captureCharFrame()).toContain("@ mencionar");
   t.press("end");
-  expect(await t.send()).toBe("hola @Ragnr chau");
+  expect(await t.send()).toBe("hola @Ramio chau");
 });
 
 test("the @ popup follows the text before the cursor", async () => {
   const t = await open();
-  await t.mockInput.typeText("@rag hola");
+  await t.mockInput.typeText("@ram hola");
   await t.renderOnce();
   expect(t.captureCharFrame()).not.toContain("@ mencionar");
   t.press("left", 5);

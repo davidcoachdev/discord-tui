@@ -84,7 +84,7 @@ async function click(h: Harness, text: string, nth = 0): Promise<void> {
 test("click on a server selects it and focuses the channel list", async () => {
   const s = setup();
   const h = await render(s);
-  await click(h, "Midjourney");
+  await click(h, "Pixelandia");
   expect(s.calls).toContain("selectGuild:910000000000000003");
   expect(s.store.getState().ui.focus).toBe("channels");
 });
@@ -143,7 +143,7 @@ test("click on a category collapses and expands it", async () => {
 test("click on a voice participant shows the volume control and − / + change it", async () => {
   const s = setup();
   const h = await render(s);
-  await click(h, "○ R  Ragnar");
+  await click(h, "○ R  Ramiro");
   expect(h.captureCharFrame()).toContain("vol");
   await click(h, " − ");
   await click(h, " − ");
@@ -244,7 +244,7 @@ test("click on a mention suggestion picks it", async () => {
   h.mockInput.pressKey("i");
   await h.mockInput.typeText("hola @");
   await h.renderOnce();
-  await click(h, " djromoro", -1); // el del cartel de sugerencias, no el de la lista de miembros
+  await click(h, " dfuentes", -1); // el del cartel de sugerencias, no el de la lista de miembros
   h.mockInput.pressEnter();
   await h.renderOnce();
   expect(s.calls.find((c) => c.startsWith("send:"))).toBe(`send:${DEMO.general}:hola <@900000000000000103> :{}`);
@@ -253,7 +253,7 @@ test("click on a mention suggestion picks it", async () => {
 test("click on a member mentions it in the composer", async () => {
   const s = setup();
   const h = await render(s);
-  await click(h, "● C  CinLo💜");
+  await click(h, "● C  Celes💜");
   h.mockInput.pressEnter();
   await h.renderOnce();
   expect(s.calls.find((c) => c.startsWith("send:"))).toBe(`send:${DEMO.general}:<@900000000000000102> :{}`);
@@ -315,7 +315,7 @@ test("hovering a server, a channel or a message highlights it", async () => {
     const spans = (h as any).captureSpans().lines[y].spans as { text: string; bg: { toString(): string } }[];
     return spans.find((span) => span.text.includes(text.trim().split(" ")[0]!))!.bg.toString();
   };
-  for (const target of ["Midjourney", "🎥-youtube", "Diablo pero"]) {
+  for (const target of ["Pixelandia", "🎥-youtube", "Diablo pero"]) {
     const before = bgAt(target);
     const { x, y } = find(h.captureCharFrame(), target);
     await h.mockMouse.moveTo(x, y);
@@ -331,14 +331,14 @@ test("direct messages: ordered by activity with presence, click opens the chat a
   const h = await render(s);
   await click(h, "✉ Mensajes");
   const frame = h.captureCharFrame();
-  const order = ["Los del ajedrez", "CinLo💜", "Ragnar, djromoro", "PmmR", "zero"].map((name) => frame.indexOf(name));
+  const order = ["Los del ajedrez", "Celes💜", "Ramiro, dfuentes", "Pepa", "zero"].map((name) => frame.indexOf(name));
   expect(order.every((at, i) => at > -1 && (i === 0 || at > order[i - 1]!))).toBe(true);
-  await click(h, "● C  CinLo💜");
+  await click(h, "● C  Celes💜");
   const opened = h.captureCharFrame();
-  expect(opened).toContain("@ CinLo💜");
+  expect(opened).toContain("@ Celes💜");
   expect(opened).toContain("jaja ¿en serio en la terminal?");
   expect(opened).toContain("EN ESTE CHAT — 2");
-  expect(opened).toContain("i para escribirle a @CinLo💜");
+  expect(opened).toContain("i para escribirle a @Celes💜");
 });
 
 test("voice channels have their own chat and you can write there without joining", async () => {

@@ -24,7 +24,7 @@ export function seedPolls(store: Store): void {
     d: {
       ...base,
       id: DEMO_POLL_ID,
-      author: { id: "900000000000000103", username: "djromoro", global_name: "djromoro" },
+      author: { id: "900000000000000103", username: "dfuentes", global_name: "dfuentes" },
       content: "",
       timestamp: new Date(Date.now() - 400 * 60_000).toISOString(),
       poll: {
@@ -54,7 +54,7 @@ export function seedPolls(store: Store): void {
     d: {
       ...base,
       id: DEMO_STICKER_MSG_ID,
-      author: { id: "900000000000000102", username: "cinlo", global_name: "CinLo💜" },
+      author: { id: "900000000000000102", username: "celes", global_name: "Celes💜" },
       content: "",
       timestamp: new Date(Date.now() - 399 * 60_000).toISOString(),
       sticker_items: [{ id: "960000000000000001", name: "Wumpus saluda", format_type: 1 }],

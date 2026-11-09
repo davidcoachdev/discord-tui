@@ -76,7 +76,7 @@ Necesita a un amigo en el canal de voz (desde el cliente oficial). Usa tu cuenta
 terminar en ban (ver `docs/protocol-notes.md`, "Transmitir pantalla").
 
 - [ ] Una vez: `sudo pacman -S wf-recorder` (ya está instalado en tu PC). Sin él usa grim a ~10 fps y te avisa.
-- [ ] `bun run demo` primero: en `🔊 Sala 1` Ragnar figura con `📺 en vivo`; entrá a la sala, click en `📺 transmitir` → aparece
+- [ ] `bun run demo` primero: en `🔊 Sala 1` Ramiro figura con `📺 en vivo`; entrá a la sala, click en `📺 transmitir` → aparece
       `¿Qué pantalla transmitir?` con tus monitores → elegí uno → `⏳ iniciando…` → `🔴 EN VIVO · detener` y `📺 en vivo` al lado
       tuyo. Click otra vez lo corta. `S` hace lo mismo con el teclado.
 - [ ] `bun run dev`, entrá al canal de voz donde está tu amigo, click en `📺 transmitir` (o `S`), elegí el monitor (en `gs` →
@@ -95,9 +95,9 @@ terminar en ban (ver `docs/protocol-notes.md`, "Transmitir pantalla").
 Necesita a un amigo que transmita pantalla (Go Live) desde el cliente oficial en un canal de voz donde estés vos. Usa tu
 cuenta, como Go Live (ver `docs/protocol-notes.md`, "Ver transmisiones"). Sin audio de la transmisión por ahora.
 
-- [ ] `bun run demo` primero: entrá a `🔊 Sala 1` → debajo de Ragnar (`📺`) aparece `▶ ver`; click → `⏳ conectando…` → barras de
-      colores en lugar de los mensajes, arriba `📺 Ragnar · en vivo · N fps` y `✕ dejar de ver`. `Esc` o `w` la cierra; `w` de
-      nuevo la abre. En el chat del canal de voz también está `▶ ver Ragnar`.
+- [ ] `bun run demo` primero: entrá a `🔊 Sala 1` → debajo de Ramiro (`📺`) aparece `▶ ver`; click → `⏳ conectando…` → barras de
+      colores en lugar de los mensajes, arriba `📺 Ramiro · en vivo · N fps` y `✕ dejar de ver`. `Esc` o `w` la cierra; `w` de
+      nuevo la abre. En el chat del canal de voz también está `▶ ver Ramiro`.
 - [ ] `bun run dev`, entrá al canal de voz de tu amigo y que él empiece a transmitir. Click en `▶ ver` debajo de su nombre (o `w`).
       En ≤ 5 s tiene que verse su pantalla. Si queda en `⏳ conectando…` o sale un error, copiá esa línea y el final del log
       (`watch.*`, sin datos privados).

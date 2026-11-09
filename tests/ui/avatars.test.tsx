@@ -54,7 +54,7 @@ test("without a URL (images off) the avatar is the initial on a name color, no i
   const r = await testRender(
     () => (
       <box flexDirection="row">
-        <Avatar userId="900000000000000101" name="ragnar" url={null} theme={THEMES.dark} />
+        <Avatar userId="900000000000000101" name="ramiro" url={null} theme={THEMES.dark} />
         <text>|</text>
       </box>
     ),
@@ -72,7 +72,7 @@ test("with a URL the image replaces the initial in the same 2 cells (no layout j
   const r = await testRender(
     () => (
       <box flexDirection="row">
-        <Avatar userId="900000000000000101" name="ragnar" url={url} theme={THEMES.dark} loader={loader} />
+        <Avatar userId="900000000000000101" name="ramiro" url={url} theme={THEMES.dark} loader={loader} />
         <text>|after</text>
       </box>
     ),
@@ -100,10 +100,10 @@ test("message header: avatar before the author on non-grouped messages only, hid
     await r.renderOnce();
     return r.captureCharFrame();
   };
-  expect(await frame(false, true)).toMatch(/R {2}Ragnar {2}\d\d:\d\d/);
-  expect(await frame(false, false)).toMatch(/^ Ragnar {2}\d\d:\d\d/m);
+  expect(await frame(false, true)).toMatch(/R {2}Ramiro {2}\d\d:\d\d/);
+  expect(await frame(false, false)).toMatch(/^ Ramiro {2}\d\d:\d\d/m);
   const grouped = await frame(true, true);
-  expect(grouped).not.toContain("Ragnar");
+  expect(grouped).not.toContain("Ramiro");
   expect(grouped).not.toMatch(/^ R {2}/m);
 });
 
@@ -120,12 +120,12 @@ test("member list, voice participants and DM rows show the avatar after the pres
   await r.renderOnce();
   const frame = r.captureCharFrame();
   expect(frame).toContain("│ ● G  Gon");
-  expect(frame).toContain("○ B  bojack7080");
-  expect(frame).toMatch(/○ R {2}Ragnar +📺/);
-  expect(frame).toMatch(/○ P {2}PmmR +🙉/);
+  expect(frame).toContain("○ B  bruno_7712");
+  expect(frame).toMatch(/○ R {2}Ramiro +📺/);
+  expect(frame).toMatch(/○ P {2}Pepa +🙉/);
   s.store.dispatch({ type: "ui/selectGuild", id: "@dms" });
   await r.renderOnce();
-  expect(r.captureCharFrame()).toMatch(/[●○] C {2}CinLo💜/);
+  expect(r.captureCharFrame()).toMatch(/[●○] C {2}Celes💜/);
 });
 
 test("showAvatars=false hides them everywhere and the old layout comes back", async () => {
@@ -134,32 +134,32 @@ test("showAvatars=false hides them everywhere and the old layout comes back", as
   await r.renderOnce();
   const frame = r.captureCharFrame();
   expect(frame).toContain("│ ● Gon");
-  expect(frame).toMatch(/○ Ragnar +📺/);
-  expect(frame).not.toMatch(/R {2}Ragnar/);
+  expect(frame).toMatch(/○ Ramiro +📺/);
+  expect(frame).not.toMatch(/R {2}Ramiro/);
   s.store.dispatch({ type: "ui/selectGuild", id: "@dms" });
   await r.renderOnce();
-  expect(r.captureCharFrame()).toMatch(/[●○] CinLo💜/);
+  expect(r.captureCharFrame()).toMatch(/[●○] Celes💜/);
 });
 
 test("long names are cut with … instead of wrapping (participant, member and DM rows)", async () => {
   const s = app();
-  const long = "Ragnarsson Lothbrok el Vikingo del Norte";
-  s.store.dispatch({ type: "gw", t: "GUILD_MEMBER_UPDATE", d: { guild_id: DEMO.guild, user: { id: "900000000000000101", username: "ragnar", global_name: long }, roles: [], nick: long } });
+  const long = "Ramirosson Lothbrok el Vikingo del Norte";
+  s.store.dispatch({ type: "gw", t: "GUILD_MEMBER_UPDATE", d: { guild_id: DEMO.guild, user: { id: "900000000000000101", username: "ramiro", global_name: long }, roles: [], nick: long } });
   const r = await s.render();
   await r.renderOnce();
   const lines = r.captureCharFrame().split("\n");
-  const voiceRow = lines.find((l) => l.includes("○ R  Ragnarsson"))!;
+  const voiceRow = lines.find((l) => l.includes("○ R  Ramirosson"))!;
   expect(voiceRow).toContain("…");
   expect(voiceRow).toContain("📺");
-  expect(lines.find((l) => l.includes("● R  Ragnarsson"))).toContain("…");
+  expect(lines.find((l) => l.includes("● R  Ramirosson"))).toContain("…");
   // Los encabezados de los mensajes sí muestran el nombre entero; las columnas angostas no.
   const sides = lines.map((l) => [...l].slice(0, 56).join("") + [...l].slice(-26).join(""));
   expect(sides.some((l) => l.includes("Norte") || l.includes("Vikingo"))).toBe(false);
 
-  s.store.dispatch({ type: "gw", t: "GUILD_MEMBER_UPDATE", d: { guild_id: DEMO.guild, user: { id: "900000000000000102", username: "cinlo", global_name: long }, roles: [] } });
+  s.store.dispatch({ type: "gw", t: "GUILD_MEMBER_UPDATE", d: { guild_id: DEMO.guild, user: { id: "900000000000000102", username: "celes", global_name: long }, roles: [] } });
   s.store.dispatch({ type: "ui/selectGuild", id: "@dms" });
   await r.renderOnce();
-  const dm = r.captureCharFrame().split("\n").find((l) => /[●○] R {2}Ragnarsson/.test(l))!;
+  const dm = r.captureCharFrame().split("\n").find((l) => /[●○] R {2}Ramirosson/.test(l))!;
   expect(dm).toContain("…");
   expect(dm).not.toContain("Vikingo");
 });
@@ -184,11 +184,11 @@ test("images on: only avatars on screen are fetched, through the CDN, and become
 });
 
 test("mention popup: avatar before each candidate when avatars are on", async () => {
-  const candidates = [{ userId: "900000000000000101", label: "Ragnar", secondary: "ragnar" }];
+  const candidates = [{ userId: "900000000000000101", label: "Ramiro", secondary: "ramiro" }];
   const r = await testRender(() => <MentionPopup candidates={candidates} index={0} theme={THEMES.dark} avatar={() => null} />, { width: 50, height: 4 });
   await r.renderOnce();
-  expect(r.captureCharFrame()).toContain("│ R  Ragnar  ragnar");
+  expect(r.captureCharFrame()).toContain("│ R  Ramiro  ramiro");
   const plain = await testRender(() => <MentionPopup candidates={candidates} index={0} theme={THEMES.dark} />, { width: 50, height: 4 });
   await plain.renderOnce();
-  expect(plain.captureCharFrame()).toContain("│ Ragnar  ragnar");
+  expect(plain.captureCharFrame()).toContain("│ Ramiro  ramiro");
 });

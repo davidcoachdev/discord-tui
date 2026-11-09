@@ -52,7 +52,7 @@ test("weird ids or hashes never leave the default avatar path", () => {
 test("userAvatarUrl reads the member avatar from the store (GUILD_MEMBER_UPDATE) and the user one otherwise", () => {
   const store = buildDemoStore();
   const userId = "900000000000000101";
-  store.dispatch({ type: "gw", t: "GUILD_MEMBER_UPDATE", d: { guild_id: DEMO.guild, user: { id: userId, username: "ragnar", avatar: HASH }, roles: [], avatar: `a_${HASH}` } });
+  store.dispatch({ type: "gw", t: "GUILD_MEMBER_UPDATE", d: { guild_id: DEMO.guild, user: { id: userId, username: "ramiro", avatar: HASH }, roles: [], avatar: `a_${HASH}` } });
   const state = store.getState();
   expect(state.members[DEMO.guild]?.[userId]?.avatar).toBe(`a_${HASH}`);
   expect(userAvatarUrl(state, userId, DEMO.guild, true)).toBe(`https://cdn.discordapp.com/guilds/${DEMO.guild}/users/${userId}/avatars/a_${HASH}.gif?size=32`);

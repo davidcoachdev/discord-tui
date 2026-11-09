@@ -58,11 +58,11 @@ export function buildDemoStore(): Store {
   const store = createStore(emptyState());
   const users = [
     user(ME, "gon", "Gon"),
-    user(U(1), "ragnar", "Ragnar"),
-    user(U(2), "cinlo", "CinLo💜"),
-    user(U(3), "djromoro", "djromoro"),
-    user(U(4), "bojack7080", "bojack7080"),
-    user(U(5), "pmmr", "PmmR"),
+    user(U(1), "ramiro", "Ramiro"),
+    user(U(2), "celes", "Celes💜"),
+    user(U(3), "dfuentes", "dfuentes"),
+    user(U(4), "bruno_7712", "bruno_7712"),
+    user(U(5), "pepa", "Pepa"),
     user(U(6), "zero", "zero"),
   ];
   for (const u of users) NAMES[u.id] = [u.username, u.global_name ?? u.username];
@@ -108,7 +108,7 @@ export function buildDemoStore(): Store {
       guilds: [
         {
           id: G1,
-          properties: { name: "Mu Gondor", owner_id: ME },
+          properties: { name: "Los Andes", owner_id: ME },
           roles,
           emojis: [{ id: "950000000000000001", name: "kek", animated: false }],
           channels,
@@ -124,8 +124,8 @@ export function buildDemoStore(): Store {
             { user_id: U(5), channel_id: DEMO.voice2, self_mute: false, self_deaf: true },
           ],
         },
-        { id: G2, properties: { name: "Gentleman Programming", owner_id: U(3) }, roles: [], channels: [ch("920000000000000200", "general", 0, 0)] },
-        { id: G3, properties: { name: "Midjourney", owner_id: U(3) }, roles: [], channels: [ch("920000000000000300", "anuncios", 0, 0)] },
+        { id: G2, properties: { name: "Club de Programadores", owner_id: U(3) }, roles: [], channels: [ch("920000000000000200", "general", 0, 0)] },
+        { id: G3, properties: { name: "Pixelandia", owner_id: U(3) }, roles: [], channels: [ch("920000000000000300", "anuncios", 0, 0)] },
       ],
       // Como lo manda Discord a una cuenta de usuario: `recipient_ids`, los usuarios van en `users`.
       private_channels: [

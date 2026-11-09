@@ -36,7 +36,7 @@ test("@ + Tab picks a mention and it is sent as <@id>; typing notifies", async (
   const { mockInput, renderOnce, captureCharFrame } = await render(s);
   await renderOnce();
   mockInput.pressKey("i");
-  await mockInput.typeText("hola @rag");
+  await mockInput.typeText("hola @ram");
   await renderOnce();
   expect(captureCharFrame()).toContain("@ mencionar");
   mockInput.pressTab();

@@ -86,7 +86,7 @@ test("editing a message with a mention shows @Name and sends <@id> back", async 
   h.mockInput.pressKey("k");
   h.mockInput.pressKey("e");
   await settle(h);
-  expect(h.captureCharFrame()).toContain("che @Ragnar mirá");
+  expect(h.captureCharFrame()).toContain("che @Ramiro mirá");
   await h.mockInput.typeText("!");
   h.mockInput.pressEnter();
   await settle(h);

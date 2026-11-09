@@ -24,14 +24,14 @@ export function seedEmoji(store: Store): void {
     reactions: [],
   };
   const at = (minutesAgo: number): string => new Date(Date.now() - minutesAgo * 60_000).toISOString();
-  const cinlo = { id: "900000000000000102", username: "cinlo", global_name: "CinLo💜" };
-  const ragnar = { id: "900000000000000101", username: "ragnar", global_name: "Ragnar" };
+  const celes = { id: "900000000000000102", username: "celes", global_name: "Celes💜" };
+  const ramiro = { id: "900000000000000101", username: "ramiro", global_name: "Ramiro" };
   const messages = [
-    { ...base, id: DEMO_EMOJI.jumboMsg, author: cinlo, timestamp: at(398), content: `<:kek:${DEMO_EMOJI.kek}> <a:baile:${DEMO_EMOJI.baile}> 🎉` },
+    { ...base, id: DEMO_EMOJI.jumboMsg, author: celes, timestamp: at(398), content: `<:kek:${DEMO_EMOJI.kek}> <a:baile:${DEMO_EMOJI.baile}> 🎉` },
     {
       ...base,
       id: DEMO_EMOJI.reactedMsg,
-      author: ragnar,
+      author: ramiro,
       timestamp: at(397),
       content: "ya anda el voice en la terminal",
       reactions: [
@@ -40,7 +40,7 @@ export function seedEmoji(store: Store): void {
         { emoji: { id: null, name: "🔥" }, count: 4, me: false },
       ],
     },
-    { ...base, id: DEMO_EMOJI.mixedMsg, author: cinlo, timestamp: at(396), content: `nooo <:kek:${DEMO_EMOJI.kek}> qué crack` },
+    { ...base, id: DEMO_EMOJI.mixedMsg, author: celes, timestamp: at(396), content: `nooo <:kek:${DEMO_EMOJI.kek}> qué crack` },
   ];
   for (const d of messages) store.dispatch({ type: "gw", t: "MESSAGE_CREATE", d });
 }

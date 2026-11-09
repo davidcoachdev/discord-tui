@@ -37,7 +37,7 @@ export function seedUnread(store: Store): void {
       id: `93000000000000${n}`,
       channel_id: DEVLAND,
       guild_id: G1,
-      author: { id: author, username: author === RAGNAR ? "ragnar" : "zero", global_name: author === RAGNAR ? "Ragnar" : "zero" },
+      author: { id: author, username: author === RAGNAR ? "ramiro" : "zero", global_name: author === RAGNAR ? "Ramiro" : "zero" },
       content,
       timestamp: at(minutesAgo),
       edited_timestamp: null,
