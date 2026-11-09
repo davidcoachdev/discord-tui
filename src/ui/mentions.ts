@@ -102,3 +102,21 @@ export function serializeComposer(text: string, mentions: PickedMention[]): stri
 export function replaceMentions(mentions: PickedMention[], from: number, to: number, inserted: number): PickedMention[] {
   return shiftMentions(shiftMentions(mentions, from, from - to), from, inserted);
 }
+
+/**
+ * Para editar un mensaje: `<@id>` / `<@!id>` → `@nombre` con su rango, así se ve como se escribió y al guardar
+ * `serializeComposer` lo vuelve a mandar como mención.
+ */
+export function composerFromContent(content: string, label: (userId: string) => string): { text: string; mentions: PickedMention[] } {
+  let text = "";
+  let at = 0;
+  const mentions: PickedMention[] = [];
+  for (const m of content.matchAll(/<@!?(\d{15,25})>/g)) {
+    text += content.slice(at, m.index);
+    const name = `@${label(m[1]!)}`;
+    mentions.push({ start: text.length, end: text.length + name.length, userId: m[1]! });
+    text += name;
+    at = m.index! + m[0].length;
+  }
+  return { text: text + content.slice(at), mentions };
+}

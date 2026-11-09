@@ -197,7 +197,7 @@ export function createActions(deps: ActionsDeps): Actions {
       await postAck(deps.rest, channelId, messageId);
     },
   });
-  const editActions = createEditActions({ rest: deps.rest });
+  const editActions = createEditActions({ rest: deps.rest, store: deps.store });
   const reactActions = createReactActions({ store: deps.store, rest: deps.rest });
   const pollActions = createPollActions({ store: deps.store, rest: deps.rest, now: deps.now });
 

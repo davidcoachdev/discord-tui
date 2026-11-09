@@ -54,6 +54,7 @@ import {
   mentionCandidates,
   mentionQueryAt,
   replaceMentions,
+  composerFromContent,
   serializeComposer,
   type PickedMention,
 } from "./mentions";
@@ -610,7 +611,9 @@ export function App(props: {
     }
     setEditing(selectedId());
     setReplyTo(null);
-    setText(String(message.content ?? ""), []);
+    const guildId = props.store.getState().channels[id]?.guildId ?? null;
+    const draft = composerFromContent(String(message.content ?? ""), (userId) => displayName(props.store.getState(), userId, guildId));
+    setText(draft.text, draft.mentions);
     setInsert(true);
   }
 
