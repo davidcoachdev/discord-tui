@@ -114,3 +114,28 @@ export async function readClipboardFiles(deps: ClipboardDeps = {}): Promise<stri
   const bytes = await run(spawn, ["wl-paste", "--no-newline", "--type", type]);
   return bytes === null ? [] : filePathsFromUriList(new TextDecoder().decode(bytes));
 }
+
+/** Copia texto al portapapeles de Wayland (`wl-copy`). Devuelve si salió bien. */
+export async function writeClipboardText(
+  text: string,
+  deps: { spawn?: (cmd: string[]) => { stdin: { write(data: string): unknown; end(): unknown } | null; exited: Promise<number> } } = {},
+): Promise<boolean> {
+  try {
+    const spawn =
+      deps.spawn ??
+      ((cmd: string[]) => {
+        const proc = spawnClean(cmd, { stdin: "pipe", stdout: "ignore" });
+        return { stdin: proc.stdin as unknown as { write(data: string): unknown; end(): unknown } | null, exited: proc.exited };
+      });
+    const proc = spawn(["wl-copy", "--type", "text/plain;charset=utf-8"]);
+    if (!proc.stdin) return false;
+    proc.stdin.write(text);
+    proc.stdin.end();
+    const code = await Promise.race([proc.exited, Bun.sleep(2000).then(() => -1)]);
+    if (code !== 0) log.info("clipboard.wl_copy", { code });
+    return code === 0;
+  } catch (error) {
+    log.warn("clipboard.wl_copy", { error_name: error instanceof Error ? error.message : "error" });
+    return false;
+  }
+}

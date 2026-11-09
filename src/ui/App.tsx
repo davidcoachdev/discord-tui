@@ -22,7 +22,7 @@ import {
 import type { Store } from "../store/store";
 import type { ApiPoll, PendingAttachment } from "../store/types";
 import { selectUnreadView } from "../store/unread";
-import { filePathsFromPastedText, readClipboardFiles, readClipboardImage, readClipboardText } from "../uploads/clipboard";
+import { filePathsFromPastedText, readClipboardFiles, readClipboardImage, readClipboardText, writeClipboardText } from "../uploads/clipboard";
 import { formatBytes, readAttachmentFromPath } from "../uploads/file";
 import { listAudioDevices } from "../voice/devices";
 import { startCapture, startPlayback } from "../voice/audio-io";
@@ -88,9 +88,10 @@ export interface AppDeps {
   readClipboardImage: typeof readClipboardImage;
   readClipboardText: typeof readClipboardText;
   readAttachmentFromPath: typeof readAttachmentFromPath;
+  writeClipboardText?: typeof writeClipboardText;
 }
 
-const defaultAppDeps: AppDeps = { readClipboardFiles, readClipboardImage, readClipboardText, readAttachmentFromPath };
+const defaultAppDeps: AppDeps = { readClipboardFiles, readClipboardImage, readClipboardText, readAttachmentFromPath, writeClipboardText };
 
 export function App(props: {
   store: Store;
@@ -1159,6 +1160,25 @@ export function App(props: {
     },
     { release: true },
   );
+
+  // Seleccionar texto con el mouse (arrastrando) lo copia al soltar, como en una terminal: wl-copy y, por las dudas,
+  // OSC 52 (lo toman Ghostty, Kitty y la mayoría de los multiplexores).
+  const onSelection = (selection: { getSelectedText(): string } | null): void => {
+    // Como las terminales: sin los espacios de relleno al final de cada línea.
+    const text = (selection?.getSelectedText() ?? "").split("\n").map((line) => line.trimEnd()).join("\n").replace(/\n+$/, "");
+    if (text.trim().length === 0) return;
+    try {
+      renderer.copyToClipboardOSC52(text);
+    } catch {
+      // la terminal no lo soporta: queda wl-copy
+    }
+    void (deps().writeClipboardText ?? (async () => false))(text).then((ok) => {
+      const n = [...text].length;
+      flash(ok ? `📋 copiado (${n} caracteres)` : `📋 copiado por la terminal (${n} caracteres; sin wl-copy)`);
+    });
+  };
+  renderer.on("selection", onSelection);
+  onCleanup(() => renderer.off("selection", onSelection));
 
   onMount(() => {
     const unsubscribe = props.store.subscribe(() => {
