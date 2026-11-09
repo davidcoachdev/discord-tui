@@ -59,6 +59,7 @@ test("Ctrl-v with an image in the clipboard attaches it; Enter sends it", async 
   await Bun.sleep(5);
   await renderOnce();
   expect(captureCharFrame()).toContain("📎 captura-20261107-120000.png (4 B) · x quita");
+  expect(captureCharFrame()).toContain("📎 pegada la imagen captura-20261107-120000.png (4 B) · Enter la manda");
   mockInput.pressEnter();
   await renderOnce();
   expect(s.sent[0]!.opts.attachments[0].filename).toBe("captura-20261107-120000.png");
@@ -96,6 +97,7 @@ test("Ctrl-v with files copied in a file manager attaches them all (before any i
   expect(frame).toContain("a.png (3 B)");
   expect(frame).toContain("informe.pdf (3 B)");
   expect(frame).not.toContain("captura.png");
+  expect(frame).toContain("📎 pegados 2 archivos");
   mockInput.pressEnter();
   await renderOnce();
   expect(s.sent[0]!.opts.attachments.map((a: any) => a.filename)).toEqual(["a.png", "informe.pdf"]);

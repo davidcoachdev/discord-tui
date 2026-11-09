@@ -23,7 +23,7 @@ import type { Store } from "../store/store";
 import type { ApiPoll, PendingAttachment } from "../store/types";
 import { selectUnreadView } from "../store/unread";
 import { filePathsFromPastedText, readClipboardFiles, readClipboardImage, readClipboardText } from "../uploads/clipboard";
-import { readAttachmentFromPath } from "../uploads/file";
+import { formatBytes, readAttachmentFromPath } from "../uploads/file";
 import { listAudioDevices } from "../voice/devices";
 import { startCapture, startPlayback } from "../voice/audio-io";
 import { CHANNEL_WIDTH, ChannelList } from "./components/ChannelList";
@@ -695,9 +695,16 @@ export function App(props: {
 
   /** Ctrl-v / 📋: archivos copiados → imagen → texto, en ese orden. */
   async function pasteFromClipboard(): Promise<void> {
+    flash("📋 leyendo el portapapeles…");
     const files = (await deps().readClipboardFiles?.()) ?? [];
     log.info("clipboard.paste", { msg: "files", count: files.length });
-    if (files.length > 0 && (await attachPaths(files)) > 0) return;
+    if (files.length > 0) {
+      const added = await attachPaths(files);
+      if (added > 0) {
+        if (added === files.length) flash(added === 1 ? `📎 pegado: ${files[0]!.split("/").pop()}` : `📎 pegados ${added} archivos`);
+        return;
+      }
+    }
     const image = await deps().readClipboardImage();
     log.info("clipboard.paste", { msg: image ? `image ${image.mime}` : "no image", count: image?.bytes.byteLength ?? 0 });
     if (image) {
@@ -707,13 +714,15 @@ export function App(props: {
       }
       addAttachment({ filename: image.filename, mime: image.mime, bytes: image.bytes });
       setInsert(true);
+      flash(`📎 pegada la imagen ${image.filename} (${formatBytes(image.bytes.byteLength)}) · Enter la manda`);
       return;
     }
     const text = await deps().readClipboardText();
     if (text) {
       setInsert(true);
       insertText(text);
-    } else flash("el portapapeles está vacío");
+      flash(`📋 pegado texto (${[...text].length} caracteres)`);
+    } else flash("el portapapeles está vacío (ni archivos, ni imagen, ni texto)");
   }
 
   async function finishAttachPrompt(): Promise<void> {
