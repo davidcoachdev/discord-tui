@@ -58,7 +58,7 @@ await scene(() => <Splash theme={THEMES.dark} status="conectando con Discord…"
     h.mockInput.pressKey("i");
     await snap(h, 300);
     await typeSlowly(h, "¿arrancamos la raid a las 22? ");
-    await typeSlowly(h, "@rag", 1);
+    await typeSlowly(h, "@ram", 1);
     await snap(h, 1100);
     h.mockInput.pressTab();
     await snap(h, 500);
@@ -78,9 +78,9 @@ await scene(() => <Splash theme={THEMES.dark} status="conectando con Discord…"
 
     await actions.voice!.toggleVoice(DEMO.voice);
     await Bun.sleep(700);
-    const ragnar = "900000000000000101";
+    const ramiro = "900000000000000101";
     for (let i = 0; i < 6; i++) {
-      store.dispatch({ type: "voice/speaking", userId: ragnar, on: i % 2 === 0 });
+      store.dispatch({ type: "voice/speaking", userId: ramiro, on: i % 2 === 0 });
       store.dispatch({ type: "voice/selfSpeaking", on: i % 3 === 1 });
       await snap(h, 450);
     }

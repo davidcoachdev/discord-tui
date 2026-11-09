@@ -14,7 +14,7 @@ function raw(n: number, channel: string, content: string, author = RAGNAR) {
     id: `93000000000000${n}`,
     channel_id: channel,
     guild_id: DEMO.guild,
-    author: { id: author, username: "ragnar", global_name: "Ragnar" },
+    author: { id: author, username: "ramiro", global_name: "Ramiro" },
     content,
     timestamp: new Date(Date.now() - (2000 - n) * 1000).toISOString(),
     edited_timestamp: null,
@@ -88,7 +88,7 @@ test("the red divider goes right before the first unread message", async () => {
   expect(divider).toBeGreaterThan(lineOf(frame, "como lo ves"));
   expect(divider).toBeLessThan(lineOf(frame, "pensé q te habías cambiado la foto"));
   // El primero de debajo del divisor lleva su encabezado.
-  expect(frame.split("\n")[divider + 2]).toContain("CinLo💜  ");
+  expect(frame.split("\n")[divider + 2]).toContain("Celes💜  ");
 });
 
 test("on open the view sits on the first unread, not at the very bottom", async () => {
@@ -135,7 +135,7 @@ test("more unread than loaded: the top bar loads older pages until the first unr
   // Queda seleccionado el primero sin leer: r responde a ése.
   h.mockInput.pressKey("r");
   await settle(h);
-  expect(h.captureCharFrame()).toContain("respondiendo a @Ragnar: viejo 1001");
+  expect(h.captureCharFrame()).toContain("respondiendo a @Ramiro: viejo 1001");
 });
 
 test("gn selects the first unread message of the open channel", async () => {
@@ -146,7 +146,7 @@ test("gn selects the first unread message of the open channel", async () => {
   await settle(h);
   h.mockInput.pressKey("r");
   await settle(h);
-  expect(h.captureCharFrame()).toContain("respondiendo a @CinLo💜: pensé q te habías cambiado la foto");
+  expect(h.captureCharFrame()).toContain("respondiendo a @Celes💜: pensé q te habías cambiado la foto");
   expect(s.calls).toEqual([]);
 });
 

@@ -47,9 +47,9 @@ test("a poll renders the question, a bar, count and % per answer, my vote and th
 test("a poll or sticker without text does not leave an empty line under the author", async () => {
   const h = await render(setup());
   const lines = frameLines(h.captureCharFrame());
-  const header = lines.findIndex((line) => /djromoro {2}\d\d:\d\d/.test(line));
+  const header = lines.findIndex((line) => /dfuentes {2}\d\d:\d\d/.test(line));
   expect(lines[header + 1]).toContain("╭─");
-  const sticker = lines.findIndex((line) => /CinLo💜 {2}\d\d:\d\d/.test(line));
+  const sticker = lines.findIndex((line) => /Celes💜 {2}\d\d:\d\d/.test(line));
   expect(lines[sticker + 1]).toContain("🏷 Wumpus saluda");
 });
 

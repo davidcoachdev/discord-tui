@@ -8,7 +8,7 @@ import { videoBox } from "../../src/ui/components/StreamViewer";
 import { buildDemoStore, demoActions, DEMO } from "../../scripts/demo-state";
 import { syntheticFrame } from "../../scripts/demo/watch";
 
-// En la demo, Ragnar (U(1)) ya transmite en Sala 1 (seedGoLive).
+// En la demo, Ramiro (U(1)) ya transmite en Sala 1 (seedGoLive).
 const RAGNAR = "900000000000000101";
 
 function setup() {
@@ -75,7 +75,7 @@ async function settle(h: Harness, ms: number): Promise<void> {
 test("▶ ver only shows for someone streaming in YOUR voice channel", async () => {
   const s = setup();
   const h = await render(s);
-  expect(h.captureCharFrame()).toMatch(/Ragnar\s+📺/);
+  expect(h.captureCharFrame()).toMatch(/Ramiro\s+📺/);
   expect(h.captureCharFrame()).not.toContain("▶ ver");
   await s.actions.voice!.toggleVoice(DEMO.voice);
   await h.renderOnce();
@@ -92,11 +92,11 @@ test("click ▶ ver → ⏳ conectando → the stream takes over the message pan
   await h.renderOnce();
   await click(h, "▶ ver");
   expect(s.calls).toEqual([`toggle:${RAGNAR}`]);
-  expect(h.captureCharFrame()).toContain("⏳ conectando con la transmisión de Ragnar…");
+  expect(h.captureCharFrame()).toContain("⏳ conectando con la transmisión de Ramiro…");
   expect(s.subscriptions()).toBe(1);
   await settle(h, 800);
   const live = h.captureCharFrame();
-  expect(live).toMatch(/📺 Ragnar · en vivo · \d+ fps/);
+  expect(live).toMatch(/📺 Ramiro · en vivo · \d+ fps/);
   expect(live).toContain("✕ dejar de ver");
   expect(live).toContain("■ dejar de ver"); // en la lista de canales
   const img = images(h.renderer.root).find((i) => i.source !== undefined);
@@ -114,8 +114,8 @@ test("the voice channel strip has ▶ ver <name> while you are in the call", asy
   await s.actions.voice!.toggleVoice(DEMO.voice);
   s.store.dispatch({ type: "ui/selectChannel", id: DEMO.voice });
   await h.renderOnce();
-  expect(h.captureCharFrame()).toContain("▶ ver Ragnar");
-  await click(h, "▶ ver Ragnar");
+  expect(h.captureCharFrame()).toContain("▶ ver Ramiro");
+  await click(h, "▶ ver Ramiro");
   expect(s.calls).toEqual([`toggle:${RAGNAR}`]);
   await s.actions.voice!.leaveVoice();
 });
@@ -131,7 +131,7 @@ test("w watches the first streamer in your channel; Esc stops watching", async (
   h.mockInput.pressKey("w");
   await h.renderOnce();
   expect(s.calls).toEqual([`watch:${RAGNAR}`]);
-  expect(h.captureCharFrame()).toContain("conectando con la transmisión de Ragnar");
+  expect(h.captureCharFrame()).toContain("conectando con la transmisión de Ramiro");
   h.mockInput.pressEscape();
   await Bun.sleep(80);
   await h.renderOnce();
@@ -146,10 +146,10 @@ test("leaving the voice channel closes the viewer", async () => {
   await s.actions.voice!.toggleVoice(DEMO.voice);
   await s.actions.voice!.watchStream!(RAGNAR);
   await settle(h, 600);
-  expect(h.captureCharFrame()).toContain("📺 Ragnar · en vivo");
+  expect(h.captureCharFrame()).toContain("📺 Ramiro · en vivo");
   await s.actions.voice!.leaveVoice();
   await h.renderOnce();
-  expect(h.captureCharFrame()).not.toContain("📺 Ragnar · en vivo");
+  expect(h.captureCharFrame()).not.toContain("📺 Ramiro · en vivo");
   expect(s.subscriptions()).toBe(0);
 });
 

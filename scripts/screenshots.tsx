@@ -36,7 +36,7 @@ await shot("splash", () => <Splash theme={THEMES.dark} status="conectando con Di
   const actions = demoActions(store);
   await shot("chat", () => <App store={store} actions={actions} onQuit={() => {}} />, async (h) => {
     h.mockInput.pressKey("i");
-    await h.mockInput.typeText("¿arrancamos la raid a las 22? @rag");
+    await h.mockInput.typeText("¿arrancamos la raid a las 22? @ram");
     await h.renderOnce();
   });
 }

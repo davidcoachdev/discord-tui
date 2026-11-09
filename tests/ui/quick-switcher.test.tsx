@@ -17,7 +17,7 @@ test("Ctrl-k opens, typing filters, Enter opens the channel, Esc closes", async 
   expect(captureCharFrame()).toContain("Saltar a…");
   await mockInput.typeText("memes");
   await renderOnce();
-  expect(captureCharFrame()).toContain("Mu Gondor › #🐸-memes");
+  expect(captureCharFrame()).toContain("Los Andes › #🐸-memes");
   mockInput.pressEnter();
   await renderOnce();
   expect(store.getState().ui.selectedChannelId).toBe("920000000000000005");

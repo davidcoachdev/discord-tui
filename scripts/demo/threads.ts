@@ -90,8 +90,8 @@ export function seedThreads(store: Store): void {
     type: "messages/page",
     channelId: DEMO_THREADS.ajedrez,
     messages: [
-      message("939000000000000901", DEMO_THREADS.ajedrez, [RAGNAR, "ragnar", "Ragnar"], "arrancamos el sábado a las 18, ¿quién se anota?", 50),
-      message("939000000000000905", DEMO_THREADS.ajedrez, [CINLO, "cinlo", "CinLo💜"], "yo! blitz 5+3 por favor", 30),
+      message("939000000000000901", DEMO_THREADS.ajedrez, [RAGNAR, "ramiro", "Ramiro"], "arrancamos el sábado a las 18, ¿quién se anota?", 50),
+      message("939000000000000905", DEMO_THREADS.ajedrez, [CINLO, "celes", "Celes💜"], "yo! blitz 5+3 por favor", 30),
       message("939000000000000910", DEMO_THREADS.ajedrez, [ME, "gon", "Gon"], "anotado, llevo el tablero de la terminal ♟", 5),
     ] as never,
     mode: "latest",

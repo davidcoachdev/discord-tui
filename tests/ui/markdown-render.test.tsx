@@ -31,14 +31,14 @@ test("messages show resolved mentions, custom emoji, reactions, edited marker, a
   });
   await renderOnce();
   const frame = captureCharFrame();
-  expect(frame).toContain("@bojack7080 ¿che pero lo estás haciendo eso en hora?");
+  expect(frame).toContain("@bruno_7712 ¿che pero lo estás haciendo eso en hora?");
   expect(frame).not.toContain("<@");
   expect(frame).toContain(":kek:");
   expect(frame).toContain("😂 3");
   expect(frame).toContain("(editado)");
   expect(frame).toContain("📎 captura-20261107.png (121 KB)");
   expect(frame).toContain("OpenTUI");
-  expect(frame).toContain("CinLo💜 está escribiendo…");
-  expect(frame).toContain("╭─ @bojack7080");
+  expect(frame).toContain("Celes💜 está escribiendo…");
+  expect(frame).toContain("╭─ @bruno_7712");
   expect(frame).toContain("EN LÍNEA — 2");
 });

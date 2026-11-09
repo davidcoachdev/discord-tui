@@ -178,3 +178,20 @@ test("message authors are remembered as users", () => {
   });
   expect(state.users["100000000000000011"]?.username).toBe("user2");
 });
+
+test("history pages keep at most 500 messages per channel, also in byId (no leak over a long session)", () => {
+  let state = emptyState();
+  const page = (from: number) =>
+    Array.from({ length: 100 }, (_, i) => ({
+      id: String(200000000000000000n + BigInt(from + i)),
+      channel_id: CHANNEL,
+      author: { id: ME, username: "gon" },
+      content: `m${from + i}`,
+      timestamp: new Date(0).toISOString(),
+    }));
+  for (let p = 0; p < 8; p++) state = reduce(state, { type: "messages/page", channelId: CHANNEL, messages: page(p * 100) as never, mode: "older" });
+  const slice = state.messages[CHANNEL]!;
+  expect(slice.ids).toHaveLength(500);
+  expect(Object.keys(slice.byId)).toHaveLength(500);
+  expect(Object.keys(slice.byId).sort()).toEqual([...slice.ids].sort());
+});
