@@ -3,7 +3,9 @@
 **Discord en tu terminal.** Texto, voz con cifrado de punta a punta, pantalla compartida y transmisiones, todo sin
 salir de la terminal. Se usa con el mouse como Discord o con el teclado estilo vim.
 
-![zcord: chat con canales, hilos, reacciones y lista de miembros](docs/img/chat.png)
+🌐 **https://zcord.gonzalorocca.com**
+
+![zcord en acción: escribir con una mención, saltar con Ctrl-k y entrar a una llamada](docs/img/zcord.gif)
 
 ## Features
 
@@ -25,7 +27,9 @@ salir de la terminal. Se usa con el mouse como Discord o con el teclado estilo v
 | --- | --- |
 | ![barra de voz con E2EE, quién habla y botones](docs/img/voz.png) | ![buscador de canales](docs/img/saltar.png) |
 
-![splash de zcord](docs/img/splash.png)
+| Chat | Splash |
+| --- | --- |
+| ![chat con canales, hilos, reacciones y lista de miembros](docs/img/chat.png) | ![splash de zcord](docs/img/splash.png) |
 
 ## Cómo correrlo
 
@@ -53,7 +57,12 @@ todas las teclas.
 bun test                       # tests (UI con testRender, sin red)
 bun run typecheck
 bun scripts/screenshots.tsx    # regenera las capturas de este README desde la demo
+bun scripts/readme-gif.tsx     # regenera docs/img/zcord.gif (necesita ffmpeg)
+bun scripts/og-image.ts        # imagen para compartir la landing
+scripts/deploy-site.sh         # publica site/ en zcord.gonzalorocca.com (cerostation)
 ```
+
+La landing vive en `site/index.html`: es estática y usa las imágenes de `docs/img`.
 
 - Las notas del protocolo están en `docs/protocol-notes.md`.
 - La checklist de pruebas con la cuenta real está en `docs/PRUEBAS-GON.md`.
