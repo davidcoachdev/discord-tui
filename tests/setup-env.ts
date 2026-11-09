@@ -6,4 +6,6 @@ import { join } from "node:path";
 if (!process.env.DISCORD_TUI_TEST_ENV) {
   process.env.DISCORD_TUI_TEST_ENV = "1";
   process.env.XDG_STATE_HOME = mkdtempSync(join(tmpdir(), "discord-tui-test-state-"));
+  // Ni el feed de voz para eco (voz.jsonl) va a la carpeta real.
+  process.env.DISCORD_TUI_RUNTIME_DIR = mkdtempSync(join(tmpdir(), "discord-tui-test-run-"));
 }

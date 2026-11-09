@@ -82,9 +82,9 @@ function fakeSpawn(opts: { exitImmediately?: number; stderrText?: string } = {})
   return { spawn, calls };
 }
 
-const CAPTURE_BASE = ["pw-record", "--raw", "--format", "s16", "--rate", "48000", "--channels", "2", "--latency", "20ms"];
+const CAPTURE_BASE = ["pw-record", "--raw", "--format", "s16", "--rate", "48000", "--channels", "2", "--latency", "20ms", "-P", '{ application.name = "discord-tui" }'];
 const CAPTURE_ARGS = [...CAPTURE_BASE, "-"];
-const PLAYBACK_BASE = ["pw-cat", "--playback", "--raw", "--format", "s16", "--rate", "48000", "--channels", "2"];
+const PLAYBACK_BASE = ["pw-cat", "--playback", "--raw", "--format", "s16", "--rate", "48000", "--channels", "2", "-P", '{ application.name = "discord-tui" }'];
 const PLAYBACK_ARGS = [...PLAYBACK_BASE, "-"];
 
 describe("startCapture", () => {
@@ -132,6 +132,23 @@ describe("startCapture", () => {
     const capture = await startCapture({ spawn: fake.spawn });
     await capture.stop();
     expect(fake.calls[0]?.killed).toBe(true);
+  });
+});
+
+describe("application.name", () => {
+  // eco elige qué streams escuchar por application.name: sin esto se llamarían "pw-cat"/"pw-record".
+  test("mic and call output are named discord-tui so eco recognizes them", async () => {
+    const fake = fakeSpawn();
+    const capture = await startCapture({ spawn: fake.spawn, target: "x" });
+    const playback = await startPlayback({ spawn: fake.spawn, target: "y" });
+    for (const call of fake.calls) {
+      const i = call.cmd.indexOf("-P");
+      expect(i).toBeGreaterThan(0);
+      expect(call.cmd[i + 1]).toBe('{ application.name = "discord-tui" }');
+      expect(call.cmd.at(-1)).toBe("-");
+    }
+    await capture.stop();
+    await playback.stop();
   });
 });
 
