@@ -226,6 +226,18 @@ export function App(props: {
     void voice.watchStream?.(streamers[0]!);
   }
   const watching = useSelector(props.store, (s) => s.voice.watch.status !== "idle");
+  // Al empezar a mirar una transmisión se abre el chat de ese canal de voz (como en Discord), al lado del video.
+  let wasWatching = false;
+  createEffect(() => {
+    const now = watching();
+    if (now && !wasWatching) {
+      const voiceChannel = props.store.getState().voice.channelId;
+      if (voiceChannel !== null && props.store.getState().ui.selectedChannelId !== voiceChannel) {
+        void props.actions.openChannel(voiceChannel).catch(() => {});
+      }
+    }
+    wasWatching = now;
+  });
 
   function flash(text: string): void {
     setHint(text);
@@ -1213,7 +1225,50 @@ export function App(props: {
     return channel.guildId === null ? `i para escribirle a @${channel.name}` : `i para escribir en #${channel.name}`;
   });
 
-  const showMembers = (): boolean => membersVisible() && inGuild() && dims().width >= 110;
+  const showMembers = (): boolean => membersVisible() && inGuild() && dims().width >= 110 && !watching();
+  const centerWidth = (): number => dims().width - GUILD_WIDTH - CHANNEL_WIDTH;
+  /** Video y chat lado a lado cuando el centro tiene lugar; si no, el chat va abajo del video. */
+  const watchSideBySide = (): boolean => centerWidth() >= 100;
+  const watchChatWidth = (): number => Math.max(40, Math.min(70, Math.round(centerWidth() * 0.34)));
+
+  const messageView = (titleWidth: number): JSX.Element => (
+    <MessageView
+      store={props.store}
+      theme={theme()}
+      selectedId={selectedId()}
+      focused={focus() === "messages"}
+      images={props.images === true && inlineImages()}
+      animate={animateImages()}
+      avatars={showAvatars()}
+      onSelect={(id) => {
+        setSelectedId(id);
+        props.actions.focus("messages");
+      }}
+      onAction={messageAction}
+      onReact={(messageId, emoji) => {
+        const id = channelId();
+        if (id !== null) void props.actions.toggleReaction(id, messageId, emoji).catch(() => {});
+      }}
+      onOpen={(url) => props.actions.openUrl?.(url)}
+      onVote={(messageId, answerId) => {
+        const id = channelId();
+        if (id !== null) void props.actions.votePoll?.(id, messageId, answerId).catch(() => {});
+      }}
+      onLoadOlder={() => {
+        const id = channelId();
+        if (id !== null) void props.actions.loadOlder(id).catch(() => {});
+      }}
+      onFocus={() => props.actions.focus("messages")}
+      onJumpUnread={() => void jumpToUnread()}
+      onJumpBottom={() => setSelectedId(null)}
+      bottomTick={bottomTick()}
+      onVoiceToggle={(id) => void props.actions.voice?.toggleVoice(id)}
+      onOpenPost={(id) => goToChannel(id)}
+      titleWidth={titleWidth}
+      onLoadArchived={(id) => void props.actions.loadArchivedPosts?.(id).catch(() => {})}
+      onWatch={(userId) => void props.actions.voice?.toggleWatch?.(userId)}
+    />
+  );
 
   return (
     <box flexDirection="column" width="100%" height="100%" backgroundColor={theme().bg}>
@@ -1231,51 +1286,29 @@ export function App(props: {
           onWatch={(userId) => void props.actions.voice?.toggleWatch?.(userId)}
         />
         <Show when={watching()}>
-          <StreamViewer
-            store={props.store}
-            theme={theme()}
-            voice={props.actions.voice}
-            focused={focus() === "messages"}
-            titleWidth={Math.max(10, Math.min(60, dims().width - GUILD_WIDTH - CHANNEL_WIDTH - (showMembers() ? MEMBER_WIDTH : 0) - 6))}
-          />
+          {/* Mirando una transmisión: el video y el chat del canal a la vez (al lado si entra, si no abajo). */}
+          <box flexDirection={watchSideBySide() ? "row" : "column"} flexGrow={1} height="100%">
+            <box flexGrow={1} flexDirection="row">
+              <StreamViewer
+                store={props.store}
+                theme={theme()}
+                voice={props.actions.voice}
+                focused={focus() === "messages"}
+                titleWidth={Math.max(10, Math.min(60, centerWidth() - (watchSideBySide() ? watchChatWidth() : 0) - 6))}
+              />
+            </box>
+            <box
+              width={watchSideBySide() ? watchChatWidth() : "100%"}
+              height={watchSideBySide() ? "100%" : "40%"}
+              flexShrink={0}
+              flexDirection="row"
+            >
+              {messageView(Math.max(10, watchChatWidth() - 6))}
+            </box>
+          </box>
         </Show>
         <Show when={!watching()}>
-        <MessageView
-          store={props.store}
-          theme={theme()}
-          selectedId={selectedId()}
-          focused={focus() === "messages"}
-          images={props.images === true && inlineImages()}
-          animate={animateImages()}
-          avatars={showAvatars()}
-          onSelect={(id) => {
-            setSelectedId(id);
-            props.actions.focus("messages");
-          }}
-          onAction={messageAction}
-          onReact={(messageId, emoji) => {
-            const id = channelId();
-            if (id !== null) void props.actions.toggleReaction(id, messageId, emoji).catch(() => {});
-          }}
-          onOpen={(url) => props.actions.openUrl?.(url)}
-          onVote={(messageId, answerId) => {
-            const id = channelId();
-            if (id !== null) void props.actions.votePoll?.(id, messageId, answerId).catch(() => {});
-          }}
-          onLoadOlder={() => {
-            const id = channelId();
-            if (id !== null) void props.actions.loadOlder(id).catch(() => {});
-          }}
-          onFocus={() => props.actions.focus("messages")}
-          onJumpUnread={() => void jumpToUnread()}
-          onJumpBottom={() => setSelectedId(null)}
-          bottomTick={bottomTick()}
-          onVoiceToggle={(id) => void props.actions.voice?.toggleVoice(id)}
-          onOpenPost={(id) => goToChannel(id)}
-          titleWidth={Math.max(10, Math.min(60, dims().width - GUILD_WIDTH - CHANNEL_WIDTH - (showMembers() ? MEMBER_WIDTH : 0) - 6))}
-          onLoadArchived={(id) => void props.actions.loadArchivedPosts?.(id).catch(() => {})}
-          onWatch={(userId) => void props.actions.voice?.toggleWatch?.(userId)}
-        />
+          {messageView(Math.max(10, Math.min(60, centerWidth() - (showMembers() ? MEMBER_WIDTH : 0) - 6)))}
         </Show>
         <Show when={showMembers()}>
           <MemberList

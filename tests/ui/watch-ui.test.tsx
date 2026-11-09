@@ -34,8 +34,8 @@ function setup() {
   return { store, actions, calls, subscriptions: () => subscriptions };
 }
 
-async function render(s: ReturnType<typeof setup>) {
-  const r = await testRender(() => <App store={s.store} actions={s.actions} onQuit={() => {}} />, { width: 180, height: 50 });
+async function render(s: ReturnType<typeof setup>, width = 180) {
+  const r = await testRender(() => <App store={s.store} actions={s.actions} onQuit={() => {}} />, { width, height: 50 });
   await r.renderOnce();
   return r;
 }
@@ -171,4 +171,34 @@ test("videoBox caps the decoder box (CPU and terminal bandwidth)", () => {
   expect(videoBox(64, 18)).toEqual({ width: 640, height: 360 });
   expect(videoBox(200, 60)).toEqual({ width: 960, height: 540 });
   expect(syntheticFrame(8, 4, 0).rgba.length).toBe(8 * 4 * 4);
+});
+
+test("while watching, the channel chat stays visible next to the video (or below it when narrow) and you can type", async () => {
+  for (const [width, side] of [[200, true], [140, false]] as const) {
+    const s = setup();
+    s.store.dispatch({ type: "gw", t: "MESSAGE_CREATE", d: { id: "939000000000009999", channel_id: DEMO.voice, author: { id: RAGNAR, username: "ramiro" }, content: "miren esto que estoy armando", timestamp: new Date().toISOString() } });
+    const h = await render(s, width);
+    await s.actions.voice!.toggleVoice(DEMO.voice);
+    await h.renderOnce();
+    await click(h, "▶ ver");
+    await settle(h, 800);
+    const frame = h.captureCharFrame();
+    expect(frame).toMatch(/📺 Ramiro · en vivo/);
+    expect(frame).toContain("miren esto que estoy armando");
+    const lines = frame.split("\n");
+    const videoRow = lines.findIndex((l) => /📺 Ramiro · en vivo/.test(l));
+    const chatRow = lines.findIndex((l) => l.includes("miren esto que estoy armando"));
+    if (side) {
+      // misma franja de filas, el chat a la derecha del video
+      expect(chatRow).toBeLessThan(videoRow + 30);
+      expect(lines[chatRow]!.indexOf("miren")).toBeGreaterThan(lines[videoRow]!.indexOf("📺"));
+    } else {
+      expect(chatRow).toBeGreaterThan(videoRow);
+    }
+    h.mockInput.pressKey("i");
+    await h.mockInput.typeText("buenísimo");
+    await h.renderOnce();
+    expect(h.captureCharFrame()).toContain("buenísimo");
+    await s.actions.voice!.leaveVoice();
+  }
 });
