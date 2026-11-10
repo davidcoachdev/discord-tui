@@ -43,6 +43,11 @@ function toBytes(data: unknown): Uint8Array | null {
   return null;
 }
 
+function dispatchLogEnabled(): boolean {
+  const value = process.env.DISCORD_TUI_DEBUG;
+  return value === "1" || value === "true";
+}
+
 export function createGateway(deps: GatewayDeps): Gateway {
   const WebSocketImpl = deps.WebSocketImpl ?? WebSocket;
   const random = deps.random ?? Math.random;
@@ -82,11 +87,15 @@ export function createGateway(deps: GatewayDeps): Gateway {
   }
 
   function send(op: number, d: unknown): void {
+    const ws = socket;
+    if (ws === null) return;
     const now = Date.now();
     while (sentAt.length > 0 && now - sentAt[0]! >= SEND_WINDOW_MS) sentAt.shift();
     if (sentAt.length >= SEND_LIMIT) {
       const wait = SEND_WINDOW_MS - (now - sentAt[0]!);
       setTimer(() => {
+        // Si el socket cambió mientras esperaba (reconexión), el payload es de la sesión vieja: se descarta.
+        if (socket !== ws) return;
         sentAt.push(Date.now());
         rawSend({ op, d });
       }, wait);
@@ -147,7 +156,7 @@ export function createGateway(deps: GatewayDeps): Gateway {
 
   function onDispatch(t: string, d: any, s: number | null): void {
     if (typeof s === "number") seq = s;
-    log.info("gateway.dispatch", { t, seq: s ?? undefined });
+    if (dispatchLogEnabled()) log.info("gateway.dispatch", { t, seq: s ?? undefined });
 
     let sessionKind: SessionKind | null = null;
     if (t === "READY" && d && typeof d === "object") {

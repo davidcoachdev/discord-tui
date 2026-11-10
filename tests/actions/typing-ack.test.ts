@@ -39,7 +39,7 @@ test("typing onSent resets the throttle", () => {
 
 test("ack: debounced to one request, only for the viewed channel", async () => {
   const calls: Array<[string, string]> = [];
-  const scheduler = createAckScheduler({ postAck: async (c, m) => { calls.push([c, m]); }, debounceMs: 20 });
+  const scheduler = createAckScheduler({ postAck: async (c, m, _token) => { calls.push([c, m]); return { token: null }; }, debounceMs: 20 });
 
   scheduler.viewing("ch", "100000000000000100");
   scheduler.viewing("ch", "100000000000000101");
@@ -50,7 +50,7 @@ test("ack: debounced to one request, only for the viewed channel", async () => {
 
 test("ack: leaving the channel before the debounce cancels it", async () => {
   const calls: string[] = [];
-  const scheduler = createAckScheduler({ postAck: async () => { calls.push("ack"); }, debounceMs: 20 });
+  const scheduler = createAckScheduler({ postAck: async () => { calls.push("ack"); return { token: null }; }, debounceMs: 20 });
 
   scheduler.viewing("ch", "100000000000000100");
   scheduler.viewing(null, null);
@@ -60,7 +60,7 @@ test("ack: leaving the channel before the debounce cancels it", async () => {
 
 test("ack: no ack when the newest visible is not newer than the last acked", async () => {
   const calls: string[] = [];
-  const scheduler = createAckScheduler({ postAck: async () => { calls.push("ack"); }, debounceMs: 20 });
+  const scheduler = createAckScheduler({ postAck: async () => { calls.push("ack"); return { token: null }; }, debounceMs: 20 });
 
   scheduler.viewing("ch", "100000000000000101");
   await Bun.sleep(30);

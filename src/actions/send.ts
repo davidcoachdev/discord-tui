@@ -3,12 +3,13 @@ import type { RestClient } from "../rest/client";
 import { postMessage } from "../rest/routes";
 import type { Store } from "../store/store";
 import type { OutboxItem, PendingAttachment } from "../store/types";
+import type { UploadedAttachment } from "../uploads/upload";
 import { generateNonce } from "../util/snowflake";
 
 export interface SendDeps {
   store: Store;
   rest: RestClient;
-  upload?: (channelId: string, files: PendingAttachment[]) => Promise<unknown[]>;
+  upload?: (channelId: string, files: PendingAttachment[]) => Promise<UploadedAttachment[]>;
 }
 
 function errorText(error: unknown): string {
@@ -18,6 +19,9 @@ function errorText(error: unknown): string {
 }
 
 export function createSendActions(deps: SendDeps) {
+  // Los slots ya subidos se cachean por nonce: reintentar un mensaje no vuelve a subir los adjuntos.
+  const uploadedByNonce = new Map<string, UploadedAttachment[]>();
+
   async function deliver(item: OutboxItem): Promise<void> {
     const { nonce, channelId, content, replyTo, attachments } = item;
     try {
@@ -27,12 +31,20 @@ export function createSendActions(deps: SendDeps) {
         body.allowed_mentions = { parse: ["users", "roles", "everyone"], replied_user: true };
       }
       if (attachments.length > 0) {
-        body.attachments = deps.upload
-          ? await deps.upload(channelId, attachments)
-          : attachments.map((attachment) => ({ filename: attachment.filename }));
+        if (deps.upload) {
+          let uploaded = uploadedByNonce.get(nonce);
+          if (!uploaded) {
+            uploaded = await deps.upload(channelId, attachments);
+            uploadedByNonce.set(nonce, uploaded);
+          }
+          body.attachments = uploaded;
+        } else {
+          body.attachments = attachments.map((attachment) => ({ filename: attachment.filename }));
+        }
       }
 
       const message = await postMessage(deps.rest, channelId, body as never);
+      uploadedByNonce.delete(nonce);
       deps.store.dispatch({ type: "outbox/sent", nonce, messageId: message.id });
     } catch (error) {
       deps.store.dispatch({ type: "outbox/failed", nonce, error: errorText(error) });

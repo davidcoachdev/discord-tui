@@ -9,9 +9,10 @@ export interface ImageCache {
 }
 
 /** LRU de imágenes del CDN. Nunca manda Authorization ni headers de cliente: es un GET pelado. */
-export function createImageCache(deps: { fetch: typeof fetch; maxBytes?: number }): ImageCache {
+export function createImageCache(deps: { fetch: typeof fetch; maxBytes?: number; maxImageBytes?: number }): ImageCache {
   // Bytes descargados (comprimidos): lo que sale se vuelve a bajar si hace falta.
   const maxBytes = deps.maxBytes ?? 16 * 1024 * 1024;
+  const maxImageBytes = deps.maxImageBytes ?? MAX_IMAGE_BYTES;
   const entries = new Map<string, Uint8Array>();
   const pending = new Map<string, Promise<Uint8Array | null>>();
   let total = 0;
@@ -24,6 +25,44 @@ export function createImageCache(deps: { fetch: typeof fetch; maxBytes?: number 
       entries.delete(key);
       total -= value.byteLength;
     }
+  }
+
+  async function readBody(response: Response): Promise<Uint8Array | null> {
+    const contentLength = Number(response.headers?.get("content-length"));
+    if (Number.isFinite(contentLength) && contentLength > maxImageBytes) return null;
+
+    const body = response.body;
+    if (body) {
+      const reader = body.getReader();
+      const chunks: Uint8Array[] = [];
+      let total = 0;
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          total += value.byteLength;
+          if (total > maxImageBytes) {
+            await reader.cancel().catch(() => {});
+            return null;
+          }
+          chunks.push(value);
+        }
+      } catch {
+        return null;
+      }
+      if (total === 0) return null;
+      const bytes = new Uint8Array(total);
+      let offset = 0;
+      for (const chunk of chunks) {
+        bytes.set(chunk, offset);
+        offset += chunk.byteLength;
+      }
+      return bytes;
+    }
+
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    if (bytes.byteLength === 0 || bytes.byteLength > maxImageBytes) return null;
+    return bytes;
   }
 
   return {
@@ -44,8 +83,8 @@ export function createImageCache(deps: { fetch: typeof fetch; maxBytes?: number 
         try {
           const response = await deps.fetch(url, { method: "GET" });
           if (!response.ok) return null;
-          const bytes = new Uint8Array(await response.arrayBuffer());
-          if (bytes.byteLength === 0 || bytes.byteLength > MAX_IMAGE_BYTES) return null;
+          const bytes = await readBody(response);
+          if (bytes === null) return null;
           remember(url, bytes);
           return bytes;
         } catch {

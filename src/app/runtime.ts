@@ -65,6 +65,11 @@ const defaultMedia: VoiceMedia = {
   },
 };
 
+function debugLogEnabled(): boolean {
+  const value = process.env.DISCORD_TUI_DEBUG;
+  return value === "1" || value === "true";
+}
+
 export interface Runtime {
   store: Store;
   actions: Actions;
@@ -136,7 +141,7 @@ export function createRuntime(deps: RuntimeDeps): Runtime {
     if (status === "ready") voiceSession.gatewayReady?.();
   });
   gateway.on("dispatch", (t, d) => {
-    if (t === "READY" && d && typeof d === "object") {
+    if (t === "READY" && d && typeof d === "object" && debugLogEnabled()) {
       const firstGuild =
         (Array.isArray(d.guilds) ? d.guilds[0] : d.guilds && typeof d.guilds === "object" ? (() => { const k = Object.keys(d.guilds as object)[0]; return k !== undefined ? (d.guilds as any)[k] : undefined; })() : undefined);
       const firstChannel = firstGuild?.channels?.[0];
@@ -250,7 +255,7 @@ export function createRuntime(deps: RuntimeDeps): Runtime {
       watch.dispose();
       stream.dispose();
       await Promise.race([stream.stop(), new Promise((resolve) => setTimeout(resolve, 2_000))]);
-      detachSettings();
+      await detachSettings();
       gateway.close();
     },
     activity(): void {

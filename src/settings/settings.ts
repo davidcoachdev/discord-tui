@@ -97,7 +97,6 @@ function parseVolumes(value: unknown): Record<string, number> {
   for (const [userId, raw] of Object.entries(record)) {
     if (typeof raw !== "number" || !Number.isFinite(raw)) continue;
     const volume = Math.round(clamp(raw, MIN_VOLUME, MAX_VOLUME));
-    if (volume === MIN_VOLUME && raw <= MIN_VOLUME) continue;
     out[userId] = volume;
   }
   return out;

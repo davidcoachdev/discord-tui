@@ -32,8 +32,37 @@ export async function postTyping(rest: RestClient, channelId: string): Promise<v
   await rest.request("POST", `/channels/${channelId}/typing`);
 }
 
-export async function postAck(rest: RestClient, channelId: string, messageId: string): Promise<void> {
-  await rest.request("POST", `/channels/${channelId}/messages/${messageId}/ack`, { token: null, last_viewed: 0 });
+const DISCORD_EPOCH_MS = 1420070400000;
+const DAY_MS = 86_400_000;
+
+/** Días desde la época de Discord (2015-01-01): es el `last_viewed` del ack. */
+export function lastViewedDays(now: number = Date.now()): number {
+  return Math.floor((now - DISCORD_EPOCH_MS) / DAY_MS);
+}
+
+export interface AckRequest {
+  /** Token de ack del canal; `null` la primera vez (docs.discord.food, "Ack Tokens"). */
+  token?: string | null;
+  /** Días desde la época de Discord; si falta, se calcula con `Date.now()`. */
+  last_viewed?: number;
+}
+
+export async function postAck(
+  rest: RestClient,
+  channelId: string,
+  messageId: string,
+  body: AckRequest = {},
+): Promise<{ token: string | null }> {
+  const payload = {
+    token: body.token ?? null,
+    last_viewed: body.last_viewed ?? lastViewedDays(),
+  };
+  const data = await rest.request<{ token?: string | null } | null>(
+    "POST",
+    `/channels/${channelId}/messages/${messageId}/ack`,
+    payload,
+  );
+  return { token: typeof data?.token === "string" ? data.token : null };
 }
 
 export async function patchMessage(

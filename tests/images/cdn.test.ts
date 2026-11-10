@@ -31,6 +31,21 @@ test("image cache never sends Authorization and refuses other hosts", async () =
   expect(JSON.stringify(calls[0]!.init ?? {}).toLowerCase()).not.toContain("authorization");
 });
 
+test("image cache rejects a body over the limit from Content-Length before reading it", async () => {
+  const cache = createImageCache({
+    fetch: (async () => new Response(new Uint8Array([1, 2, 3]), { status: 200, headers: { "content-length": String(9 * 1024 * 1024) } })) as never,
+  });
+  expect(await cache.get("https://cdn.discordapp.com/x.png")).toBeNull();
+});
+
+test("image cache streams and stops when the body exceeds the limit without Content-Length", async () => {
+  const cache = createImageCache({
+    maxImageBytes: 4,
+    fetch: (async () => new Response(new Uint8Array(20))) as never,
+  });
+  expect(await cache.get("https://cdn.discordapp.com/x.png")).toBeNull();
+});
+
 test("attachmentView keeps aspect ratio inside 40x12 and falls back to link", () => {
   const base = { filename: "a.png", size: 2048, url: "https://cdn.discordapp.com/a.png", proxy_url: "https://media.discordapp.net/a.png", content_type: "image/png", width: 800, height: 400 };
   const view = attachmentView(base, "kitty");

@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 
 import { cleanEnv } from "../../src/proc/spawn";
-import { notify, shouldNotify } from "../../src/notify/notify";
+import { notify, notificationTitle, shouldNotify } from "../../src/notify/notify";
 import { reduce } from "../../src/store/reduce";
 import { emptyState } from "../../src/store/store";
 import type { Message } from "../../src/store/types";
@@ -71,6 +71,32 @@ test.each([
   expect(shouldNotify(full, message(state, { authorId: own ? "me" : "other", channelId: "ch", mentionsMe: mention }), viewing)).toBe(expected);
 });
 
+test("notificationTitle names group DMs by their group name", () => {
+  const state = base();
+  const full = {
+    ...state,
+    channels: {
+      ch: { id: "ch", guildId: null, name: "los pibes", type: 3, position: 0, parentId: null, permissionOverwrites: [], lastMessageId: null },
+    },
+    users: { other: { id: "other", username: "pepe", globalName: null, avatar: null, bot: false } },
+  };
+  const msg = message(state, { channelId: "ch", authorId: "other" });
+  expect(notificationTitle(full, msg)).toBe("pepe (los pibes)");
+});
+
+test("notificationTitle keeps regular DMs as (DM)", () => {
+  const state = base();
+  const full = {
+    ...state,
+    channels: {
+      ch: { id: "ch", guildId: null, name: "pepe", type: 1, position: 0, parentId: null, permissionOverwrites: [], lastMessageId: null },
+    },
+    users: { other: { id: "other", username: "pepe", globalName: null, avatar: null, bot: false } },
+  };
+  const msg = message(state, { channelId: "ch", authorId: "other" });
+  expect(notificationTitle(full, msg)).toBe("pepe (DM)");
+});
+
 test("notify spawns notify-send with an args array and clean env", () => {
   const calls: Array<{ cmd: string[]; opts: any }> = [];
   const spawn = ((cmd: string[], opts?: any) => {
@@ -80,4 +106,18 @@ test("notify spawns notify-send with an args array and clean env", () => {
 
   notify("gon (DM)", "hola", { spawn: spawn as never });
   expect(calls[0]!.cmd).toEqual(["notify-send", "-a", "zcord", "gon (DM)", "hola"]);
+});
+
+test("notify does not throw when the spawner throws synchronously", () => {
+  const spawn = (() => {
+    throw new Error("notify-send missing");
+  }) as never;
+
+  expect(() => notify("gon (DM)", "hola", { spawn: spawn as never })).not.toThrow();
+});
+
+test("notify ignores a rejected child exit", () => {
+  const spawn = (() => ({ stdout: null, exited: Promise.reject(new Error("boom")) })) as never;
+
+  expect(() => notify("gon (DM)", "hola", { spawn: spawn as never })).not.toThrow();
 });

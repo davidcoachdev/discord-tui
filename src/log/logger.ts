@@ -1,4 +1,4 @@
-import { fsyncSync, mkdirSync, openSync, writeSync } from "node:fs";
+import { closeSync, fsyncSync, fstatSync, mkdirSync, openSync, renameSync, writeSync } from "node:fs";
 import { dirname } from "node:path";
 
 import { logPath } from "../config/paths";
@@ -47,9 +47,35 @@ function redactTokens(value: string): string {
   return out;
 }
 
-export function createLogger(opts: { file?: string } = {}): Logger {
+export function createLogger(opts: { file?: string; maxBytes?: number } = {}): Logger {
   const file = opts.file ?? logPath();
+  const maxBytes = opts.maxBytes ?? 10 * 1024 * 1024;
   let fd: number | null = null;
+  let bytes = 0;
+
+  function ensureOpen(): void {
+    if (fd !== null) return;
+    mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
+    fd = openSync(file, "a", 0o600);
+    try {
+      bytes = fstatSync(fd).size;
+    } catch {
+      bytes = 0;
+    }
+  }
+
+  function rotate(): void {
+    if (fd === null) return;
+    closeSync(fd);
+    fd = null;
+    try {
+      renameSync(file, `${file}.1`);
+    } catch {
+      // sin permiso o ya no existe: seguimos appendando al mismo archivo
+    }
+    bytes = 0;
+    ensureOpen();
+  }
 
   function write(level: "info" | "warn" | "error", event: string, fields: LogFields = {}): void {
     const record: Record<string, unknown> = {
@@ -64,11 +90,11 @@ export function createLogger(opts: { file?: string } = {}): Logger {
         record[key] = typeof value === "string" ? redactTokens(value) : value;
       }
     }
-    if (fd === null) {
-      mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
-      fd = openSync(file, "a", 0o600);
-    }
-    writeSync(fd, JSON.stringify(record) + "\n");
+    const line = JSON.stringify(record) + "\n";
+    ensureOpen();
+    if (bytes > 0 && bytes + Buffer.byteLength(line, "utf8") > maxBytes) rotate();
+    writeSync(fd!, line);
+    bytes += Buffer.byteLength(line, "utf8");
   }
 
   return {

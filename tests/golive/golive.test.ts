@@ -169,7 +169,7 @@ describe("stop", () => {
 
   const autoStops: Array<[string, (s: ReturnType<typeof setup>) => void | Promise<void>, string | null]> = [
     ["you leave voice", (s) => s.store.dispatch({ type: "voice/left" }), STREAM_ERRORS.leftVoice],
-    ["you switch channel", (s) => s.store.dispatch({ type: "voice/moved", channelId: VOICE_B }), STREAM_ERRORS.leftVoice],
+    ["you switch channel", (s) => s.store.dispatch({ type: "voice/moved", guildId: GUILD, channelId: VOICE_B }), STREAM_ERRORS.leftVoice],
     ["voice errors out", (s) => s.store.dispatch({ type: "voice/left", error: "se cortó la voz" }), STREAM_ERRORS.leftVoice],
     ["the gateway disconnects", (s) => s.gw.status("disconnected"), STREAM_ERRORS.gatewayLost],
     ["the gateway comes back with a new session", (s) => s.gw.session("identified"), STREAM_ERRORS.newSession],

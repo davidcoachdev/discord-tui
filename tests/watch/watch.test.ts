@@ -177,7 +177,7 @@ describe("stops by itself", () => {
   test("leaving voice or moving to another channel stops watching (op 19)", async () => {
     const s = setup();
     await s.watcher.watch(RAGNAR);
-    s.store.dispatch({ type: "voice/moved", channelId: VOICE_B });
+    s.store.dispatch({ type: "voice/moved", guildId: GUILD, channelId: VOICE_B });
     expect(s.watch().status).toBe("idle");
     expect(s.notices()).toContain(WATCH_ERRORS.leftVoice);
     expect(s.gw.sent.at(-1)).toEqual({ op: 19, d: { stream_key: KEY } });

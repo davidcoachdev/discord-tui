@@ -156,6 +156,54 @@ test("being removed from the channel by Discord leaves voice here too", async ()
   expect(store.getState().voice).toMatchObject({ channelId: null, error: "te desconectaron del canal" });
 });
 
+test("being moved to another voice channel rejoins the session there", async () => {
+  const { voice, store, calls } = setup();
+  await voice.toggleVoice(VOICE_A);
+  store.dispatch({ type: "gw", t: "VOICE_STATE_UPDATE", d: { guild_id: GUILD, user_id: ME, channel_id: VOICE_A } });
+  store.dispatch({ type: "gw", t: "VOICE_STATE_UPDATE", d: { guild_id: GUILD, user_id: ME, channel_id: VOICE_B } });
+  await Bun.sleep(5);
+  expect(store.getState().voice).toMatchObject({ guildId: GUILD, channelId: VOICE_B, status: "connected" });
+  expect(calls).toContain(`join:${VOICE_B}:false:false`);
+});
+
+test("leaving voice does not rejoin when our voice state still shows the old channel (regression)", async () => {
+  const { voice, store, calls } = setup();
+  await voice.toggleVoice(VOICE_A);
+  store.dispatch({ type: "gw", t: "VOICE_STATE_UPDATE", d: { guild_id: GUILD, user_id: ME, channel_id: VOICE_A } });
+  await voice.leaveVoice();
+  // el channel_id null de Discord todavía no llegó: el estado sigue diciendo VOICE_A
+  store.dispatch({ type: "gw", t: "VOICE_STATE_UPDATE", d: { guild_id: GUILD, user_id: ME, channel_id: VOICE_A, self_mute: true } });
+  await Bun.sleep(5);
+  expect(store.getState().voice.channelId).toBeNull();
+  expect(calls.filter((c) => c.startsWith("join:"))).toEqual([`join:${VOICE_A}:false:false`]);
+});
+
+test("joining voice in another guild from another device does not pull this session there", async () => {
+  const { voice, store, calls } = setup();
+  await voice.toggleVoice(VOICE_A);
+  store.dispatch({ type: "gw", t: "VOICE_STATE_UPDATE", d: { guild_id: GUILD, user_id: ME, channel_id: VOICE_A } });
+  store.dispatch({ type: "gw", t: "VOICE_STATE_UPDATE", d: { guild_id: "100000000000009999", user_id: ME, channel_id: "100000000000009998" } });
+  await Bun.sleep(5);
+  expect(calls.filter((c) => c.startsWith("join:"))).toEqual([`join:${VOICE_A}:false:false`]);
+});
+
+test("a move carries the current mute/deaf flags into the new join", async () => {
+  const { voice, store, calls } = setup();
+  voice.toggleMute();
+  await voice.toggleVoice(VOICE_A);
+  store.dispatch({ type: "gw", t: "VOICE_STATE_UPDATE", d: { guild_id: GUILD, user_id: ME, channel_id: VOICE_A } });
+  store.dispatch({ type: "gw", t: "VOICE_STATE_UPDATE", d: { guild_id: GUILD, user_id: ME, channel_id: VOICE_B } });
+  await Bun.sleep(5);
+  expect(store.getState().voice).toMatchObject({ guildId: GUILD, channelId: VOICE_B, selfMute: true });
+  expect(calls).toContain(`join:${VOICE_B}:true:false`);
+});
+
+test("voice/moved updates guildId and channelId", () => {
+  const { store } = setup();
+  store.dispatch({ type: "voice/moved", guildId: GUILD, channelId: VOICE_B });
+  expect(store.getState().voice).toMatchObject({ guildId: GUILD, channelId: VOICE_B, speaking: {} });
+});
+
 test("M toggles the input mode and pttKey only acts in push_to_talk", async () => {
   const { voice, store } = setup();
   voice.pttKey({ name: "space", eventType: "press" });

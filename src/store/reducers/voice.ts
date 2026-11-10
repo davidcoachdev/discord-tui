@@ -145,7 +145,7 @@ export function reduceVoiceAction(state: AppState, action: any): AppState {
         watch: { status: "idle", userId: null, error: null },
       });
     case "voice/moved":
-      return withVoice(state, { channelId: action.channelId, speaking: {} });
+      return withVoice(state, { guildId: action.guildId, channelId: action.channelId, speaking: {} });
     case "voice/flags":
       return withVoice(state, { selfMute: action.selfMute, selfDeaf: action.selfDeaf, muteBeforeDeaf: action.muteBeforeDeaf });
     case "voice/selfSpeaking":

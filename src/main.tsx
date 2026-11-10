@@ -1,102 +1,20 @@
 import { createCliRenderer } from "@opentui/core";
-import { render, useKeyboard } from "@opentui/solid";
-import { createSignal, onCleanup, onMount, Show, type Accessor, type JSX } from "solid-js";
+import { render } from "@opentui/solid";
 import { KITTY_KEYBOARD } from "./ui/kitty";
 
 import { boot } from "./app/boot";
+import { Root } from "./app/root";
 import { createRuntime, type Runtime } from "./app/runtime";
-import { createRemoteAuth } from "./auth/remote-auth";
-import { deleteSession, loadSession, saveSession, type Session } from "./auth/session";
-import { normalizePastedToken, validateToken } from "./auth/token-login";
+import { deleteSession, loadSession, type Session } from "./auth/session";
+import { validateToken } from "./auth/token-login";
 import { fetchBuildNumber } from "./client-props/build-number";
 import { createClientProps } from "./client-props/props";
-import { CaptchaRequiredError, UnauthorizedError } from "./rest/errors";
 import { createHttp } from "./rest/http";
-import { loadSettings, type Settings } from "./settings/settings";
-import type { Secret } from "./secret";
-import { App } from "./ui/App";
+import { loadSettings } from "./settings/settings";
 import { APP_NAME } from "./ui/brand";
-import { LoginScreen } from "./ui/screens/LoginScreen";
 
 export function assertTty(stream: { isTTY?: boolean }): string | null {
   return stream.isTTY ? null : "zcord necesita una terminal";
-}
-
-function LoginRoot(props: {
-  buildNumber: number;
-  settings: Settings;
-  onQuit: (runtime: Runtime | null) => void;
-  kittyKeyboard: () => boolean;
-}): JSX.Element {
-  const clientProps = createClientProps({ buildNumber: props.buildNumber });
-  const auth = createRemoteAuth({ http: createHttp({ props: clientProps }) });
-  const [runtime, setRuntime] = createSignal<Runtime | null>(null);
-  let lastName = "";
-
-  async function finish(token: Secret, userId: string, username: string): Promise<void> {
-    const session: Session = { token, userId, buildNumber: props.buildNumber };
-    await saveSession(session);
-
-    const next = createRuntime({
-      session,
-      me: { id: userId, username },
-      props: clientProps,
-      initialSettings: props.settings,
-      kittyKeyboard: props.kittyKeyboard,
-    });
-    next.onUnauthorized(() => {
-      void next.stop();
-      setRuntime(null);
-    });
-    next.start();
-    setRuntime(next);
-  }
-
-  onMount(() => {
-    const off = auth.on((event) => {
-      if (event.type === "scanned") lastName = event.username;
-      if (event.type === "token") void finish(event.token, event.userId, lastName);
-    });
-    onCleanup(off);
-  });
-
-  async function onPasteToken(raw: string): Promise<string | null> {
-    const normalized = normalizePastedToken(raw);
-    if (!normalized.ok) {
-      if (normalized.reason === "empty") return "Pegá un token";
-      if (normalized.reason === "prefixed") return "Sin prefijo Bot/Bearer: solo el token";
-      return "Eso no parece un token de Discord";
-    }
-    try {
-      const authed = createHttp({ props: clientProps, token: normalized.token });
-      const me = await validateToken(normalized.token, authed);
-      await finish(normalized.token, me.userId, me.username);
-      return null;
-    } catch (error) {
-      if (error instanceof CaptchaRequiredError) return "Discord pidió captcha, pegá el token";
-      if (error instanceof UnauthorizedError) return "Token rechazado";
-      return "No se pudo validar el token";
-    }
-  }
-
-  useKeyboard((key) => {
-    if (runtime() === null && key.name === "q" && !key.ctrl && !key.meta) props.onQuit(null);
-  });
-
-  return (
-    <Show when={runtime()} fallback={<LoginScreen auth={auth} onPasteToken={onPasteToken} />}>
-      {(active: Accessor<Runtime>) => (
-        <App
-          store={active().store}
-          actions={active().actions}
-          onQuit={() => props.onQuit(active())}
-          onActivity={() => active().activity()}
-          images
-          splash
-        />
-      )}
-    </Show>
-  );
 }
 
 async function main(): Promise<void> {
@@ -138,9 +56,20 @@ async function main(): Promise<void> {
     });
   };
 
+  const clientProps = createClientProps({ buildNumber });
+
   if (result.kind === "login") {
     await render(
-      () => <LoginRoot buildNumber={buildNumber} settings={settings} onQuit={quit} kittyKeyboard={kittyKeyboard} />,
+      () => (
+        <Root
+          buildNumber={buildNumber}
+          settings={settings}
+          clientProps={clientProps}
+          initialRuntime={null}
+          onQuit={quit}
+          kittyKeyboard={kittyKeyboard}
+        />
+      ),
       renderer,
     );
     return;
@@ -151,20 +80,19 @@ async function main(): Promise<void> {
   const runtime = createRuntime({
     session,
     me,
-    props: createClientProps({ buildNumber }),
+    props: clientProps,
     initialSettings: settings,
     kittyKeyboard,
   });
-  runtime.start();
   await render(
     () => (
-      <App
-        store={runtime.store}
-        actions={runtime.actions}
-        onQuit={() => quit(runtime)}
-        onActivity={() => runtime.activity()}
-        images
-        splash
+      <Root
+        buildNumber={buildNumber}
+        settings={settings}
+        clientProps={clientProps}
+        initialRuntime={runtime}
+        onQuit={quit}
+        kittyKeyboard={kittyKeyboard}
       />
     ),
     renderer,

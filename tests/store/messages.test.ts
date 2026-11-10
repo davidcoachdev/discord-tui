@@ -53,6 +53,35 @@ test("MESSAGE_CREATE appends and bumps channel last_message_id", () => {
   expect(state.channels[CHANNEL]?.lastMessageId).toBe("100000000000000100");
 });
 
+test("own MESSAGE_CREATE marks the channel read", () => {
+  let state = baseState();
+  state = create(state, "100000000000000100");
+  expect(state.readState[CHANNEL]?.lastAckedId).toBe("100000000000000100");
+  expect(state.readState[CHANNEL]?.mentionCount).toBe(0);
+});
+
+test("a mention from another author increments mentionCount", () => {
+  let state = baseState();
+  state = create(state, "100000000000000101", { author: { id: "100000000000000011", username: "user2" }, content: `hola <@${ME}>` });
+  expect(state.readState[CHANNEL]?.lastAckedId).toBe("100000000000000021");
+  expect(state.readState[CHANNEL]?.mentionCount).toBe(1);
+});
+
+test("a DM from another author also increments mentionCount", () => {
+  let state = baseState();
+  state = reduce(state, {
+    type: "gw",
+    t: "MESSAGE_CREATE",
+    d: {
+      id: "100000000000000102",
+      channel_id: "100000000000000004",
+      author: { id: "100000000000000011", username: "user2" },
+      content: "dm hola",
+    },
+  });
+  expect(state.readState["100000000000000004"]?.mentionCount).toBe(1);
+});
+
 test("messages/page older prepends, dedupes by id and sets hasMoreBefore=false when fewer than 50", () => {
   let state = baseState();
   state = reduce(state, {

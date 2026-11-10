@@ -8,6 +8,7 @@ process.env.XDG_CONFIG_HOME = mkdtempSync(join(tmpdir(), "discord-tui-runtime-co
 
 import { createRuntime } from "../../src/app/runtime";
 import { createClientProps } from "../../src/client-props/props";
+import { logPath } from "../../src/config/paths";
 import { Secret } from "../../src/secret";
 import { selectMessages } from "../../src/store/selectors";
 import { startFakeGateway, type FakeGateway } from "../fakes/fake-gateway";
@@ -187,6 +188,47 @@ test("4004 from the gateway calls onUnauthorized", async () => {
   } finally {
     runtime.stop();
     fake.stop();
+  }
+});
+
+test("does not log ready.shape diagnostics unless DISCORD_TUI_DEBUG is set", async () => {
+  let fake: FakeGateway;
+  let ready = null as ReturnType<typeof readyFor> | null;
+  fake = startFakeGateway({ onIdentify: () => fake.dispatch("READY", ready!.d) });
+  ready = readyFor(fake);
+
+  const runtime = runtimeFor(fake, [], () => []);
+  try {
+    runtime.start();
+    await waitFor(() => runtime.store.getState().me !== null);
+  } finally {
+    await runtime.stop();
+    fake.stop();
+  }
+  expect(readFileSync(logPath(), "utf8")).not.toContain('"event":"ready.shape"');
+});
+
+test("logs ready.shape diagnostics when DISCORD_TUI_DEBUG is enabled", async () => {
+  const previous = process.env.DISCORD_TUI_DEBUG;
+  process.env.DISCORD_TUI_DEBUG = "1";
+  try {
+    let fake: FakeGateway;
+    let ready = null as ReturnType<typeof readyFor> | null;
+    fake = startFakeGateway({ onIdentify: () => fake.dispatch("READY", ready!.d) });
+    ready = readyFor(fake);
+
+    const runtime = runtimeFor(fake, [], () => []);
+    try {
+      runtime.start();
+      await waitFor(() => runtime.store.getState().me !== null);
+    } finally {
+      await runtime.stop();
+      fake.stop();
+    }
+    expect(readFileSync(logPath(), "utf8")).toContain('"event":"ready.shape"');
+  } finally {
+    if (previous === undefined) delete process.env.DISCORD_TUI_DEBUG;
+    else process.env.DISCORD_TUI_DEBUG = previous;
   }
 });
 

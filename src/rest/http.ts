@@ -15,7 +15,10 @@ export interface HttpDeps {
   token?: Secret;
   baseUrl?: string;
   fetch?: typeof fetch;
+  timeoutMs?: number;
 }
+
+const DEFAULT_TIMEOUT_MS = 30_000;
 
 function routeTemplate(path: string): string {
   return path.split("?")[0]!.replace(SNOWFLAKE_SEGMENT, "/:id");
@@ -52,6 +55,7 @@ export function createHttp(deps: HttpDeps): Http {
           method,
           headers,
           body: body === undefined ? undefined : JSON.stringify(body),
+          signal: AbortSignal.timeout(deps.timeoutMs ?? DEFAULT_TIMEOUT_MS),
         });
       } catch (error) {
         const fields: LogFields = { method, route };
@@ -80,10 +84,25 @@ export function createHttp(deps: HttpDeps): Http {
 
         if (captcha) throw new CaptchaRequiredError(route);
         if (response.status === 429) {
-          const retryAfter = typeof parsed?.retry_after === "number" ? parsed.retry_after : Number(response.headers.get("retry-after") ?? "1");
+          let retryAfter = 1;
+          if (typeof parsed?.retry_after === "number") {
+            retryAfter = parsed.retry_after;
+          } else {
+            const header = response.headers.get("retry-after");
+            if (header !== null) {
+              const parsedHeader = Number(header);
+              if (Number.isFinite(parsedHeader)) retryAfter = parsedHeader;
+            }
+          }
+          retryAfter = Math.max(0, retryAfter);
+
           const scope =
             typeof parsed?.scope === "string" ? parsed.scope : response.headers.get("x-ratelimit-scope");
-          throw new RateLimitedError(route, Math.max(0, retryAfter) * 1000, parsed?.global === true, scope ?? null);
+          const global =
+            parsed?.global === true ||
+            response.headers.get("x-ratelimit-global") === "true" ||
+            scope === "global";
+          throw new RateLimitedError(route, retryAfter * 1000, global, scope ?? null);
         }
         if (response.status === 401) throw new UnauthorizedError(route, code);
         throw new HttpError(response.status, route, code);

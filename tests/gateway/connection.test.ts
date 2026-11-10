@@ -140,6 +140,41 @@ test("never logs the identify payload", async () => {
   expect(logFile).not.toContain(fakeToken());
 });
 
+test("does not log every dispatch unless DISCORD_TUI_DEBUG is set", async () => {
+  const fake = startFakeGateway({ onIdentify: () => fake.dispatch("READY", ready.d) });
+  const gw = gatewayFor(fake);
+  gw.connect();
+  try {
+    await waitFor(() => gw.status === "ready");
+    fake.dispatch("MESSAGE_CREATE", { id: "1" });
+    await waitFor(() => gw.seq === 2);
+  } finally {
+    gw.close();
+    fake.stop();
+  }
+  expect(readFileSync(logPath(), "utf8")).not.toContain('"event":"gateway.dispatch"');
+});
+
+test("logs dispatch when DISCORD_TUI_DEBUG is enabled", async () => {
+  const previous = process.env.DISCORD_TUI_DEBUG;
+  process.env.DISCORD_TUI_DEBUG = "1";
+  try {
+    const fake = startFakeGateway({ onIdentify: () => fake.dispatch("READY", ready.d) });
+    const gw = gatewayFor(fake);
+    gw.connect();
+    try {
+      await waitFor(() => gw.status === "ready");
+    } finally {
+      gw.close();
+      fake.stop();
+    }
+    expect(readFileSync(logPath(), "utf8")).toContain('"event":"gateway.dispatch"');
+  } finally {
+    if (previous === undefined) delete process.env.DISCORD_TUI_DEBUG;
+    else process.env.DISCORD_TUI_DEBUG = previous;
+  }
+});
+
 test("send throttles to 110 payloads per 60 s", () => {
   class StubWebSocket {
     static instances: StubWebSocket[] = [];
@@ -184,4 +219,52 @@ test("send throttles to 110 payloads per 60 s", () => {
   expect(timers).toHaveLength(1);
   timers[0]!();
   expect(sentOps()).toBe(110);
+});
+
+test("throttled payloads are not sent on a new socket", () => {
+  class StubWebSocket {
+    static instances: StubWebSocket[] = [];
+    sent: string[] = [];
+    onmessage: ((event: { data: unknown }) => void) | null = null;
+    onclose: ((event: { code: number }) => void) | null = null;
+    onerror: (() => void) | null = null;
+
+    constructor(public url: string) {
+      StubWebSocket.instances.push(this);
+    }
+
+    send(data: string): void {
+      this.sent.push(data);
+    }
+
+    close(): void {
+      // noop
+    }
+  }
+
+  const timers: Array<() => void> = [];
+  const gw = createGateway({
+    token: new Secret(fakeToken()),
+    props: createClientProps({ buildNumber: 1 }),
+    WebSocketImpl: StubWebSocket as unknown as typeof WebSocket,
+    setTimer: ((fn: () => void) => {
+      timers.push(fn);
+      return 0;
+    }) as unknown as typeof setTimeout,
+  });
+
+  gw.connect();
+  const first = StubWebSocket.instances[0]!;
+  first.onmessage!({ data: JSON.stringify({ op: 10, d: { heartbeat_interval: 60_000 } }) });
+
+  for (let index = 0; index < 109; index += 1) gw.send(3, { index });
+  gw.send(3, { last: true });
+  expect(timers).toHaveLength(1);
+
+  gw.close();
+  gw.connect();
+  const second = StubWebSocket.instances[1]!;
+
+  timers[0]!();
+  expect(second.sent.map((raw) => JSON.parse(raw).op)).not.toContain(3);
 });

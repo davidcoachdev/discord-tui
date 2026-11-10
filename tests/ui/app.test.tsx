@@ -96,6 +96,42 @@ test("gm calls toggleMembers", async () => {
   expect(calls).toBe(1);
 });
 
+test("l in messages focus starts composing", async () => {
+  const { store, actions } = setup();
+  store.dispatch({ type: "ui/selectGuild", id: "guild1" });
+  store.dispatch({
+    type: "gw",
+    t: "READY",
+    d: {
+      user: { id: "me1", username: "me" },
+      guilds: [
+        {
+          id: "guild1",
+          name: "Test",
+          owner_id: "me1",
+          roles: [],
+          emojis: [],
+          channels: [{ id: "ch1", type: 0, name: "general", position: 0, permission_overwrites: [] }],
+        },
+      ],
+      private_channels: [],
+      users: [],
+    },
+  });
+  store.dispatch({ type: "ui/selectChannel", id: "ch1" });
+  store.dispatch({ type: "ui/focus", focus: "messages" });
+
+  const { mockInput, renderOnce, captureCharFrame } = await testRender(
+    () => <App store={store} actions={actions} onQuit={() => {}} />,
+    { width: 100, height: 30 },
+  );
+  await renderOnce();
+  expect(captureCharFrame()).toContain("NORMAL");
+  mockInput.pressKey("l");
+  await renderOnce();
+  expect(captureCharFrame()).toContain("INSERT");
+});
+
 test("click on a channel opens it", async () => {
   const { store, actions } = setup();
   let opened: string | null = null as string | null;

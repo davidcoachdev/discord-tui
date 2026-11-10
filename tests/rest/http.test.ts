@@ -8,7 +8,7 @@ process.env.XDG_CONFIG_HOME = mkdtempSync(join(tmpdir(), "discord-tui-http-confi
 
 const { logPath } = await import("../../src/config/paths");
 const { createClientProps } = await import("../../src/client-props/props");
-const { CaptchaRequiredError, InvalidResponseError, RateLimitedError, UnauthorizedError } = await import("../../src/rest/errors");
+const { CaptchaRequiredError, InvalidResponseError, NetworkError, RateLimitedError, UnauthorizedError } = await import("../../src/rest/errors");
 const { createHttp } = await import("../../src/rest/http");
 const { findTokenLike } = await import("../../src/security/token-pattern");
 const { Secret } = await import("../../src/secret");
@@ -134,6 +134,89 @@ test("429 throws RateLimitedError with retry_after, global and scope", async () 
     expect(error.retryAfterMs).toBeCloseTo(50, 0);
     expect(error.global).toBe(false);
     expect(error.scope).toBe("user");
+  } finally {
+    fake.stop();
+  }
+});
+
+test("a hung request times out and throws NetworkError", async () => {
+  const fake = startFakeHttp(() => new Promise<Response>(() => {}));
+  try {
+    const http = createHttp({
+      props: createClientProps({ buildNumber: 1 }),
+      baseUrl: fake.url,
+      timeoutMs: 40,
+    });
+    await expect(http.request("GET", "/users/@me")).rejects.toBeInstanceOf(NetworkError);
+  } finally {
+    fake.stop();
+  }
+});
+
+test("429 with only x-ratelimit-global header is treated as global", async () => {
+  const fake = startFakeHttp(() =>
+    new Response(null, {
+      status: 429,
+      headers: { "retry-after": "0.05", "x-ratelimit-global": "true", "x-ratelimit-scope": "user" },
+    }),
+  );
+  try {
+    const http = createHttp({ props: createClientProps({ buildNumber: 1 }), baseUrl: fake.url });
+    const error = (await http
+      .request("GET", "/channels/1/messages")
+      .catch((caught) => caught)) as InstanceType<typeof RateLimitedError>;
+    expect(error).toBeInstanceOf(RateLimitedError);
+    expect(error.global).toBe(true);
+    expect(error.scope).toBe("user");
+    expect(error.retryAfterMs).toBeCloseTo(50, 0);
+  } finally {
+    fake.stop();
+  }
+});
+
+test("429 with scope global in the body is treated as global", async () => {
+  const fake = startFakeHttp(() => Response.json({ retry_after: 0.1, scope: "global" }, { status: 429 }));
+  try {
+    const http = createHttp({ props: createClientProps({ buildNumber: 1 }), baseUrl: fake.url });
+    const error = (await http
+      .request("GET", "/channels/1/messages")
+      .catch((caught) => caught)) as InstanceType<typeof RateLimitedError>;
+    expect(error).toBeInstanceOf(RateLimitedError);
+    expect(error.global).toBe(true);
+  } finally {
+    fake.stop();
+  }
+});
+
+test("a custom fetch that aborts on signal maps the abort to NetworkError", async () => {
+  const http = createHttp({
+    props: createClientProps({ buildNumber: 1 }),
+    baseUrl: "https://discord.com",
+    timeoutMs: 20,
+    fetch: (async (_input, init) => {
+      await new Promise<void>((_resolve, reject) => {
+        const signal = init?.signal;
+        if (signal?.aborted) {
+          reject(signal.reason ?? new Error("aborted"));
+          return;
+        }
+        signal?.addEventListener("abort", () => reject(signal.reason ?? new Error("aborted")), { once: true });
+      });
+      return Response.json({});
+    }) as typeof fetch,
+  });
+  await expect(http.request("GET", "/users/@me")).rejects.toBeInstanceOf(NetworkError);
+});
+
+test("429 without a numeric retry-after falls back to 1 second", async () => {
+  const fake = startFakeHttp(() => new Response(null, { status: 429, headers: { "retry-after": "not-a-number" } }));
+  try {
+    const http = createHttp({ props: createClientProps({ buildNumber: 1 }), baseUrl: fake.url });
+    const error = (await http
+      .request("GET", "/channels/1/messages")
+      .catch((caught) => caught)) as InstanceType<typeof RateLimitedError>;
+    expect(error).toBeInstanceOf(RateLimitedError);
+    expect(error.retryAfterMs).toBe(1000);
   } finally {
     fake.stop();
   }

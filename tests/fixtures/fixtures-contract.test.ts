@@ -19,6 +19,7 @@ const REQUIRED = [
   "browser/ack.json",
   "browser/messages-page.json",
   "gateway/READY-1.json",
+  "gateway/READY-versioned-1.json",
   "gateway/MESSAGE_CREATE-1.json",
   "gateway/GUILD_MEMBER_LIST_UPDATE-1.json",
   "gateway/VOICE_STATE_UPDATE-1.json",

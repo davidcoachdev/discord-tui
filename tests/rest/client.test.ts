@@ -151,3 +151,71 @@ test("getMessages builds the paged history request", async () => {
   await getMessages(rest, "123456789012345678", { before: "223456789012345678" });
   expect(seen).toBe("GET /channels/123456789012345678/messages?limit=50&before=223456789012345678");
 });
+
+test("route queue entry is removed after the route drains", async () => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const http: Http = {
+    request: async <T>(): Promise<T> => {
+      await gate;
+      return {} as T;
+    },
+  };
+
+  const rest = createRestClient({ http, onUnauthorized: () => {} });
+  const pending = rest.request("GET", "/a");
+  expect(rest.queueCount).toBe(1);
+
+  release();
+  await pending;
+  await Bun.sleep(0);
+  expect(rest.queueCount).toBe(0);
+});
+
+test("parallel same-route requests share one queue entry", async () => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const http: Http = {
+    request: async <T>(): Promise<T> => {
+      await gate;
+      return {} as T;
+    },
+  };
+
+  const rest = createRestClient({ http, onUnauthorized: () => {} });
+  const a = rest.request("GET", "/a");
+  const b = rest.request("GET", "/a");
+  expect(rest.queueCount).toBe(1);
+
+  release();
+  await Promise.all([a, b]);
+  await Bun.sleep(0);
+  expect(rest.queueCount).toBe(0);
+});
+
+test("different routes get their own queue entries and both drain", async () => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const http: Http = {
+    request: async <T>(): Promise<T> => {
+      await gate;
+      return {} as T;
+    },
+  };
+
+  const rest = createRestClient({ http, onUnauthorized: () => {} });
+  const a = rest.request("GET", "/a");
+  const b = rest.request("GET", "/b");
+  expect(rest.queueCount).toBe(2);
+
+  release();
+  await Promise.all([a, b]);
+  await Bun.sleep(0);
+  expect(rest.queueCount).toBe(0);
+});

@@ -33,6 +33,24 @@ describe("settings", () => {
     });
   });
 
+  test("userVolumes keeps a 0 (muted) volume and clamps negatives to 0", async () => {
+    await withTempDir(async (dir) => {
+      const path = join(dir, "settings.json");
+      await writeFile(path, JSON.stringify({ userVolumes: { "1": 0, "2": 50, "3": -5 } }));
+      const settings = await loadSettings({ path });
+      expect(settings.userVolumes).toEqual({ "1": 0, "2": 50, "3": 0 });
+    });
+  });
+
+  test("a 0 user volume survives save/load", async () => {
+    await withTempDir(async (dir) => {
+      const path = join(dir, "settings.json");
+      const settings = { ...DEFAULT_SETTINGS, userVolumes: { "1": 0, "2": 100 } };
+      await saveSettings(settings, { path });
+      expect((await loadSettings({ path })).userVolumes).toEqual({ "1": 0, "2": 100 });
+    });
+  });
+
   test("Go Live settings: defaults to ask + 720p30, keeps valid values, drops invalid ones", () => {
     expect(normalizeSettings({})).toMatchObject({ streamMonitor: null, streamQuality: "720p30" });
     expect(normalizeSettings({}).animateImages).toBe(true);
@@ -99,6 +117,36 @@ describe("settings persistence in the store", () => {
       store.dispatch({ type: "settings/set", patch: { theme: "light" } });
       store.dispatch({ type: "settings/set", patch: { idleAfterMinutes: null } });
       await Bun.sleep(80);
+      const saved = await loadSettings({ path });
+      expect(saved.theme).toBe("light");
+      expect(saved.idleAfterMinutes).toBeNull();
+    });
+  });
+
+  test("detaching flushes a pending save before the debounce fires", async () => {
+    const { createStore, emptyState } = await import("../../src/store/store");
+    const { attachSettingsPersistence } = await import("../../src/settings/persist");
+    await withTempDir(async (dir) => {
+      const path = join(dir, "settings.json");
+      const store = createStore(emptyState());
+      const detach = attachSettingsPersistence(store, { path, debounceMs: 1000 });
+      store.dispatch({ type: "settings/set", patch: { theme: "light" } });
+      await detach();
+      const saved = await loadSettings({ path });
+      expect(saved.theme).toBe("light");
+    });
+  });
+
+  test("detach flush saves the latest of several rapid changes", async () => {
+    const { createStore, emptyState } = await import("../../src/store/store");
+    const { attachSettingsPersistence } = await import("../../src/settings/persist");
+    await withTempDir(async (dir) => {
+      const path = join(dir, "settings.json");
+      const store = createStore(emptyState());
+      const detach = attachSettingsPersistence(store, { path, debounceMs: 1000 });
+      store.dispatch({ type: "settings/set", patch: { theme: "light" } });
+      store.dispatch({ type: "settings/set", patch: { idleAfterMinutes: null } });
+      await detach();
       const saved = await loadSettings({ path });
       expect(saved.theme).toBe("light");
       expect(saved.idleAfterMinutes).toBeNull();

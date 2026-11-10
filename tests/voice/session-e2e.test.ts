@@ -10,6 +10,7 @@ process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
 const GUILD = "100000000000000001";
 const CHANNEL = "100000000000000003";
+const CHANNEL_2 = "100000000000000004";
 const ME = "100000000000000010";
 
 function fakeMainGateway(server: FakeVoiceServer, opts: { serverUpdateDelayMs?: number; silent?: boolean } = {}) {
@@ -96,6 +97,17 @@ test("@discordjs/voice in Bun: join through our adapter, send opus, receive opus
   await session.leave();
   expect(gateway.sent.at(-1)).toEqual({ op: 4, d: { guild_id: GUILD, channel_id: null, self_mute: false, self_deaf: false } });
   expect(statuses.at(-1)).toBe("idle");
+}, 15_000);
+
+test("joining another channel tears down the old connection and joins the new one", async () => {
+  server = await startFakeVoiceServer();
+  const gateway = fakeMainGateway(server);
+  session = createDjsVoiceSession({ adapterCreator: createVoiceAdapterCreator({ gateway, meId: () => ME }), meId: () => ME });
+  await session.join(GUILD, CHANNEL, { selfMute: false, selfDeaf: false });
+  await session.join(GUILD, CHANNEL_2, { selfMute: false, selfDeaf: false });
+  const joins = gateway.sent.filter((p) => p.op === 4 && p.d.channel_id !== null);
+  expect(joins.map((p) => p.d.channel_id)).toEqual([CHANNEL, CHANNEL_2]);
+  expect(gateway.sent.some((p) => p.op === 4 && p.d.channel_id === null)).toBe(true);
 }, 15_000);
 
 test("mute/deaf changes go out as a new op 4", async () => {

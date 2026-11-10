@@ -1,4 +1,5 @@
 import { spawnClean } from "../proc/spawn";
+import { log } from "../log/logger";
 import { isChannelMuted } from "../store/selectors";
 import type { AppState, Message } from "../store/types";
 
@@ -17,7 +18,10 @@ export function shouldNotify(state: AppState, message: Message, viewingChannelId
 export function notificationTitle(state: AppState, message: Message): string {
   const author = state.users[message.authorId]?.globalName ?? state.users[message.authorId]?.username ?? message.authorId;
   const channel = state.channels[message.channelId];
-  if (channel?.guildId === null) return `${author} (DM)`;
+  if (channel?.guildId === null) {
+    if (channel.type === 3) return `${author} (${channel.name ?? message.channelId})`;
+    return `${author} (DM)`;
+  }
   const channelName = channel?.name ?? message.channelId;
   const guildName = channel?.guildId ? state.guilds[channel.guildId]?.name : null;
   return guildName ? `${author} en #${channelName} (${guildName})` : `${author} en #${channelName}`;
@@ -25,5 +29,11 @@ export function notificationTitle(state: AppState, message: Message): string {
 
 export function notify(title: string, body: string, deps?: { spawn?: typeof spawnClean }): void {
   const spawn = deps?.spawn ?? spawnClean;
-  spawn(["notify-send", "-a", "zcord", title, body], { stdout: "ignore" });
+  try {
+    const child = spawn(["notify-send", "-a", "zcord", title, body], { stdout: "ignore" });
+    child.exited?.catch(() => {});
+  } catch (error) {
+    // Un fallo de la notificación no debe romper el dispatch del gateway que lo disparó.
+    log.warn("notify.failed", { error_name: error instanceof Error ? error.name : "unknown" });
+  }
 }

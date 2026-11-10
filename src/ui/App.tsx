@@ -1058,7 +1058,7 @@ export function App(props: {
           return;
         case "escape":
           if (watching()) return void props.actions.voice?.stopWatching?.();
-          toBottom();
+          if (focused === "messages") toBottom();
           setHint(null);
           return;
         case "w":
@@ -1094,6 +1094,10 @@ export function App(props: {
         case "right":
           if (focused === "channels") openSelected();
           else if (focused === "guilds") focusChannels();
+          else if (focused === "messages") {
+            if (!isTextChannel()) flash("abrí un canal de texto para escribir");
+            else setInsert(true);
+          }
           return;
         case "return":
           openSelected();

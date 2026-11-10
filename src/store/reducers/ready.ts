@@ -15,6 +15,18 @@ function asList(value: unknown, idKey: string): any[] {
   return [];
 }
 
+/**
+ * Desenvuelve una `versioned structure` (`{ entries, partial, version }`) que Discord manda cuando las
+ * capabilities `VERSIONED_READ_STATES`/`VERSIONED_USER_GUILD_SETTINGS` están prendidas. Cae a `asList`
+ * para los mapas viejos (`{ id: {...} }`) y devuelve los arrays tal cual.
+ */
+export function entriesOf(value: unknown, idKey = "id"): any[] {
+  if (Array.isArray(value)) return value;
+  const record = value as { entries?: unknown } | null;
+  if (record !== null && typeof record === "object" && Array.isArray(record.entries)) return record.entries;
+  return asList(value, idKey);
+}
+
 /** `discriminator` solo cuando es del sistema viejo de nombres (no "0"). */
 export function legacyDiscriminator(raw: any): { discriminator?: string } {
   const disc = raw?.discriminator;
@@ -160,6 +172,30 @@ export function applyReady(state: AppState, d: any): AppState {
     }
   }
 
+  // Con DEDUPE_USER_OBJECTS (1<<4) los miembros llegan colapsados en `merged_members[i]` por guild y
+  // `guild.members` no viene; con PRIORITIZED_READY_PAYLOAD (1<<5) trae solo tu propio member. Se mezcla
+  // encima de lo que ya haya en `guild.members`.
+  const mergedMembers: any[] = Array.isArray(d.merged_members) ? d.merged_members : [];
+  if (mergedMembers.length > 0) {
+    asList(d.guilds, "id").forEach((rawGuild, index) => {
+      const list = mergedMembers[index];
+      if (typeof rawGuild?.id !== "string" || !Array.isArray(list)) return;
+      const byUser = { ...(members[rawGuild.id] ?? {}) };
+      for (const raw of list) {
+        if (typeof raw?.user_id !== "string") continue;
+        byUser[raw.user_id] = {
+          userId: raw.user_id,
+          guildId: rawGuild.id,
+          roles: Array.isArray(raw.roles) ? raw.roles : byUser[raw.user_id]?.roles ?? [],
+          nick: raw.nick ?? byUser[raw.user_id]?.nick ?? null,
+          ...memberAvatar(raw, byUser[raw.user_id]?.avatar),
+        };
+        if (raw.user) rememberUser(raw.user);
+      }
+      members[rawGuild.id] = byUser;
+    });
+  }
+
   const privateChannelIds: string[] = [];
   for (const rawChannel of asList(d.private_channels, "id")) {
     for (const recipient of asList(rawChannel.recipients, "id")) rememberUser(recipient);
@@ -168,7 +204,7 @@ export function applyReady(state: AppState, d: any): AppState {
   }
 
   const readState = { ...state.readState };
-  for (const raw of asList(d.read_state, "id")) {
+  for (const raw of entriesOf(d.read_state, "id")) {
     readState[raw.id] = {
       lastAckedId: raw.last_message_id ?? null,
       mentionCount: typeof raw.mention_count === "number" ? raw.mention_count : 0,
@@ -177,11 +213,11 @@ export function applyReady(state: AppState, d: any): AppState {
 
   const mutedGuilds = [...state.guildSettings.mutedGuilds];
   const mutedChannels = [...state.guildSettings.mutedChannels];
-  for (const raw of asList(d.user_guild_settings, "guild_id")) {
+  for (const raw of entriesOf(d.user_guild_settings, "guild_id")) {
     if (raw.muted === true && typeof raw.guild_id === "string" && !mutedGuilds.includes(raw.guild_id)) {
       mutedGuilds.push(raw.guild_id);
     }
-    for (const override of asList(raw.channel_overrides, "channel_id")) {
+    for (const override of entriesOf(raw.channel_overrides, "channel_id")) {
       if (override.muted === true && typeof override.channel_id === "string" && !mutedChannels.includes(override.channel_id)) {
         mutedChannels.push(override.channel_id);
       }

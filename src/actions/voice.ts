@@ -292,6 +292,9 @@ export function createVoiceActions(deps: {
 
   // Si Discord nos saca del canal (entraste desde otro dispositivo, kick) salimos también acá;
   // si un moderador nos mueve de canal, lo seguimos.
+  // Solo mientras estamos en una llamada y solo en ese guild: al salir, el VOICE_STATE_UPDATE con channel_id null
+  // llega después, y si se mirara igual parecería "me movieron" y volvería a entrar solo. Un estado propio en otro
+  // guild es entrar a voz desde otro dispositivo: Discord corta esta sesión (llega como channel_id null acá).
   let seenSelf = false;
   store.subscribe(() => {
     const state = store.getState();
@@ -301,15 +304,19 @@ export function createVoiceActions(deps: {
       seenSelf = false;
       return;
     }
-    const mine = v.states[v.guildId]?.[meId];
+    const guildId = v.guildId;
+    const mine = v.states[guildId]?.[meId];
     if (mine?.channelId === v.channelId) {
       seenSelf = true;
       return;
     }
     if (!seenSelf) return;
     seenSelf = false;
-    if (mine === undefined) void leaveVoice("te desconectaron del canal");
-    else store.dispatch({ type: "voice/moved", channelId: mine.channelId });
+    if (mine === undefined || typeof mine.channelId !== "string") void leaveVoice("te desconectaron del canal");
+    else {
+      const channelId = mine.channelId;
+      void serial(() => moveVoice(guildId, channelId));
+    }
   });
 
   async function leaveVoice(error?: string): Promise<void> {
@@ -340,6 +347,22 @@ export function createVoiceActions(deps: {
     const next = queue.then(job, job);
     queue = next.catch(() => {});
     return next;
+  }
+
+  /** Moderador te movió de canal: cortás lo viejo y entrás al canal nuevo (mismo guild u otro). */
+  async function moveVoice(guildId: string, channelId: string): Promise<void> {
+    await deps.watch?.stop();
+    await deps.stream?.stop();
+    await stopMedia();
+    await session.leave();
+    store.dispatch({ type: "voice/moved", guildId, channelId });
+    if (settings().inputMode === "push_to_talk") getPtt();
+    try {
+      await session.join(guildId, channelId, { selfMute: voice().selfMute, selfDeaf: voice().selfDeaf });
+    } catch (error) {
+      await stopMedia();
+      store.dispatch({ type: "voice/left", error: errorText(error) });
+    }
   }
 
   async function toggleVoiceNow(channelId: string): Promise<void> {

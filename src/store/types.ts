@@ -286,7 +286,7 @@ export type Action =
   | { type: "voice/joining"; guildId: string; channelId: string }
   | { type: "voice/status"; status: VoiceStatus; error?: string | null }
   | { type: "voice/left"; error?: string | null }
-  | { type: "voice/moved"; channelId: string }
+  | { type: "voice/moved"; guildId: string; channelId: string }
   | { type: "voice/flags"; selfMute: boolean; selfDeaf: boolean; muteBeforeDeaf: boolean }
   | { type: "voice/selfSpeaking"; on: boolean }
   | { type: "voice/speaking"; userId: string; on: boolean }

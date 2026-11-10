@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 
 import { createActions } from "../../src/actions";
+import { createSendActions } from "../../src/actions/send";
 import { createClientProps } from "../../src/client-props/props";
 import { createRestClient, type RestClient } from "../../src/rest/client";
 import { createHttp } from "../../src/rest/http";
@@ -142,4 +143,55 @@ test("failed item stays after other messages arrive", async () => {
   });
 
   expect(selectOutbox(store.getState(), CH)).toHaveLength(1);
+});
+
+test("retry reuses the uploaded attachments instead of uploading again", async () => {
+  let uploads = 0;
+  let attempts = 0;
+  const rest: RestClient = {
+    closed: false,
+    request: async <T>(): Promise<T> => {
+      attempts += 1;
+      if (attempts === 1) throw new Error("boom");
+      return { id: "100000000000000903", channel_id: CH, author: { id: "1" }, content: "x" } as T;
+    },
+  };
+  const store = createStore(emptyState());
+  const actions = createSendActions({
+    store,
+    rest,
+    upload: async (_channelId, files) => {
+      uploads += 1;
+      return files.map((file) => ({ id: "0", filename: file.filename, uploaded_filename: `slot_${file.filename}` }));
+    },
+  });
+
+  await actions.send(CH, "hola", { attachments: [{ filename: "a.png", mime: "image/png", bytes: new Uint8Array([1]) }] });
+  const nonce = selectOutbox(store.getState(), CH)[0]!.nonce;
+  await actions.retry(nonce);
+
+  expect(uploads).toBe(1);
+  expect(selectOutbox(store.getState(), CH)).toHaveLength(0);
+});
+
+test("different sends upload their own attachments", async () => {
+  let uploads = 0;
+  const rest: RestClient = {
+    closed: false,
+    request: async <T>(): Promise<T> => ({ id: "100000000000000904", channel_id: CH, author: { id: "1" }, content: "x" }) as T,
+  };
+  const store = createStore(emptyState());
+  const actions = createSendActions({
+    store,
+    rest,
+    upload: async (_channelId, files) => {
+      uploads += 1;
+      return files.map((file) => ({ id: "0", filename: file.filename, uploaded_filename: `slot_${file.filename}` }));
+    },
+  });
+
+  await actions.send(CH, "uno", { attachments: [{ filename: "a.png", mime: "image/png", bytes: new Uint8Array([1]) }] });
+  await actions.send(CH, "dos", { attachments: [{ filename: "b.png", mime: "image/png", bytes: new Uint8Array([2]) }] });
+
+  expect(uploads).toBe(2);
 });

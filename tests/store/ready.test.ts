@@ -105,3 +105,98 @@ test("guild data comes from properties when READY omits the root fields", () => 
   const state = reduceReady(payload.d);
   expect(selectGuildList(state)[0]?.name).toBe("Mi Server");
 });
+
+test("READY parses versioned read_state { entries, partial, version }", () => {
+  const payload = structuredClone(ready);
+  payload.d.read_state = {
+    entries: [{ id: "100000000000000002", last_message_id: "100000000000000021", mention_count: 5 }],
+    partial: false,
+    version: 3,
+  };
+
+  const state = reduceReady(payload.d);
+  expect(state.readState["100000000000000002"]).toEqual({
+    lastAckedId: "100000000000000021",
+    mentionCount: 5,
+  });
+  expect(state.readState).not.toHaveProperty("entries");
+  expect(state.readState).not.toHaveProperty("partial");
+  expect(state.readState).not.toHaveProperty("version");
+});
+
+test("READY parses versioned user_guild_settings with versioned channel_overrides", () => {
+  const payload = structuredClone(ready);
+  payload.d.user_guild_settings = {
+    entries: [
+      {
+        guild_id: "100000000000000001",
+        muted: true,
+        channel_overrides: {
+          entries: [{ channel_id: "100000000000000002", muted: true }],
+          partial: false,
+          version: 1,
+        },
+      },
+    ],
+    partial: false,
+    version: 1,
+  };
+
+  const state = reduceReady(payload.d);
+  expect(state.guildSettings.mutedGuilds).toContain("100000000000000001");
+  expect(state.guildSettings.mutedChannels).toContain("100000000000000002");
+});
+
+test("READY merges top-level merged_members for the own member", () => {
+  const payload = structuredClone(ready);
+  const guildId = payload.d.guilds[0].id;
+  payload.d.guilds[0].members = [];
+  payload.d.merged_members = [
+    [{ user_id: "100000000000000010", roles: ["100000000000000001"], nick: "yo", avatar: null }],
+  ];
+
+  const state = reduceReady(payload.d);
+  expect(state.members[guildId]!["100000000000000010"]).toMatchObject({
+    userId: "100000000000000010",
+    guildId,
+    roles: ["100000000000000001"],
+    nick: "yo",
+  });
+});
+
+test("merged_members augments members from guild.members instead of replacing them", () => {
+  const payload = structuredClone(ready);
+  const guildId = payload.d.guilds[0].id;
+  payload.d.merged_members = [
+    [{ user_id: "100000000000000010", roles: ["100000000000000009"], nick: "YoMod" }],
+  ];
+
+  const state = reduceReady(payload.d);
+  expect(state.members[guildId]!["100000000000000010"]).toMatchObject({
+    nick: "YoMod",
+    roles: ["100000000000000009"],
+  });
+  expect(state.members[guildId]!["100000000000000011"]).toBeDefined();
+});
+
+test("versioned read_state keeps every entry and defaults a missing mention_count", () => {
+  const payload = structuredClone(ready);
+  payload.d.read_state = {
+    entries: [
+      { id: "100000000000000002", last_message_id: "100000000000000021", mention_count: 2 },
+      { id: "100000000000000003", last_message_id: null },
+    ],
+    partial: true,
+    version: 7,
+  };
+
+  const state = reduceReady(payload.d);
+  expect(state.readState["100000000000000002"]).toEqual({
+    lastAckedId: "100000000000000021",
+    mentionCount: 2,
+  });
+  expect(state.readState["100000000000000003"]).toEqual({
+    lastAckedId: null,
+    mentionCount: 0,
+  });
+});

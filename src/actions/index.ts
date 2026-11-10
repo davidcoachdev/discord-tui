@@ -192,9 +192,9 @@ export function createActions(deps: ActionsDeps): Actions {
   });
   const typing = createTypingNotifier({ postTyping: (id) => postTyping(deps.rest, id), now: deps.now ?? Date.now });
   const ack = createAckScheduler({
-    postAck: async (channelId, messageId) => {
+    postAck: async (channelId, messageId, token) => {
       deps.store.dispatch({ type: "gw", t: "MESSAGE_ACK", d: { channel_id: channelId, message_id: messageId } });
-      await postAck(deps.rest, channelId, messageId);
+      return postAck(deps.rest, channelId, messageId, { token });
     },
   });
   const editActions = createEditActions({ rest: deps.rest, store: deps.store });
@@ -244,11 +244,19 @@ export function createActions(deps: ActionsDeps): Actions {
 
   return {
     selectGuild(id: string | "@dms"): void {
+      const wasSelected = deps.store.getState().ui.selectedGuildId !== null;
       deps.store.dispatch({ type: "ui/selectGuild", id });
       const first = selectChannelList(deps.store.getState(), id).find(
         (row) => row.kind === "text" || row.kind === "dm" || row.kind === "group_dm",
       );
-      if (first) void openChannel(first.id).catch(() => {});
+      if (!first) return;
+      // Solo la selección inicial abre el primer canal y pide su historial; los j/k
+      // siguientes solo cambian la selección (B6): sin GET por cada movimiento.
+      if (!wasSelected) {
+        void openChannel(first.id).catch(() => {});
+      } else {
+        deps.store.dispatch({ type: "ui/selectChannel", id: first.id });
+      }
     },
     openChannel,
     loadOlder,

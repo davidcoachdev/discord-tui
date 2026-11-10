@@ -3,6 +3,7 @@ import type { Http } from "./http";
 
 export interface RestClient {
   readonly closed: boolean;
+  readonly queueCount?: number;
   request<T>(method: string, path: string, body?: unknown): Promise<T>;
 }
 
@@ -78,19 +79,23 @@ export function createRestClient(deps: RestClientDeps): RestClient {
   function enqueue<T>(key: string, task: () => Promise<T>): Promise<T> {
     const previous = queues.get(key) ?? Promise.resolve();
     const next = previous.then(task, task);
-    queues.set(
-      key,
-      next.then(
-        () => undefined,
-        () => undefined,
-      ),
+    const tail = next.then(
+      () => undefined,
+      () => undefined,
     );
+    queues.set(key, tail);
+    void tail.then(() => {
+      if (queues.get(key) === tail) queues.delete(key);
+    });
     return next;
   }
 
   return {
     get closed(): boolean {
       return closed;
+    },
+    get queueCount(): number {
+      return queues.size;
     },
     request<T>(method: string, path: string, body?: unknown): Promise<T> {
       if (closed) return Promise.reject(new UnauthorizedError(path));

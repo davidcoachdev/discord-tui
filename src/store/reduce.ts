@@ -7,7 +7,7 @@ import {
   applyMessageUpdate,
   applyPage,
 } from "./reducers/messages";
-import { applyChannelUnreadUpdate, applyMessageAck } from "./reducers/read-state";
+import { applyChannelUnreadUpdate, applyMessageAck, applyMessageCreateReadState } from "./reducers/read-state";
 import { applyReaction } from "./reducers/reactions";
 import { applyPollVote } from "./reducers/polls";
 import { snapshotUnread } from "./unread";
@@ -46,6 +46,7 @@ export function reduce(state: AppState, action: Action): AppState {
           return applySupplementalMembers(applyReadyVoiceStates(applyReadySupplemental(state, action.d), action.d), action.d);
         case "MESSAGE_CREATE": {
           let next = applyMessageCreate(ensureDmForMessage(state, action.d), action.d);
+          next = applyMessageCreateReadState(next, action.d);
           if (typeof action.d?.author?.id === "string" && typeof action.d?.channel_id === "string") {
             next = clearTypingFor(next, action.d.channel_id, action.d.author.id);
           }
