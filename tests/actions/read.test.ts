@@ -157,6 +157,30 @@ test("selectGuild with a guild already selected switches without a GET", () => {
   expect(store.getState().ui.selectedChannelId).toBe(CHAN_B);
 });
 
+test("after moving between guilds, the channel you stop on loads its history (never stuck in 'cargando…')", () => {
+  const store = twoGuildStore();
+  const calls: string[] = [];
+  const timers: Array<() => void> = [];
+  const setTimer = ((fn: () => void) => (timers.push(fn), timers.length as unknown as ReturnType<typeof setTimeout>)) as unknown as typeof setTimeout;
+  const rest: RestClient = {
+    closed: false,
+    request: async <T>(method: string, path: string): Promise<T> => {
+      calls.push(`${method} ${path}`);
+      return [] as T;
+    },
+  };
+  const actions = createActions({ store, rest, gateway, setTimer });
+  actions.selectGuild(GUILD_A);
+  actions.selectGuild(GUILD_B);
+  actions.selectGuild(GUILD_A);
+  actions.selectGuild(GUILD_B);
+  expect(calls).toHaveLength(1);
+  // solo el último timer abre (los anteriores ven que la selección cambió)
+  for (const fire of timers) fire();
+  expect(calls).toHaveLength(2);
+  expect(calls[1]).toContain(`/channels/${CHAN_B}/messages`);
+});
+
 test("ack scheduler sends null first and reuses the token returned for the channel", async () => {
   let pending: (() => void) | null = null;
   const setTimer = ((fn: () => void, _ms: number) => {

@@ -72,6 +72,9 @@ function noticeText(action: string, error: unknown): string {
   return status !== null ? `no se pudo ${action}: ${status}` : `no se pudo ${action}`;
 }
 
+/** Cuánto esperar quieto en un servidor antes de abrir su primer canal (j/k rápidos no piden historial). */
+const GUILD_OPEN_DEBOUNCE_MS = 250;
+
 export function createActions(deps: ActionsDeps): Actions {
   function reportError(key: string, action: string, error: unknown): void {
     deps.store.dispatch({ type: "notice/push", key, level: "warn", text: noticeText(action, error) });
@@ -93,6 +96,8 @@ export function createActions(deps: ActionsDeps): Actions {
 
   const now = deps.now ?? Date.now;
   const setTimer = deps.setTimer ?? setTimeout;
+  let pendingGuildOpen: ReturnType<typeof setTimeout> | null = null;
+  let guildOpenSeq = 0;
   let lastMembersOp = -Infinity;
   let pendingMembers: string | null = null;
 
@@ -250,13 +255,23 @@ export function createActions(deps: ActionsDeps): Actions {
         (row) => row.kind === "text" || row.kind === "dm" || row.kind === "group_dm",
       );
       if (!first) return;
-      // Solo la selección inicial abre el primer canal y pide su historial; los j/k
-      // siguientes solo cambian la selección (B6): sin GET por cada movimiento.
+      // La selección inicial abre el primer canal al toque. Después, j/k entre servidores solo cambian la selección
+      // y el canal donde quedás se abre (con su historial) cuando dejás de moverte: sin un GET por cada paso (B6),
+      // pero nunca queda en "cargando…".
+      if (pendingGuildOpen !== null) clearTimeout(pendingGuildOpen);
+      pendingGuildOpen = null;
       if (!wasSelected) {
+        guildOpenSeq++;
         void openChannel(first.id).catch(() => {});
-      } else {
-        deps.store.dispatch({ type: "ui/selectChannel", id: first.id });
+        return;
       }
+      deps.store.dispatch({ type: "ui/selectChannel", id: first.id });
+      const seq = ++guildOpenSeq;
+      pendingGuildOpen = setTimer(() => {
+        if (seq !== guildOpenSeq) return; // hubo otro movimiento después
+        pendingGuildOpen = null;
+        if (deps.store.getState().ui.selectedChannelId === first.id) void openChannel(first.id).catch(() => {});
+      }, GUILD_OPEN_DEBOUNCE_MS);
     },
     openChannel,
     loadOlder,
